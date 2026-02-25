@@ -1,0 +1,16 @@
+// Prisma Schema - Sistema de Gestión Institucional
+// Configurado para PostgreSQL en Neon (serverless)
+// https://pris.ly/d/neon
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Para Neon: DIRECT_URL opcional desde 2024. Si usas pooler, una sola URL basta.
+  // directUrl = env("DIRECT_URL")
+}
+
+// Los modelos User, Role, Permission, Legajo, etc. se agregarán en el Paso 2

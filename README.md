@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sistema de Gestión Institucional
 
-## Getting Started
+Sistema de gestión institucional completo construido con Next.js 14+, TypeScript, PostgreSQL (Neon), Prisma y shadcn/ui.
 
-First, run the development server:
+## Stack Tecnológico
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Framework:** Next.js 16 (App Router)
+- **Lenguaje:** TypeScript
+- **Base de datos:** PostgreSQL en Neon (serverless)
+- **ORM:** Prisma
+- **Autenticación:** NextAuth.js v5 (por implementar)
+- **Estilos:** Tailwind CSS v4
+- **Componentes UI:** shadcn/ui
+- **Deploy:** Vercel
+
+## Requisitos Previos
+
+- Node.js 18+
+- Cuenta en [Neon](https://neon.tech) para la base de datos PostgreSQL
+- npm o pnpm
+
+## Configuración Inicial
+
+1. **Clonar y instalar dependencias:**
+
+   ```bash
+   npm install
+   ```
+
+2. **Configurar variables de entorno:**
+
+   - Copiar `.env.example` a `.env`
+   - Obtener connection string de PostgreSQL desde [Neon Console](https://console.neon.tech)
+   - Completar `DATABASE_URL` con tu connection string
+   - Generar `NEXTAUTH_SECRET`: `openssl rand -base64 32`
+
+3. **Ejecutar migraciones** (cuando el schema esté definido en el Paso 2):
+
+   ```bash
+   npm run db:migrate
+   ```
+
+## Scripts Disponibles
+
+| Script         | Descripción                          |
+|----------------|--------------------------------------|
+| `npm run dev`  | Servidor de desarrollo               |
+| `npm run build`| Build de producción                  |
+| `npm run start`| Iniciar en producción                |
+| `npm run lint` | Ejecutar ESLint                      |
+| `npm run db:generate` | Generar cliente Prisma        |
+| `npm run db:push`     | Sincronizar schema con DB (dev) |
+| `npm run db:migrate`  | Ejecutar migraciones            |
+
+## Estructura del Proyecto
+
+```
+src/
+├── app/           # App Router (rutas y layouts)
+├── components/    # Componentes React
+│   ├── ui/        # shadcn/ui
+│   ├── layout/    # Sidebar, Header, Breadcrumb
+│   ├── legajos/   # Módulo RRHH
+│   └── usuarios/  # Gestión de usuarios
+├── lib/           # Utilidades y configuración
+│   ├── prisma.ts  # Cliente Prisma singleton
+│   └── utils.ts   # Utilidades (cn, etc.)
+├── prisma/        # Schema y migraciones
+└── types/         # Tipos TypeScript
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Paleta de Colores
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Verdes pastel:** #A8D5B5, #C8E6C9, #E8F5E9
+- **Blancos:** #FFFFFF, #F9FAFB
+- **Acentos primarios:** #4CAF50, #388E3C
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Estado del Proyecto
 
-## Learn More
+- [x] **Paso 1:** Setup inicial (Next.js + Tailwind + shadcn + Prisma + Neon)
+- [ ] Paso 2: Schema de base de datos y migraciones
+- [ ] Paso 3: Sistema de autenticación (NextAuth + login)
+- [ ] Paso 4: Layout principal (Sidebar + Header)
+- [ ] Pasos posteriores...
 
-To learn more about Next.js, take a look at the following resources:
+## Licencia
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Privado - Uso institucional
