@@ -1,15 +1,14 @@
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/auth.config";
+
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
 
-  const isAuthPage = nextUrl.pathname.startsWith("/login");
-
-  if (isAuthPage) {
-    if (isLoggedIn) {
-      return Response.redirect(new URL("/dashboard", nextUrl));
-    }
+  if (nextUrl.pathname.startsWith("/login")) {
+    if (isLoggedIn) return Response.redirect(new URL("/dashboard", nextUrl));
     return;
   }
 
@@ -18,8 +17,6 @@ export default auth((req) => {
     loginUrl.searchParams.set("callbackUrl", nextUrl.pathname);
     return Response.redirect(loginUrl);
   }
-
-  return;
 });
 
 export const config = {
