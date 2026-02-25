@@ -1,6 +1,5 @@
 // Prisma Schema - Sistema de Gestión Institucional
 // Configurado para PostgreSQL en Neon (serverless)
-// https://pris.ly/d/neon
 
 generator client {
   provider = "prisma-client-js"
@@ -9,8 +8,138 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // Para Neon: DIRECT_URL opcional desde 2024. Si usas pooler, una sola URL basta.
-  // directUrl = env("DIRECT_URL")
 }
 
-// Los modelos User, Role, Permission, Legajo, etc. se agregarán en el Paso 2
+// === AUTENTICACIÓN Y ROLES ===
+
+model User {
+  id           String         @id @default(cuid())
+  nombre       String
+  apellido     String
+  email        String         @unique
+  passwordHash String
+  activo       Boolean        @default(true)
+  creadoEn     DateTime       @default(now())
+  roles        UserRole[]
+  permisos     UserPermission[]
+
+  @@map("users")
+}
+
+model Role {
+  id     String     @id @default(cuid())
+  nombre RoleNombre @unique
+  users  UserRole[]
+
+  @@map("roles")
+}
+
+enum RoleNombre {
+  ADMIN
+  SECRETARIA
+  TESORERO
+  RRHH
+  EMPLEADO
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role  Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Permission {
+  id     String   @id @default(cuid())
+  modulo String
+  accion Accion
+  users  UserPermission[]
+
+  @@unique([modulo, accion])
+  @@map("permissions")
+}
+
+enum Accion {
+  VER
+  CREAR
+  EDITAR
+  ELIMINAR
+}
+
+model UserPermission {
+  userId       String
+  permissionId String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@map("user_permissions")
+}
+
+// === RECURSOS HUMANOS - LEGAJOS ===
+
+model Legajo {
+  id            String              @id @default(cuid())
+  numeroLegajo  Int                 @unique
+  nombres       String
+  apellidos     String
+  dni           String              @unique
+  cuil          String?
+  fotoUrl       String?
+  calle         String
+  numero        Int
+  casa          String?
+  departamento  String?
+  piso          String?
+  localidad     String
+  codigoPostal  String
+  fechaAlta     DateTime
+  fechaBaja     DateTime?
+  motivoBaja    String?
+  celular       String?
+  deletedAt     DateTime?
+  contactos     ContactoAdicional[]
+
+  @@index([dni])
+  @@index([numeroLegajo])
+  @@index([deletedAt])
+  @@map("legajos")
+}
+
+model ContactoAdicional {
+  id          String           @id @default(cuid())
+  legajoId    String
+  legajo      Legajo           @relation(fields: [legajoId], references: [id], onDelete: Cascade)
+  nombres     String
+  apellidos   String
+  parentesco  Parentesco
+  calle       String?
+  numero      String?
+  casa        String?
+  departamento String?
+  piso        String?
+  telefonos   TelefonoContacto[]
+
+  @@map("contactos_adicionales")
+}
+
+enum Parentesco {
+  CONYUGE
+  HIJO
+  PADRE
+  MADRE
+  HERMANO
+  OTRO
+}
+
+model TelefonoContacto {
+  id        String            @id @default(cuid())
+  contactoId String
+  contacto  ContactoAdicional @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  numero    String
+
+  @@map("telefonos_contacto")
+}
