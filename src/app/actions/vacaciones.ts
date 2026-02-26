@@ -657,11 +657,10 @@ export async function darDeBajaSolicitud(
     const hastaStr = formatearFecha(solicitud.fechaHasta);
     const diasStr = String(solicitud.diasSolicitados);
 
-    let config: { diasDisponibles: number } | null = null;
     const resultado = await prisma.$transaction(async (tx) => {
       if (solicitud.estado === EstadoVacaciones.APROBADA) {
         // Devolver días al saldo del empleado
-        config = await tx.configuracionVacaciones.findUnique({
+        const config = await tx.configuracionVacaciones.findUnique({
           where: { legajoId: solicitud.legajoId },
         });
         if (config) {
@@ -678,7 +677,10 @@ export async function darDeBajaSolicitud(
           data: { estado: EstadoVacaciones.BAJA },
         });
 
-        return { diasDevolver: solicitud.diasSolicitados };
+        const nuevoSaldo = config
+          ? config.diasDisponibles + solicitud.diasSolicitados
+          : solicitud.diasSolicitados;
+        return { diasDevolver: solicitud.diasSolicitados, nuevoSaldo };
       }
 
       // PENDIENTE → BAJA
@@ -687,16 +689,14 @@ export async function darDeBajaSolicitud(
         data: { estado: EstadoVacaciones.BAJA },
       });
 
-      return { diasDevolver: undefined };
+      return { diasDevolver: undefined as number | undefined, nuevoSaldo: undefined as number | undefined };
     });
 
     // Notificaciones fuera de la transacción (tx.notificacion no está disponible)
     if (empleadoUsuario) {
       try {
-        if (solicitud.estado === EstadoVacaciones.APROBADA) {
-          const nuevoSaldo = config
-            ? config.diasDisponibles + solicitud.diasSolicitados
-            : solicitud.diasSolicitados;
+        if (solicitud.estado === EstadoVacaciones.APROBADA && resultado.nuevoSaldo != null) {
+          const nuevoSaldo = resultado.nuevoSaldo;
           await prisma.notificacion.create({
             data: {
               usuarioId: empleadoUsuario.id,
@@ -971,7 +971,11 @@ export async function getHistorialVacaciones(
     const anio = anioParsed.success ? anioParsed.data : undefined;
     const estadoFiltro = estadoParsed.success ? estadoParsed.data : "TODOS";
 
-    const whereClause: Parameters<typeof prisma.solicitudVacaciones.findMany>[0]["where"] = {
+    const whereClause: {
+      legajoId: string;
+      fechaDesde?: { gte: Date; lte: Date };
+      estado?: EstadoVacaciones;
+    } = {
       legajoId: legajoFinal,
     };
 

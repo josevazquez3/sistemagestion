@@ -113,7 +113,7 @@ export async function GET(request: Request) {
         anio
       );
       const filename = nombreArchivoHistorial(nombreEmpleado, anio, "xlsx");
-      return new NextResponse(buffer, {
+      return new NextResponse(new Uint8Array(buffer), {
         headers: {
           "Content-Type":
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -129,7 +129,7 @@ export async function GET(request: Request) {
       anio
     );
     const filename = nombreArchivoHistorialPDF(nombreEmpleado, anio);
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,

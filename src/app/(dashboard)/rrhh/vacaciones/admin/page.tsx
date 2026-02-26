@@ -252,8 +252,8 @@ export default function VacacionesAdminPage() {
     setAprobarLoading(s.id);
     try {
       const res = await aprobarSolicitudVacaciones(Number(s.id));
-      if (res.success && empleadoId) {
-        cargarConfigYSolicitudes(empleadoId);
+      if (res.success) {
+        if (empleadoId) cargarConfigYSolicitudes(empleadoId);
       } else {
         alert(res.error ?? "Error al aprobar");
       }

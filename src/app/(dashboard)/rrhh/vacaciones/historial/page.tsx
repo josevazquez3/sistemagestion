@@ -71,11 +71,12 @@ export default async function HistorialVacacionesPage({
     );
   }
 
+  const estadoFiltro = (estado ?? "TODOS") as "PENDIENTE" | "APROBADA" | "BAJA" | "TODOS";
   const [historialRes, aniosRes] = await Promise.all([
     getHistorialVacaciones({
       legajoId,
       anio,
-      estado: estado ?? "TODOS",
+      estado: estadoFiltro,
     }),
     getAniosConSolicitudes(legajoId),
   ]);
