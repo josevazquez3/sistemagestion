@@ -19,6 +19,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       apellido: true,
       email: true,
       activo: true,
+      legajoId: true,
+      legajo: { select: { id: true, numeroLegajo: true, apellidos: true, nombres: true } },
       roles: { include: { role: true } },
       permisos: { include: { permission: true } },
     },
@@ -34,6 +36,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     apellido: user.apellido,
     email: user.email,
     activo: user.activo,
+    legajoId: user.legajoId,
+    legajo: user.legajo
+      ? { id: user.legajo.id, numeroLegajo: user.legajo.numeroLegajo, label: `${user.legajo.apellidos}, ${user.legajo.nombres}` }
+      : null,
     roleIds: user.roles.map((r) => r.roleId),
     permissionIds: user.permisos.map((p) => p.permissionId),
   });
@@ -55,10 +61,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   try {
     const body = await req.json();
-    const { roleIds, permissionIds, activo } = body;
+    const { roleIds, permissionIds, activo, legajoId } = body;
 
-    if (typeof activo === "boolean") {
-      await prisma.user.update({ where: { id }, data: { activo } });
+    const updateData: { activo?: boolean; legajoId?: string | null } = {};
+    if (typeof activo === "boolean") updateData.activo = activo;
+    if (legajoId !== undefined) updateData.legajoId = legajoId === null || legajoId === "" ? null : legajoId;
+
+    if (Object.keys(updateData).length > 0) {
+      await prisma.user.update({ where: { id }, data: updateData });
     }
 
     if (Array.isArray(roleIds)) {

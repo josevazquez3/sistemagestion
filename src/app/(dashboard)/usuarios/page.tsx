@@ -23,18 +23,29 @@ import {
 } from "@/components/ui/dialog";
 import { UserPlus, Loader2 } from "lucide-react";
 
-type User = { id: string; nombre: string; email: string; roles: string[]; activo: boolean };
+type User = {
+  id: string;
+  nombre: string;
+  email: string;
+  roles: string[];
+  activo: boolean;
+  legajoId: string | null;
+  legajo: { id: string; numeroLegajo: number; label: string } | null;
+};
 type Role = { id: string; nombre: string };
+type Legajo = { id: string; numeroLegajo: number; nombres: string; apellidos: string };
 type PermissionsByModule = Record<string, { id: string; accion: string }[]>;
 
 export default function UsuariosPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [legajos, setLegajos] = useState<Legajo[]>([]);
   const [permissionsByModule, setPermissionsByModule] = useState<PermissionsByModule>({});
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editRoleIds, setEditRoleIds] = useState<string[]>([]);
   const [editPermissionIds, setEditPermissionIds] = useState<string[]>([]);
+  const [editLegajoId, setEditLegajoId] = useState<string | "">("");
   const [saving, setSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -71,20 +82,35 @@ export default function UsuariosPage() {
     }
   };
 
+  const fetchLegajos = async () => {
+    try {
+      const r = await fetch("/api/legajos?estado=activo&perPage=500");
+      if (!r.ok) throw new Error("Error");
+      const data = await r.json();
+      setLegajos(data.data ?? []);
+    } catch {
+      setLegajos([]);
+    }
+  };
+
   useEffect(() => {
-    Promise.all([fetchUsers(), fetchRolesAndPermissions()]).finally(() => setLoading(false));
+    Promise.all([fetchUsers(), fetchRolesAndPermissions(), fetchLegajos()]).finally(() =>
+      setLoading(false)
+    );
   }, []);
 
   const openEditSheet = async (user: User) => {
     setSelectedUser(user);
     setEditRoleIds([]);
     setEditPermissionIds([]);
+    setEditLegajoId("");
     try {
       const r = await fetch(`/api/usuarios/${user.id}`);
       if (!r.ok) throw new Error("Error");
       const data = await r.json();
       setEditRoleIds(data.roleIds ?? []);
       setEditPermissionIds(data.permissionIds ?? []);
+      setEditLegajoId(data.legajoId ?? "");
     } catch {
       // ignore
     }
@@ -109,7 +135,11 @@ export default function UsuariosPage() {
       const r = await fetch(`/api/usuarios/${selectedUser.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roleIds: editRoleIds, permissionIds: editPermissionIds }),
+        body: JSON.stringify({
+          roleIds: editRoleIds,
+          permissionIds: editPermissionIds,
+          legajoId: editLegajoId || null,
+        }),
       });
       if (!r.ok) throw new Error("Error");
       await fetchUsers();
@@ -216,6 +246,7 @@ export default function UsuariosPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roles</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Legajo vinculado</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
             </tr>
           </thead>
@@ -229,6 +260,17 @@ export default function UsuariosPage() {
                 <td className="px-6 py-4 text-sm font-medium text-gray-900">{user.nombre}</td>
                 <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
                 <td className="px-6 py-4 text-sm text-gray-600">{user.roles.join(", ") || "—"}</td>
+                <td className="px-6 py-4">
+                  {user.legajo ? (
+                    <span className="inline-flex rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800">
+                      {user.legajo.label}
+                    </span>
+                  ) : (
+                    <span className="inline-flex rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-800">
+                      Sin legajo
+                    </span>
+                  )}
+                </td>
                 <td className="px-6 py-4">
                   <span
                     className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -257,6 +299,21 @@ export default function UsuariosPage() {
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-6 py-6">
+            <div className="space-y-2">
+              <Label>Legajo vinculado (para vacaciones)</Label>
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={editLegajoId}
+                onChange={(e) => setEditLegajoId(e.target.value)}
+              >
+                <option value="">Sin legajo</option>
+                {legajos.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.apellidos}, {l.nombres} (Leg. {l.numeroLegajo})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-2">
               <Label>Roles</Label>
               <div className="flex flex-wrap gap-3">

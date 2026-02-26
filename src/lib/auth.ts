@@ -40,6 +40,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: user.id,
           email: user.email,
           name: `${user.nombre} ${user.apellido}`,
+          legajoId: user.legajoId ?? undefined,
           roles: user.roles.map((r) => r.role.nombre),
           permisos: user.permisos.map((p) => ({
             modulo: p.permission.modulo,
@@ -57,6 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.legajoId = (user as { legajoId?: string }).legajoId;
         token.roles = (user as { roles?: string[] }).roles ?? [];
         token.permisos = (user as { permisos?: { modulo: string; accion: string }[] }).permisos ?? [];
       }
@@ -65,6 +67,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         (session.user as { id?: string }).id = token.id as string;
+        (session.user as { legajoId?: string }).legajoId = token.legajoId as string | undefined;
         (session.user as { roles?: string[] }).roles = (token.roles as string[]) ?? [];
         (session.user as { permisos?: { modulo: string; accion: string }[] }).permisos =
           (token.permisos as { modulo: string; accion: string }[]) ?? [];

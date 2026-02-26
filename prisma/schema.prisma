@@ -13,15 +13,18 @@ datasource db {
 // === AUTENTICACIÓN Y ROLES ===
 
 model User {
-  id           String         @id @default(cuid())
-  nombre       String
-  apellido     String
-  email        String         @unique
-  passwordHash String
-  activo       Boolean        @default(true)
-  creadoEn     DateTime       @default(now())
-  roles        UserRole[]
-  permisos     UserPermission[]
+  id            String          @id @default(cuid())
+  nombre        String
+  apellido      String
+  email         String          @unique
+  passwordHash  String
+  activo        Boolean         @default(true)
+  creadoEn      DateTime        @default(now())
+  legajoId      String?         @unique
+  legajo        Legajo?         @relation(fields: [legajoId], references: [id])
+  roles         UserRole[]
+  permisos      UserPermission[]
+  notificaciones Notificacion[]
 
   @@map("users")
 }
@@ -82,26 +85,29 @@ model UserPermission {
 // === RECURSOS HUMANOS - LEGAJOS ===
 
 model Legajo {
-  id            String              @id @default(cuid())
-  numeroLegajo  Int                 @unique
-  nombres       String
-  apellidos     String
-  dni           String              @unique
-  cuil          String?
-  fotoUrl       String?
-  calle         String
-  numero        Int
-  casa          String?
-  departamento  String?
-  piso          String?
-  localidad     String
-  codigoPostal  String
-  fechaAlta     DateTime
-  fechaBaja     DateTime?
-  motivoBaja    String?
-  celular       String?
-  deletedAt     DateTime?
-  contactos     ContactoAdicional[]
+  id                     String                  @id @default(cuid())
+  users                  User[]
+  numeroLegajo           Int                     @unique
+  nombres                String
+  apellidos              String
+  dni                    String                  @unique
+  cuil                   String?
+  fotoUrl                String?
+  calle                  String
+  numero                 Int
+  casa                   String?
+  departamento           String?
+  piso                   String?
+  localidad              String
+  codigoPostal           String
+  fechaAlta              DateTime
+  fechaBaja              DateTime?
+  motivoBaja             String?
+  celular                String?
+  deletedAt              DateTime?
+  contactos              ContactoAdicional[]
+  configuracionVacaciones ConfiguracionVacaciones?
+  solicitudesVacaciones   SolicitudVacaciones[]
 
   @@index([dni])
   @@index([numeroLegajo])
@@ -142,4 +148,59 @@ model TelefonoContacto {
   numero    String
 
   @@map("telefonos_contacto")
+}
+
+// === MÓDULO DE VACACIONES ===
+
+enum EstadoVacaciones {
+  PENDIENTE
+  APROBADA
+  BAJA
+}
+
+model ConfiguracionVacaciones {
+  id                Int      @id @default(autoincrement())
+  legajoId          String   @unique
+  legajo            Legajo   @relation(fields: [legajoId], references: [id], onDelete: Cascade)
+  diasDisponibles   Int
+  secretarioGeneral String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model SolicitudVacaciones {
+  id              Int               @id @default(autoincrement())
+  legajoId        String
+  legajo          Legajo            @relation(fields: [legajoId], references: [id], onDelete: Cascade)
+  fechaDesde      DateTime
+  fechaHasta      DateTime
+  diasSolicitados Int
+  diasRestantes   Int
+  estado          EstadoVacaciones  @default(PENDIENTE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([legajoId, fechaDesde])
+}
+
+// === NOTIFICACIONES INTERNAS ===
+
+enum TipoNotificacion {
+  VACACIONES_APROBADA
+  VACACIONES_BAJA
+  VACACIONES_BAJA_APROBADA
+}
+
+model Notificacion {
+  id          Int               @id @default(autoincrement())
+  usuarioId   String
+  usuario     User              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo        TipoNotificacion
+  titulo      String
+  mensaje     String
+  leida       Boolean           @default(false)
+  solicitudId Int?
+  createdAt   DateTime         @default(now())
+
+  @@index([usuarioId, leida])
 }

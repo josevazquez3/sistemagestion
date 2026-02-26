@@ -18,6 +18,8 @@ export async function GET() {
       apellido: true,
       email: true,
       activo: true,
+      legajoId: true,
+      legajo: { select: { id: true, numeroLegajo: true, apellidos: true, nombres: true } },
       roles: { include: { role: true } },
     },
     orderBy: { creadoEn: "desc" },
@@ -30,6 +32,10 @@ export async function GET() {
       email: u.email,
       roles: u.roles.map((r) => r.role.nombre),
       activo: u.activo,
+      legajoId: u.legajoId,
+      legajo: u.legajo
+        ? { id: u.legajo.id, numeroLegajo: u.legajo.numeroLegajo, label: `${u.legajo.apellidos}, ${u.legajo.nombres}` }
+        : null,
     }))
   );
 }

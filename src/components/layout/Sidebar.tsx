@@ -9,6 +9,7 @@ import {
   Landmark,
   Scale,
   UserCog,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Session } from "next-auth";
@@ -16,6 +17,9 @@ import type { Session } from "next-auth";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/rrhh/legajos", label: "Legajos", icon: Users, parent: "rrhh" },
+  { href: "/rrhh/vacaciones", label: "Vacaciones", icon: Calendar, parent: "rrhh" },
+  { href: "/rrhh/vacaciones/historial", label: "Historial de Vacaciones", icon: FileText, parent: "rrhh" },
+  { href: "/rrhh/vacaciones/admin", label: "Vacaciones (Admin)", icon: Calendar, parent: "rrhh", adminOnly: true },
   { href: "/tesoreria", label: "Tesorería", icon: Landmark },
   { href: "/legales", label: "Legales", icon: Scale },
   { href: "/secretaria", label: "Secretaría", icon: FileText },
@@ -25,9 +29,10 @@ const navItems = [
 export function Sidebar({ user }: { user: Session["user"] }) {
   const pathname = usePathname();
   const isAdmin = (user as { roles?: string[] })?.roles?.includes("ADMIN") ?? false;
+  const isRrhh = (user as { roles?: string[] })?.roles?.includes("RRHH") ?? false;
 
   const items = navItems.filter((item) => {
-    if (item.adminOnly && !isAdmin) return false;
+    if (item.adminOnly && !isAdmin && !isRrhh) return false;
     return true;
   });
 

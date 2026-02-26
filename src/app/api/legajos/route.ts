@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get("q")?.trim() ?? "";
   const estado = searchParams.get("estado") ?? "activo"; // activo | baja
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
-  const perPage = 10;
+  const perPage = Math.min(500, Math.max(1, parseInt(searchParams.get("perPage") ?? "10")));
 
   const where: { fechaBaja?: null | { not: null }; OR?: object[] } =
     estado === "baja" ? { fechaBaja: { not: null } } : { fechaBaja: null };
