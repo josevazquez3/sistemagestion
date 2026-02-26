@@ -13,6 +13,14 @@ import {
   SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { UserPlus, Loader2 } from "lucide-react";
 
 type User = { id: string; nombre: string; email: string; roles: string[]; activo: boolean };
@@ -303,20 +311,20 @@ export default function UsuariosPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Sheet crear usuario */}
-      <Sheet
+      {/* Modal crear usuario - centro de la página */}
+      <Dialog
         open={showCreateForm}
         onOpenChange={(open) => {
           setShowCreateForm(open);
           if (!open) setCreateForm({ nombre: "", apellido: "", email: "", password: "", roleIds: [], permissionIds: [] });
         }}
       >
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Nuevo usuario</SheetTitle>
-            <SheetDescription>Completá los datos del usuario</SheetDescription>
-          </SheetHeader>
-          <div className="space-y-4 py-6">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Nuevo usuario</DialogTitle>
+            <DialogDescription>Completá los datos del usuario</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 overflow-y-auto flex-1 min-h-0">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="nombre">Nombre</Label>
@@ -391,17 +399,17 @@ export default function UsuariosPage() {
               ))}
             </div>
           </div>
-          <SheetFooter>
+          <DialogFooter className="pt-4 border-t">
             <Button
               onClick={createUser}
               disabled={creating}
-              className="w-full bg-[#4CAF50] hover:bg-[#388E3C] text-white"
+              className="w-full sm:w-auto bg-[#4CAF50] hover:bg-[#388E3C] text-white"
             >
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear usuario"}
             </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
