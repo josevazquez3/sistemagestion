@@ -36,6 +36,20 @@ async function main() {
   const adminRole = roles[0];
   const rrhhRole = roles[3];
 
+  // Crear permisos granulares por módulo (VER, CREAR, EDITAR, ELIMINAR)
+  const modulos = ["RRHH", "TESORERIA", "SECRETARIA", "LEGALES", "USUARIOS"];
+  const acciones = ["VER", "CREAR", "EDITAR", "ELIMINAR"] as const;
+  for (const modulo of modulos) {
+    for (const accion of acciones) {
+      await prisma.permission.upsert({
+        where: { modulo_accion: { modulo, accion: accion as "VER" | "CREAR" | "EDITAR" | "ELIMINAR" } },
+        update: {},
+        create: { modulo, accion },
+      });
+    }
+  }
+  console.log("✓ Permisos creados (5 módulos x 4 acciones)");
+
   // Crear usuario admin si no existe
   const existingAdmin = await prisma.user.findUnique({
     where: { email: "admin@sistema.com" },

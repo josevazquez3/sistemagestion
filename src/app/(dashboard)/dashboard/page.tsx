@@ -6,7 +6,7 @@ export default async function DashboardPage() {
   const session = await auth();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl">
       <div>
         <h1 className="text-2xl font-semibold text-gray-800">
           Bienvenido, {session?.user?.name?.split(" ")[0] ?? "Usuario"}
