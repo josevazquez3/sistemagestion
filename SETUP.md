@@ -54,9 +54,13 @@ Abrí [http://localhost:3000](http://localhost:3000) — serás redirigido al lo
 
 Configurá estas variables en **Project Settings → Environment Variables**:
 
-- `DATABASE_URL` — Connection string de Neon
-- `AUTH_SECRET` o `NEXTAUTH_SECRET` — Mismo valor que local
-- `NEXTAUTH_URL` — URL de producción (ej: https://tu-app.vercel.app)
+| Variable | Valor | Importante |
+|----------|-------|------------|
+| `DATABASE_URL` | Connection string de Neon | Obligatorio |
+| `AUTH_SECRET` | openssl rand -base64 32 | Obligatorio |
+| `NEXTAUTH_URL` | **https://tu-dominio.vercel.app** | Crítico: debe ser la URL real de producción |
+
+**Si NEXTAUTH_URL está mal o vacío** → ERR_TOO_MANY_REDIRECTS al abrir el sitio.
 
 **Importante:** Después del primer deploy, ejecutá las migraciones contra la base de datos de producción. Podés usar `npx prisma migrate deploy` desde tu máquina con `DATABASE_URL` apuntando a Neon.
 

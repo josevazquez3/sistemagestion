@@ -9,6 +9,7 @@ import bcrypt from "bcryptjs";
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "dev-secret-cambiar-en-produccion",
+  trustHost: true, // Necesario para Vercel y plataformas con proxy
   providers: [
     Credentials({
       name: "credentials",
