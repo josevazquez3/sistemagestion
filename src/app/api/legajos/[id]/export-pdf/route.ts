@@ -1,7 +1,39 @@
 import { NextResponse } from "next/server";
+import { readFileSync } from "fs";
+import path from "path";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { jsPDF } from "jspdf";
+
+/** Obtiene la imagen como data URL (base64) para jsPDF. Devuelve null si falla. */
+async function getFotoDataUrl(fotoUrl: string): Promise<{ data: string; format: "JPEG" | "PNG" } | null> {
+  try {
+    const ext = fotoUrl.split(".").pop()?.toLowerCase() ?? "jpg";
+    const format = ext === "png" ? "PNG" : "JPEG";
+
+    if (fotoUrl.startsWith("data:image/")) {
+      return { data: fotoUrl, format };
+    }
+
+    if (fotoUrl.startsWith("http://") || fotoUrl.startsWith("https://")) {
+      const res = await fetch(fotoUrl);
+      if (!res.ok) return null;
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const base64 = buffer.toString("base64");
+      const mime = format === "PNG" ? "image/png" : "image/jpeg";
+      return { data: `data:${mime};base64,${base64}`, format };
+    }
+
+    const rutaRelativa = fotoUrl.replace(/^\//, "");
+    const fotoPath = path.join(process.cwd(), "public", rutaRelativa);
+    const buffer = readFileSync(fotoPath);
+    const base64 = buffer.toString("base64");
+    const mime = format === "PNG" ? "image/png" : "image/jpeg";
+    return { data: `data:${mime};base64,${base64}`, format };
+  } catch {
+    return null;
+  }
+}
 
 const PARENTESCO_LABEL: Record<string, string> = {
   CONYUGE: "Cónyuge",
@@ -30,6 +62,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const margin = 20;
   let y = 20;
+
+  if (legajo.fotoUrl) {
+    const foto = await getFotoDataUrl(legajo.fotoUrl);
+    if (foto) {
+      try {
+        doc.addImage(foto.data, foto.format, 150, 15, 40, 40);
+      } catch {
+        // Si jsPDF no puede incrustar la imagen, seguir sin ella
+      }
+    }
+  }
 
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
