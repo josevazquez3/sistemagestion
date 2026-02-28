@@ -76,21 +76,21 @@ type Delegate = {
 };
 
 const PRISMA_DELEGATES: Record<string, Delegate> = {
-  roles: prisma.role as Delegate,
-  permissions: prisma.permission as Delegate,
-  legajos: prisma.legajo as Delegate,
-  users: prisma.user as Delegate,
-  user_roles: prisma.userRole as Delegate,
-  user_permissions: prisma.userPermission as Delegate,
-  contactos_adicionales: prisma.contactoAdicional as Delegate,
-  telefonos_contacto: prisma.telefonoContacto as Delegate,
-  configuracion_vacaciones: prisma.configuracionVacaciones as Delegate,
-  solicitud_vacaciones: prisma.solicitudVacaciones as Delegate,
-  licencias: prisma.licencia as Delegate,
-  observaciones_licencia: prisma.observacionLicencia as Delegate,
-  certificados: prisma.certificado as Delegate,
-  notificaciones: prisma.notificacion as Delegate,
-  auditoria_logs: prisma.auditoriaLog as Delegate,
+  roles: prisma.role as unknown as Delegate,
+  permissions: prisma.permission as unknown as Delegate,
+  legajos: prisma.legajo as unknown as Delegate,
+  users: prisma.user as unknown as Delegate,
+  user_roles: prisma.userRole as unknown as Delegate,
+  user_permissions: prisma.userPermission as unknown as Delegate,
+  contactos_adicionales: prisma.contactoAdicional as unknown as Delegate,
+  telefonos_contacto: prisma.telefonoContacto as unknown as Delegate,
+  configuracion_vacaciones: prisma.configuracionVacaciones as unknown as Delegate,
+  solicitud_vacaciones: prisma.solicitudVacaciones as unknown as Delegate,
+  licencias: prisma.licencia as unknown as Delegate,
+  observaciones_licencia: prisma.observacionLicencia as unknown as Delegate,
+  certificados: prisma.certificado as unknown as Delegate,
+  notificaciones: prisma.notificacion as unknown as Delegate,
+  auditoria_logs: prisma.auditoriaLog as unknown as Delegate,
 };
 
 /** Compatibilidad con backups antiguos que usaban "usuarios" en lugar de "users". */
