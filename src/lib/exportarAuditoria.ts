@@ -114,7 +114,7 @@ export async function exportarDOCX(
   const font = "Arial";
   const size = 22; // 11pt half-points
 
-  const children: (Paragraph | Table)[] = [
+  const children = [
     new Paragraph({
       children: [
         new TextRun({ text: opciones.nombreSistema, font, size: 28, bold: true }),
