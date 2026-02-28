@@ -70,25 +70,27 @@ const DELETE_ORDER = [
   "permissions",
 ] as const;
 
-const PRISMA_DELEGATES: Record<
-  string,
-  { deleteMany: () => Promise<unknown>; createMany: (args: { data: unknown[]; skipDuplicates?: boolean }) => Promise<unknown> }
-> = {
-  roles: prisma.role,
-  permissions: prisma.permission,
-  legajos: prisma.legajo,
-  users: prisma.user,
-  user_roles: prisma.userRole,
-  user_permissions: prisma.userPermission,
-  contactos_adicionales: prisma.contactoAdicional,
-  telefonos_contacto: prisma.telefonoContacto,
-  configuracion_vacaciones: prisma.configuracionVacaciones,
-  solicitud_vacaciones: prisma.solicitudVacaciones,
-  licencias: prisma.licencia,
-  observaciones_licencia: prisma.observacionLicencia,
-  certificados: prisma.certificado,
-  notificaciones: prisma.notificacion,
-  auditoria_logs: prisma.auditoriaLog,
+type Delegate = {
+  deleteMany: () => Promise<unknown>;
+  createMany: (args: { data: unknown[]; skipDuplicates?: boolean }) => Promise<unknown>;
+};
+
+const PRISMA_DELEGATES: Record<string, Delegate> = {
+  roles: prisma.role as Delegate,
+  permissions: prisma.permission as Delegate,
+  legajos: prisma.legajo as Delegate,
+  users: prisma.user as Delegate,
+  user_roles: prisma.userRole as Delegate,
+  user_permissions: prisma.userPermission as Delegate,
+  contactos_adicionales: prisma.contactoAdicional as Delegate,
+  telefonos_contacto: prisma.telefonoContacto as Delegate,
+  configuracion_vacaciones: prisma.configuracionVacaciones as Delegate,
+  solicitud_vacaciones: prisma.solicitudVacaciones as Delegate,
+  licencias: prisma.licencia as Delegate,
+  observaciones_licencia: prisma.observacionLicencia as Delegate,
+  certificados: prisma.certificado as Delegate,
+  notificaciones: prisma.notificacion as Delegate,
+  auditoria_logs: prisma.auditoriaLog as Delegate,
 };
 
 /** Compatibilidad con backups antiguos que usaban "usuarios" en lugar de "users". */
