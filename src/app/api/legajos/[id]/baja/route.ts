@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 function canManageLegajos(roles: string[]) {
   return roles.includes("ADMIN") || roles.includes("RRHH");
@@ -30,6 +31,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     where: { id },
     data: { fechaBaja: new Date(fechaBaja), motivoBaja: motivoBaja.trim() },
   });
+
+  const user = session?.user as { id?: string; name?: string; email?: string };
+  try {
+    await registrarAuditoria({
+      userId: user?.id ?? "",
+      userNombre: user?.name ?? "",
+      userEmail: user?.email ?? "",
+      accion: "Eliminó un legajo",
+      modulo: "Legajos",
+      detalle: `Legajo N°${legajo.numeroLegajo} - ${legajo.apellidos} ${legajo.nombres}`,
+    });
+  } catch {}
 
   return NextResponse.json({ ok: true });
 }

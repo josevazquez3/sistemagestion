@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { EstadoVacaciones } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileText, Building2, CalendarDays } from "lucide-react";
+import { DashboardLicenciasWidget } from "@/components/licencias/DashboardLicenciasWidget";
 
 const ROLES_ADMIN = ["ADMIN", "RRHH"] as const;
 
@@ -58,7 +59,9 @@ export default async function DashboardPage() {
             <CardDescription>Gestión de empleados y legajos</CardDescription>
           </CardContent>
         </Card>
-        {/* Tarjeta Vacaciones - insertada aquí */}
+        {/* Tarjeta Licencias - empleados con licencia activa */}
+        {esAdmin && <DashboardLicenciasWidget />}
+        {/* Tarjeta Vacaciones */}
         <Link href={totalPendientes > 0 ? "/rrhh/vacaciones/admin" : "/rrhh/vacaciones"}>
           <Card
             className={

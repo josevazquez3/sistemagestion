@@ -55,10 +55,11 @@ function maskCUIL(value: string) {
   return `${v.slice(0, 2)}-${v.slice(2, 10)}-${v.slice(10)}`;
 }
 
-function maskCelular(value: string) {
-  const v = value.replace(/\D/g, "").slice(0, 15);
-  if (v.length <= 4) return v ? `+54 ${v}` : "";
-  return `+54 ${v.slice(0, 4)} ${v.slice(4).replace(/(\d{4})(?=\d)/g, "$1-")}`;
+/** Devuelve solo la parte del número sin el prefijo +54 para mostrar en el input. */
+function celularSinPrefijo(valorGuardado: string | null | undefined): string {
+  const v = (valorGuardado ?? "").trim();
+  if (!v) return "";
+  return v.startsWith("+54") ? v.slice(3).trim() : v;
 }
 
 export function LegajoForm({
@@ -117,7 +118,7 @@ export function LegajoForm({
             codigoPostal: data.codigoPostal ?? "",
             fechaAlta: data.fechaAlta ? new Date(data.fechaAlta).toISOString().split("T")[0] : "",
             fechaBaja: data.fechaBaja ? new Date(data.fechaBaja).toISOString().split("T")[0] : "",
-            celular: data.celular ?? "",
+            celular: celularSinPrefijo(data.celular),
             contactos: (data.contactos ?? []).map((c: { nombres: string; apellidos: string; parentesco: string; calle?: string; numero?: string; casa?: string; departamento?: string; piso?: string; telefonos: { numero: string }[] }) => ({
               nombres: c.nombres,
               apellidos: c.apellidos,
@@ -230,7 +231,7 @@ export function LegajoForm({
         localidad: form.localidad,
         codigoPostal: form.codigoPostal,
         fechaAlta: form.fechaAlta,
-        celular: form.celular || null,
+        celular: form.celular.trim() ? "+54 " + form.celular.trim() : null,
         contactos: showContactos
           ? form.contactos
               .filter((c) => c.nombres || c.apellidos)
@@ -332,11 +333,22 @@ export function LegajoForm({
             </div>
             <div className="space-y-2">
               <Label>Celular</Label>
-              <Input
-                value={form.celular}
-                onChange={(e) => setForm((f) => ({ ...f, celular: maskCelular(e.target.value) }))}
-                placeholder="+54 9 11 1234-5678"
-              />
+              <div className="flex items-center rounded-md border border-input overflow-hidden focus-within:ring-2 focus-within:ring-[#4CAF50] focus-within:ring-offset-0">
+                <span className="px-3 py-2 bg-gray-100 text-gray-600 border-r border-input select-none text-sm font-medium">
+                  +54
+                </span>
+                <input
+                  type="tel"
+                  value={form.celular}
+                  onChange={(e) => {
+                    const soloNumeros = e.target.value.replace(/[^\d\s\-]/g, "");
+                    setForm((f) => ({ ...f, celular: soloNumeros.slice(0, 15) }));
+                  }}
+                  placeholder="11 1234-5678"
+                  className="flex-1 min-w-0 px-3 py-2 outline-none text-sm rounded-none border-0 h-9"
+                  maxLength={15}
+                />
+              </div>
             </div>
           </div>
 

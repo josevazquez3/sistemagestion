@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 /** GET - Obtener usuario por ID con roles y permisos (solo ADMIN) */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -90,6 +91,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         });
       }
     }
+
+    const sessionUser = session?.user as { id?: string; name?: string; email?: string };
+    try {
+      await registrarAuditoria({
+        userId: sessionUser?.id ?? "",
+        userNombre: sessionUser?.name ?? "",
+        userEmail: sessionUser?.email ?? "",
+        accion: "Editó un usuario",
+        modulo: "Usuarios",
+        detalle: `${user.nombre} ${user.apellido} - ${user.email}`,
+      });
+    } catch {}
 
     return NextResponse.json({ ok: true });
   } catch (e) {

@@ -25,6 +25,7 @@ model User {
   roles         UserRole[]
   permisos      UserPermission[]
   notificaciones Notificacion[]
+  auditoriaLogs AuditoriaLog[]
 
   @@map("users")
 }
@@ -108,6 +109,8 @@ model Legajo {
   contactos              ContactoAdicional[]
   configuracionVacaciones ConfiguracionVacaciones?
   solicitudesVacaciones   SolicitudVacaciones[]
+  licencias              Licencia[]
+  certificados           Certificado[]
 
   @@index([dni])
   @@index([numeroLegajo])
@@ -183,6 +186,82 @@ model SolicitudVacaciones {
   @@index([legajoId, fechaDesde])
 }
 
+// === LICENCIAS (RRHH) ===
+
+enum TipoLicencia {
+  ART
+  ENFERMEDAD
+  ESTUDIO
+  MATERNIDAD
+  PATERNIDAD
+}
+
+enum EstadoLicencia {
+  ACTIVA
+  FINALIZADA
+}
+
+enum TipoArchivo {
+  PDF
+  JPG
+}
+
+enum EtapaCertificado {
+  INICIO
+  CIERRE
+}
+
+model Licencia {
+  id            Int               @id @default(autoincrement())
+  legajoId      String
+  tipoLicencia  TipoLicencia
+  fechaInicio   DateTime
+  fechaFin      DateTime?
+  estado        EstadoLicencia     @default(ACTIVA)
+  observaciones String?
+  diasMarcados  Json               // array de fechas marcadas en el calendario (ISO strings)
+  fechaCierre   DateTime?          // fecha efectiva de finalización al cerrar
+  observacionesCierre String?
+  creadoEn      DateTime           @default(now())
+  actualizadoEn DateTime           @updatedAt
+  legajo        Legajo             @relation(fields: [legajoId], references: [id], onDelete: Cascade)
+  certificados  Certificado[]
+  observacionesNomina ObservacionLicencia[]
+
+  @@index([legajoId])
+  @@index([estado])
+  @@map("licencias")
+}
+
+model ObservacionLicencia {
+  id           Int      @id @default(autoincrement())
+  licenciaId   Int
+  texto        String
+  creadoEn     DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+  licencia     Licencia @relation(fields: [licenciaId], references: [id], onDelete: Cascade)
+
+  @@index([licenciaId])
+  @@map("observaciones_licencia")
+}
+
+model Certificado {
+  id           Int                @id @default(autoincrement())
+  licenciaId   Int
+  legajoId     String
+  nombreArchivo String
+  tipoArchivo  TipoArchivo
+  urlArchivo   String
+  fechaCarga   DateTime           @default(now())
+  etapa        EtapaCertificado
+  licencia     Licencia           @relation(fields: [licenciaId], references: [id], onDelete: Cascade)
+  legajo       Legajo             @relation(fields: [legajoId], references: [id], onDelete: Cascade)
+
+  @@index([licenciaId])
+  @@index([legajoId])
+  @@map("certificados")
+}
+
 // === NOTIFICACIONES INTERNAS ===
 
 enum TipoNotificacion {
@@ -203,4 +282,24 @@ model Notificacion {
   createdAt   DateTime         @default(now())
 
   @@index([usuarioId, leida])
+}
+
+// === AUDITORÍA ===
+
+model AuditoriaLog {
+  id         Int      @id @default(autoincrement())
+  userId     String
+  userNombre String
+  userEmail  String
+  accion     String
+  modulo     String
+  detalle    String?
+  ip         String?
+  creadoEn   DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([modulo])
+  @@index([creadoEn])
+  @@map("auditoria_logs")
 }

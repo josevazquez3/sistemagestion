@@ -10,6 +10,7 @@ import {
   Scale,
   UserCog,
   Calendar,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Session } from "next-auth";
@@ -17,6 +18,7 @@ import type { Session } from "next-auth";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/rrhh/legajos", label: "Legajos", icon: Users, parent: "rrhh" },
+  { href: "/rrhh/licencias", label: "Licencias", icon: FileText, parent: "rrhh" },
   { href: "/rrhh/vacaciones", label: "Vacaciones", icon: Calendar, parent: "rrhh" },
   { href: "/rrhh/vacaciones/historial", label: "Historial de Vacaciones", icon: FileText, parent: "rrhh" },
   { href: "/rrhh/vacaciones/admin", label: "Vacaciones (Admin)", icon: Calendar, parent: "rrhh", adminOnly: true },
@@ -24,6 +26,7 @@ const navItems = [
   { href: "/legales", label: "Legales", icon: Scale },
   { href: "/secretaria", label: "Secretaría", icon: FileText },
   { href: "/usuarios", label: "Usuarios", icon: UserCog, adminOnly: true },
+  { href: "/configuraciones", label: "Configuraciones", icon: Settings, configuracionesOnly: true },
 ];
 
 export function Sidebar({ user }: { user: Session["user"] }) {
@@ -32,6 +35,7 @@ export function Sidebar({ user }: { user: Session["user"] }) {
   const isRrhh = (user as { roles?: string[] })?.roles?.includes("RRHH") ?? false;
 
   const items = navItems.filter((item) => {
+    if ("configuracionesOnly" in item && item.configuracionesOnly && !isAdmin) return false;
     if (item.adminOnly && !isAdmin && !isRrhh) return false;
     return true;
   });

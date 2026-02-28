@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 import bcrypt from "bcryptjs";
 
 /** GET - Listar todos los usuarios (solo ADMIN) */
@@ -85,6 +86,18 @@ export async function POST(req: Request) {
         skipDuplicates: true,
       });
     }
+
+    const sessionUser = session?.user as { id?: string; name?: string; email?: string };
+    try {
+      await registrarAuditoria({
+        userId: sessionUser?.id ?? "",
+        userNombre: sessionUser?.name ?? "",
+        userEmail: sessionUser?.email ?? "",
+        accion: "Creó un usuario",
+        modulo: "Usuarios",
+        detalle: `${nombre} ${apellido} - ${email}`,
+      });
+    } catch {}
 
     return NextResponse.json({ id: user.id, email: user.email });
   } catch (e) {

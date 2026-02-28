@@ -6,14 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from "@/components/ui/sheet";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -289,16 +281,18 @@ export default function UsuariosPage() {
         )}
       </div>
 
-      {/* Sheet editar usuario */}
-      <Sheet open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Editar usuario</SheetTitle>
-            <SheetDescription>
-              {selectedUser?.nombre} — {selectedUser?.email}
-            </SheetDescription>
-          </SheetHeader>
-          <div className="space-y-6 py-6">
+      {/* Modal editar usuario - centrado */}
+      <Dialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
+        <DialogContent className="w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col p-0 gap-0">
+          <div className="p-6 pb-0 shrink-0">
+            <DialogHeader>
+              <DialogTitle>Editar usuario</DialogTitle>
+              <DialogDescription>
+                {selectedUser?.nombre} — {selectedUser?.email}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="space-y-6 py-6 px-6 overflow-y-auto flex-1 min-h-0">
             <div className="space-y-2">
               <Label>Legajo vinculado (para vacaciones)</Label>
               <select
@@ -348,7 +342,7 @@ export default function UsuariosPage() {
               ))}
             </div>
           </div>
-          <SheetFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className="p-6 pt-4 border-t flex-col sm:flex-row gap-2 shrink-0">
             <Button
               onClick={saveChanges}
               disabled={saving}
@@ -364,9 +358,9 @@ export default function UsuariosPage() {
             >
               Desactivar usuario
             </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal crear usuario - centro de la página */}
       <Dialog
