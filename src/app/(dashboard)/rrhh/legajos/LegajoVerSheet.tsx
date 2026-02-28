@@ -9,7 +9,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { User, FileSpreadsheet, FileText } from "lucide-react";
+import { User, FileText, FileDown } from "lucide-react";
 
 const PARENTESCO_LABEL: Record<string, string> = {
   CONYUGE: "Cónyuge", HIJO: "Hijo/a", PADRE: "Padre", MADRE: "Madre", HERMANO: "Hermano/a", OTRO: "Otro",
@@ -134,16 +134,16 @@ export function LegajoVerSheet({ legajoId, onClose }: { legajoId: string | null;
             )}
 
             <div className="flex gap-2 pt-4">
-              <a href={`/api/legajos/${legajo.id}/export-excel`} download className="flex-1">
-                <Button className="w-full bg-[#4CAF50] hover:bg-[#388E3C] text-white">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Exportar Excel
-                </Button>
-              </a>
               <a href={`/api/legajos/${legajo.id}/export-pdf`} download className="flex-1">
                 <Button className="w-full bg-[#4CAF50] hover:bg-[#388E3C] text-white">
                   <FileText className="h-4 w-4 mr-2" />
                   Exportar PDF
+                </Button>
+              </a>
+              <a href={`/api/legajos/${legajo.id}/export-word`} download className="flex-1">
+                <Button className="w-full bg-[#4CAF50] hover:bg-[#388E3C] text-white">
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Exportar DOCX
                 </Button>
               </a>
             </div>

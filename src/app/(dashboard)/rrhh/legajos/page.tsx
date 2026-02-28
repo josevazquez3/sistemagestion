@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, UserPlus, Eye, Pencil, UserMinus, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { Search, UserPlus, Eye, Pencil, UserMinus, FileText, FileDown, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -213,14 +213,14 @@ export default function LegajosPage() {
                           <UserMinus className="h-4 w-4" />
                         </Button>
                       )}
-                      <a href={`/api/legajos/${l.id}/export-excel`} download className="inline-flex">
-                        <Button variant="ghost" size="icon-sm" title="Exportar Excel" className="text-[#4CAF50] hover:text-[#388E3C]">
-                          <FileSpreadsheet className="h-4 w-4" />
-                        </Button>
-                      </a>
                       <a href={`/api/legajos/${l.id}/export-pdf`} download className="inline-flex">
                         <Button variant="ghost" size="icon-sm" title="Exportar PDF" className="text-[#4CAF50] hover:text-[#388E3C]">
                           <FileText className="h-4 w-4" />
+                        </Button>
+                      </a>
+                      <a href={`/api/legajos/${l.id}/export-word`} download className="inline-flex">
+                        <Button variant="ghost" size="icon-sm" title="Exportar DOCX" className="text-[#4CAF50] hover:text-[#388E3C]">
+                          <FileDown className="h-4 w-4" />
                         </Button>
                       </a>
                     </td>
