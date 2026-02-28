@@ -1,10 +1,10 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { formatearFecha } from "@/lib/vacaciones.utils";
 import type { SolicitudHistorial, TotalesAnio } from "@/app/actions/vacaciones";
 
-const COLOR_APROBADA = "C6EFCE";
-const COLOR_PENDIENTE = "FFEB9C";
-const COLOR_BAJA = "FFC7CE";
+const COLOR_APROBADA = "FFC6EFCE";
+const COLOR_PENDIENTE = "FFFFEB9C";
+const COLOR_BAJA = "FFFFC7CE";
 
 function estadoATexto(estado: SolicitudHistorial["estado"]): string {
   switch (estado) {
@@ -44,71 +44,60 @@ export function nombreArchivoHistorial(
  * Exporta el historial de vacaciones a un archivo Excel.
  * Retorna un Buffer listo para enviar como descarga.
  */
-export function exportarHistorialExcel(
+export async function exportarHistorialExcel(
   solicitudes: SolicitudHistorial[],
   totalesPorAnio: TotalesAnio[],
   nombreEmpleado: string,
   anioFiltrado?: number
-): Buffer {
+): Promise<Buffer> {
   const fechaGeneracion = formatearFecha(new Date());
-
-  const wb = XLSX.utils.book_new();
+  const wb = new ExcelJS.Workbook();
 
   // --- HOJA 1: Solicitudes ---
-  const encabezadoSolicitudes = [
-    ["Empleado", nombreEmpleado, "Fecha de generación", fechaGeneracion],
-    ["Año", "Desde", "Hasta", "Días solicitados", "Días restantes", "Estado"],
-    ...solicitudes.map((s) => [
+  const wsSolicitudes = wb.addWorksheet("Solicitudes");
+  wsSolicitudes.addRow(["Empleado", nombreEmpleado, "Fecha de generación", fechaGeneracion]);
+  wsSolicitudes.addRow(["Año", "Desde", "Hasta", "Días solicitados", "Días restantes", "Estado"]);
+
+  for (const s of solicitudes) {
+    const row = wsSolicitudes.addRow([
       anioDeFecha(s.fechaDesde),
       formatearFecha(s.fechaDesde),
       formatearFecha(s.fechaHasta),
       s.diasSolicitados,
       s.diasRestantes,
       estadoATexto(s.estado),
-    ]),
-  ];
-
-  const wsSolicitudes = XLSX.utils.aoa_to_sheet(encabezadoSolicitudes);
-
-  if (wsSolicitudes["!ref"]) {
-    const range = XLSX.utils.decode_range(wsSolicitudes["!ref"]);
-    for (let r = 2; r <= range.e.r; r++) {
-      const solicitud = solicitudes[r - 2];
-      if (solicitud) {
-        const color =
-          solicitud.estado === "APROBADA"
-            ? COLOR_APROBADA
-            : solicitud.estado === "PENDIENTE"
-              ? COLOR_PENDIENTE
-              : COLOR_BAJA;
-        ["A", "B", "C", "D", "E", "F"].forEach((col, i) => {
-          const addr = XLSX.utils.encode_cell({ r, c: i });
-          if (wsSolicitudes[addr]) {
-            (wsSolicitudes[addr] as XLSX.CellObject).s = {
-              fill: { fgColor: { rgb: color } },
-            };
-          }
-        });
-      }
+    ]);
+    const color =
+      s.estado === "APROBADA"
+        ? COLOR_APROBADA
+        : s.estado === "PENDIENTE"
+          ? COLOR_PENDIENTE
+          : COLOR_BAJA;
+    for (let c = 1; c <= 6; c++) {
+      row.getCell(c).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: color },
+      };
     }
   }
 
-  XLSX.utils.book_append_sheet(wb, wsSolicitudes, "Solicitudes");
-
   // --- HOJA 2: Resumen por año ---
   const valorNull = "—";
-  const filasResumen = [
-    ["Empleado", nombreEmpleado, "Fecha de generación", fechaGeneracion],
-    [
-      "Año",
-      "Disponibles",
-      "Pendientes",
-      "Aprobados",
-      "Dados de baja",
-      "Usados",
-      "Restantes",
-    ],
-    ...totalesPorAnio.map((t) => [
+  const wsResumen = wb.addWorksheet("Resumen por año");
+  wsResumen.addRow(["Empleado", nombreEmpleado, "Fecha de generación", fechaGeneracion]);
+  wsResumen.addRow([
+    "Año",
+    "Disponibles",
+    "Pendientes",
+    "Aprobados",
+    "Dados de baja",
+    "Usados",
+    "Restantes",
+  ]);
+
+  for (const t of totalesPorAnio) {
+    wsResumen.addRow([
       t.anio,
       t.diasDisponibles ?? valorNull,
       t.diasPendientes,
@@ -116,8 +105,8 @@ export function exportarHistorialExcel(
       t.diasBaja,
       t.diasUsados,
       t.diasRestantes ?? valorNull,
-    ]),
-  ];
+    ]);
+  }
 
   if (totalesPorAnio.length > 0) {
     const totales = totalesPorAnio.reduce(
@@ -138,7 +127,7 @@ export function exportarHistorialExcel(
         diasRestantes: 0,
       }
     );
-    filasResumen.push([
+    wsResumen.addRow([
       "TOTALES",
       totales.diasDisponibles || valorNull,
       totales.diasPendientes,
@@ -149,8 +138,6 @@ export function exportarHistorialExcel(
     ]);
   }
 
-  const wsResumen = XLSX.utils.aoa_to_sheet(filasResumen);
-  XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen por año");
-
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const buffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(buffer);
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -19,6 +19,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!legajo) return NextResponse.json({ error: "Legajo no encontrado" }, { status: 404 });
 
   const parentescoLabel: Record<string, string> = { CONYUGE: "Cónyuge", HIJO: "Hijo/a", PADRE: "Padre", MADRE: "Madre", HERMANO: "Hermano/a", OTRO: "Otro" };
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Legajo");
 
   const rows: (string | number | null)[][] = [
     ["Nº Legajo", legajo.numeroLegajo],
@@ -50,12 +53,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  XLSX.utils.book_append_sheet(wb, ws, "Legajo");
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  for (const row of rows) {
+    ws.addRow(row);
+  }
 
-  return new NextResponse(buf, {
+  const buf = await wb.xlsx.writeBuffer();
+
+  return new NextResponse(Buffer.from(buf), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="legajo-${legajo.numeroLegajo}.xlsx"`,

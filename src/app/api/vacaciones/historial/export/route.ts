@@ -106,7 +106,7 @@ export async function GET(request: Request) {
     const { solicitudes, totalesPorAnio } = historialRes.data;
 
     if (formato === "excel") {
-      const buffer = exportarHistorialExcel(
+      const buffer = await exportarHistorialExcel(
         solicitudes,
         totalesPorAnio,
         nombreEmpleado,
