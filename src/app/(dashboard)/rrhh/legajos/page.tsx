@@ -218,8 +218,8 @@ export default function LegajosPage() {
                           <FileSpreadsheet className="h-4 w-4" />
                         </Button>
                       </a>
-                      <a href={`/api/legajos/${l.id}/export-word`} download className="inline-flex">
-                        <Button variant="ghost" size="icon-sm" title="Exportar Word" className="text-[#4CAF50] hover:text-[#388E3C]">
+                      <a href={`/api/legajos/${l.id}/export-pdf`} download className="inline-flex">
+                        <Button variant="ghost" size="icon-sm" title="Exportar PDF" className="text-[#4CAF50] hover:text-[#388E3C]">
                           <FileText className="h-4 w-4" />
                         </Button>
                       </a>

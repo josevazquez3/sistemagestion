@@ -140,10 +140,10 @@ export function LegajoVerSheet({ legajoId, onClose }: { legajoId: string | null;
                   Exportar Excel
                 </Button>
               </a>
-              <a href={`/api/legajos/${legajo.id}/export-word`} download className="flex-1">
+              <a href={`/api/legajos/${legajo.id}/export-pdf`} download className="flex-1">
                 <Button className="w-full bg-[#4CAF50] hover:bg-[#388E3C] text-white">
                   <FileText className="h-4 w-4 mr-2" />
-                  Exportar Word
+                  Exportar PDF
                 </Button>
               </a>
             </div>
