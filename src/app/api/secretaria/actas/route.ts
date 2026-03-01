@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
+import type { Prisma } from "@prisma/client";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
@@ -32,10 +33,7 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const perPage = Math.min(50, Math.max(1, parseInt(searchParams.get("perPage") ?? "20", 10)));
 
-  const where: {
-    OR?: { titulo: { contains: string; mode: "insensitive" }; nombreArchivo: { contains: string; mode: "insensitive" } }[];
-    fechaActa?: { gte?: Date; lte?: Date };
-  } = {};
+  const where: Prisma.ActaWhereInput = {};
 
   if (q) {
     where.OR = [
@@ -44,17 +42,21 @@ export async function GET(req: NextRequest) {
     ];
   }
 
+  const fechaActaRange: { gte?: Date; lte?: Date } = {};
   if (desde) {
     const d = parseFechaArgentina(desde);
-    if (d) where.fechaActa = { ...where.fechaActa, gte: d };
+    if (d) fechaActaRange.gte = d;
   }
   if (hasta) {
     const h = parseFechaArgentina(hasta);
     if (h) {
       const endOfDay = new Date(h);
       endOfDay.setHours(23, 59, 59, 999);
-      where.fechaActa = { ...where.fechaActa, lte: endOfDay };
+      fechaActaRange.lte = endOfDay;
     }
+  }
+  if (fechaActaRange.gte !== undefined || fechaActaRange.lte !== undefined) {
+    where.fechaActa = fechaActaRange;
   }
 
   const [data, total] = await Promise.all([
