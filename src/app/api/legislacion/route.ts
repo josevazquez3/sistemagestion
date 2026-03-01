@@ -65,17 +65,21 @@ export async function GET(req: NextRequest) {
     where.tipoArchivo = tipo;
   }
 
+  const fechaDoc: { gte?: Date; lte?: Date } = {};
   if (desde) {
     const d = parseFechaArgentina(desde);
-    if (d) where.fechaDocumento = { ...(where.fechaDocumento ?? {}), gte: d };
+    if (d) fechaDoc.gte = d;
   }
   if (hasta) {
     const h = parseFechaArgentina(hasta);
     if (h) {
       const endOfDay = new Date(h);
       endOfDay.setHours(23, 59, 59, 999);
-      where.fechaDocumento = { ...(where.fechaDocumento ?? {}), lte: endOfDay };
+      fechaDoc.lte = endOfDay;
     }
+  }
+  if (fechaDoc.gte !== undefined || fechaDoc.lte !== undefined) {
+    where.fechaDocumento = fechaDoc;
   }
 
   if (q) {
