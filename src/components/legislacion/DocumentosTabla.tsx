@@ -102,7 +102,7 @@ export function DocumentosTabla({
                     {doc.tipoArchivo === "PDF" ? (
                       <span className="text-red-600" title="PDF">PDF</span>
                     ) : (
-                      <FileText className="h-4 w-4 text-blue-600" title="DOCX" />
+                      <FileText className="h-4 w-4 text-blue-600" aria-label="DOCX" />
                     )}
                     {doc.tipoArchivo}
                   </span>
