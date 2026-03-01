@@ -53,7 +53,7 @@ export async function GET(
       : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   const filename = doc.nombreArchivo || `documento.${doc.tipoArchivo?.toLowerCase() || "pdf"}`;
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": contentType,
       "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
