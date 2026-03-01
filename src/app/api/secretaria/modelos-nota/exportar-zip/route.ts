@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     });
 
     const filename = nombreZip();
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(new Uint8Array(zipBuffer), {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${filename}"`,
