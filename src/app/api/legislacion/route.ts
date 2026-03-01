@@ -67,14 +67,14 @@ export async function GET(req: NextRequest) {
 
   if (desde) {
     const d = parseFechaArgentina(desde);
-    if (d) where.fechaDocumento = { ...where.fechaDocumento, gte: d };
+    if (d) where.fechaDocumento = { ...(where.fechaDocumento ?? {}), gte: d };
   }
   if (hasta) {
     const h = parseFechaArgentina(hasta);
     if (h) {
       const endOfDay = new Date(h);
       endOfDay.setHours(23, 59, 59, 999);
-      where.fechaDocumento = { ...where.fechaDocumento, lte: endOfDay };
+      where.fechaDocumento = { ...(where.fechaDocumento ?? {}), lte: endOfDay };
     }
   }
 
