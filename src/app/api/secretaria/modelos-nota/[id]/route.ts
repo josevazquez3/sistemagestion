@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
@@ -82,7 +83,7 @@ export async function PUT(
       const tipoNotaIdStr = formData.get("tipoNotaId") as string | null;
       const file = formData.get("file") as File | null;
 
-      const data: { nombre?: string; tipoNotaId?: number; nombreArchivo?: string; urlArchivo?: string; contenido?: Buffer } = {};
+      const data: Prisma.ModeloNotaUncheckedUpdateInput = {};
       if (nombre) data.nombre = nombre;
       if (tipoNotaIdStr) {
         const tid = parseInt(tipoNotaIdStr, 10);
