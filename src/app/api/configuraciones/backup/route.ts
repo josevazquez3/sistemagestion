@@ -22,6 +22,11 @@ const BACKUP_KEYS = [
   "certificados",
   "notificaciones",
   "auditoria_logs",
+  "tipos_nota",
+  "modelos_nota",
+  "actas",
+  "categorias_legislacion",
+  "documentos_legislacion",
 ] as const;
 
 function nombreZip() {
@@ -58,6 +63,11 @@ export async function POST() {
     certificados: () => prisma.certificado.findMany(),
     notificaciones: () => prisma.notificacion.findMany(),
     auditoria_logs: () => prisma.auditoriaLog.findMany(),
+    tipos_nota: () => prisma.tipoNota.findMany(),
+    modelos_nota: () => prisma.modeloNota.findMany(),
+    actas: () => prisma.acta.findMany(),
+    categorias_legislacion: () => prisma.categoriaLegislacion.findMany(),
+    documentos_legislacion: () => prisma.documentoLegislacion.findMany(),
   };
 
   const tablas: Record<string, unknown[]> = {};

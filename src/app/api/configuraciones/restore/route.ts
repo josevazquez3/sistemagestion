@@ -16,12 +16,14 @@ const CAMPOS_FECHA = [
   "fechaFin",
   "fechaCierre",
   "fechaCarga",
+  "fechaActa",
+  "fechaDocumento",
   "deletedAt",
   "createdAt",
   "updatedAt",
 ];
 
-function transformarFila(_key: string, row: Record<string, unknown>): Record<string, unknown> {
+function transformarFila(key: string, row: Record<string, unknown>): Record<string, unknown> {
   const resultado = { ...row };
   for (const campo of CAMPOS_FECHA) {
     const val = resultado[campo];
@@ -29,10 +31,16 @@ function transformarFila(_key: string, row: Record<string, unknown>): Record<str
       resultado[campo] = new Date(val);
     }
   }
+  if (key === "modelos_nota" && resultado.contenido != null && typeof resultado.contenido === "object") {
+    const c = resultado.contenido as { type?: string; data?: number[] };
+    if (c.type === "Buffer" && Array.isArray(c.data)) {
+      resultado.contenido = Buffer.from(c.data);
+    }
+  }
   return resultado;
 }
 
-/** Orden de inserción: padres antes que dependientes (respeta FKs). users depende de legajos (legajoId). */
+/** Orden de inserción: padres antes que dependientes (respeta FKs). modelos_nota depende de tipos_nota. */
 const INSERT_ORDER = [
   "roles",
   "permissions",
@@ -49,10 +57,20 @@ const INSERT_ORDER = [
   "certificados",
   "notificaciones",
   "auditoria_logs",
+  "tipos_nota",
+  "modelos_nota",
+  "actas",
+  "categorias_legislacion",
+  "documentos_legislacion",
 ] as const;
 
 /** Orden de eliminación: dependientes antes que padres. */
 const DELETE_ORDER = [
+  "documentos_legislacion",
+  "categorias_legislacion",
+  "actas",
+  "modelos_nota",
+  "tipos_nota",
   "auditoria_logs",
   "observaciones_licencia",
   "certificados",
@@ -91,6 +109,11 @@ const PRISMA_DELEGATES: Record<string, Delegate> = {
   certificados: prisma.certificado as unknown as Delegate,
   notificaciones: prisma.notificacion as unknown as Delegate,
   auditoria_logs: prisma.auditoriaLog as unknown as Delegate,
+  tipos_nota: prisma.tipoNota as unknown as Delegate,
+  modelos_nota: prisma.modeloNota as unknown as Delegate,
+  actas: prisma.acta as unknown as Delegate,
+  categorias_legislacion: prisma.categoriaLegislacion as unknown as Delegate,
+  documentos_legislacion: prisma.documentoLegislacion as unknown as Delegate,
 };
 
 /** Compatibilidad con backups antiguos que usaban "usuarios" en lugar de "users". */

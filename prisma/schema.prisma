@@ -303,3 +303,81 @@ model AuditoriaLog {
   @@index([creadoEn])
   @@map("auditoria_logs")
 }
+
+// === SECRETARÍA - MODELOS DE NOTAS ===
+
+model TipoNota {
+  id            Int         @id @default(autoincrement())
+  nombre        String      // ej: "Salutaciones", "Citaciones", etc.
+  descripcion   String?
+  activo        Boolean     @default(true)
+  creadoEn      DateTime    @default(now())
+  actualizadoEn DateTime    @updatedAt
+  modelos       ModeloNota[]
+
+  @@map("tipos_nota")
+}
+
+model ModeloNota {
+  id            Int       @id @default(autoincrement())
+  tipoNotaId    Int
+  nombre        String    // nombre descriptivo del modelo
+  nombreArchivo String    // nombre original del archivo .docx
+  urlArchivo    String    // ruta en public/uploads/modelos-notas/
+  contenido     Bytes?    // contenido binario del .docx para edición
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+  tipoNota      TipoNota  @relation(fields: [tipoNotaId], references: [id])
+
+  @@map("modelos_nota")
+}
+
+// === SECRETARÍA - ACTAS ===
+
+model Acta {
+  id            Int       @id @default(autoincrement())
+  titulo        String    // texto/título del acta
+  fechaActa     DateTime  // fecha del acta
+  nombreArchivo String?   // nombre original del archivo .docx (si se sube)
+  urlArchivo    String?   // ruta en public/uploads/actas/
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  @@map("actas")
+}
+
+// === LEGISLACIÓN ===
+
+enum SeccionLegislacion {
+  LEGISLACION
+  RESOLUCIONES_CS
+}
+
+model CategoriaLegislacion {
+  id             Int                     @id @default(autoincrement())
+  nombre         String
+  descripcion    String?
+  activo         Boolean                 @default(true)
+  creadoEn       DateTime                @default(now())
+  actualizadoEn  DateTime                 @updatedAt
+  documentos     DocumentoLegislacion[]
+
+  @@map("categorias_legislacion")
+}
+
+model DocumentoLegislacion {
+  id              Int                   @id @default(autoincrement())
+  categoriaId     Int?
+  titulo          String
+  descripcion     String?
+  nombreArchivo   String
+  urlArchivo      String
+  tipoArchivo     String                // PDF o DOCX
+  seccion         SeccionLegislacion    @default(LEGISLACION)
+  fechaDocumento  DateTime?
+  creadoEn        DateTime              @default(now())
+  actualizadoEn   DateTime               @updatedAt
+  categoria       CategoriaLegislacion? @relation(fields: [categoriaId], references: [id])
+
+  @@map("documentos_legislacion")
+}

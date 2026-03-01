@@ -5,6 +5,9 @@ import { registrarAuditoria } from "@/lib/auditoria";
 
 /** Orden de eliminación: tablas dependientes primero. NO se eliminan usuarios ni roles/permisos. */
 const VACIAR_ORDER = [
+  prisma.documentoLegislacion.deleteMany(),
+  prisma.categoriaLegislacion.deleteMany(),
+  prisma.acta.deleteMany(),
   prisma.auditoriaLog.deleteMany(),
   prisma.observacionLicencia.deleteMany(),
   prisma.certificado.deleteMany(),
