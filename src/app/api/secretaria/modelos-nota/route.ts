@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
@@ -29,20 +30,16 @@ export async function GET(req: NextRequest) {
   const tipoNotaId = searchParams.get("tipoNotaId");
   const estado = searchParams.get("estado") ?? "todos"; // todos | activos
 
-  const where: {
-    tipoNota?: { activo?: boolean };
-    OR?: { nombre: { contains: string; mode: "insensitive" }; nombreArchivo?: { contains: string; mode: "insensitive" }; tipoNota?: { nombre: { contains: string; mode: "insensitive" } } }[];
-  } = {};
+  const where: Prisma.ModeloNotaWhereInput = {};
 
-  if (estado === "activos") {
-    where.tipoNota = { activo: true };
-  }
-
+  const tipoNotaIs: { id?: number; activo?: boolean } = {};
+  if (estado === "activos") tipoNotaIs.activo = true;
   if (tipoNotaId && tipoNotaId !== "todos") {
     const id = parseInt(tipoNotaId, 10);
-    if (!isNaN(id)) {
-      where.tipoNota = { ...where.tipoNota, id };
-    }
+    if (!isNaN(id)) tipoNotaIs.id = id;
+  }
+  if (Object.keys(tipoNotaIs).length > 0) {
+    where.tipoNota = { is: tipoNotaIs };
   }
 
   if (q) {
