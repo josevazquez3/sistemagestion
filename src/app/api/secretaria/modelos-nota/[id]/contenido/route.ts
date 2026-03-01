@@ -93,7 +93,7 @@ export async function POST(
     const children =
       lines.length > 0
         ? lines.map(
-            (line) =>
+            (line: string) =>
               new Paragraph({
                 children: [new TextRun(line || " ")],
                 spacing: { after: 200 },
