@@ -6,6 +6,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
 import { SeccionLegislacion } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 const ROLES_WRITE = ["ADMIN", "SECRETARIA"] as const;
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
@@ -49,13 +50,7 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const perPage = Math.min(50, Math.max(1, parseInt(searchParams.get("perPage") ?? "20", 10)));
 
-  const where: {
-    seccion?: SeccionLegislacion;
-    categoriaId?: number | null;
-    tipoArchivo?: string;
-    fechaDocumento?: { gte?: Date; lte?: Date };
-    OR?: { titulo: { contains: string; mode: "insensitive" }; descripcion: { contains: string; mode: "insensitive" }; nombreArchivo: { contains: string; mode: "insensitive" }; categoria?: { nombre: { contains: string; mode: "insensitive" } } }[];
-  } = {};
+  const where: Prisma.DocumentoLegislacionWhereInput = {};
 
   if (seccionParam && validarSeccion(seccionParam)) {
     where.seccion = seccionParam;
