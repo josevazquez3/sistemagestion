@@ -346,6 +346,18 @@ model Acta {
   @@map("actas")
 }
 
+model OficioRespondido {
+  id            Int       @id @default(autoincrement())
+  titulo        String
+  fechaOficio   DateTime
+  nombreArchivo String?
+  urlArchivo    String?
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  @@map("oficios_respondidos")
+}
+
 // === LEGISLACIÓN ===
 
 enum SeccionLegislacion {
@@ -380,4 +392,32 @@ model DocumentoLegislacion {
   categoria       CategoriaLegislacion? @relation(fields: [categoriaId], references: [id])
 
   @@map("documentos_legislacion")
+}
+
+// === LEGALES - MODELOS DE OFICIOS ===
+
+model TipoOficio {
+  id            Int            @id @default(autoincrement())
+  nombre        String
+  descripcion   String?
+  activo        Boolean        @default(true)
+  creadoEn      DateTime       @default(now())
+  actualizadoEn DateTime       @updatedAt
+  modelos       ModeloOficio[]
+
+  @@map("tipos_oficio")
+}
+
+model ModeloOficio {
+  id            Int         @id @default(autoincrement())
+  tipoOficioId  Int
+  nombre        String
+  nombreArchivo String
+  urlArchivo    String
+  contenido     Bytes?
+  creadoEn      DateTime   @default(now())
+  actualizadoEn DateTime   @updatedAt
+  tipoOficio    TipoOficio  @relation(fields: [tipoOficioId], references: [id])
+
+  @@map("modelos_oficio")
 }

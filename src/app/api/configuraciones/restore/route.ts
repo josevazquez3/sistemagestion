@@ -17,6 +17,7 @@ const CAMPOS_FECHA = [
   "fechaCierre",
   "fechaCarga",
   "fechaActa",
+  "fechaOficio",
   "fechaDocumento",
   "deletedAt",
   "createdAt",
@@ -31,7 +32,7 @@ function transformarFila(key: string, row: Record<string, unknown>): Record<stri
       resultado[campo] = new Date(val);
     }
   }
-  if (key === "modelos_nota" && resultado.contenido != null && typeof resultado.contenido === "object") {
+  if ((key === "modelos_nota" || key === "modelos_oficio") && resultado.contenido != null && typeof resultado.contenido === "object") {
     const c = resultado.contenido as { type?: string; data?: number[] };
     if (c.type === "Buffer" && Array.isArray(c.data)) {
       resultado.contenido = Buffer.from(c.data);
@@ -59,7 +60,10 @@ const INSERT_ORDER = [
   "auditoria_logs",
   "tipos_nota",
   "modelos_nota",
+  "tipos_oficio",
+  "modelos_oficio",
   "actas",
+  "oficios_respondidos",
   "categorias_legislacion",
   "documentos_legislacion",
 ] as const;
@@ -69,8 +73,11 @@ const DELETE_ORDER = [
   "documentos_legislacion",
   "categorias_legislacion",
   "actas",
+  "oficios_respondidos",
   "modelos_nota",
   "tipos_nota",
+  "modelos_oficio",
+  "tipos_oficio",
   "auditoria_logs",
   "observaciones_licencia",
   "certificados",
@@ -111,7 +118,10 @@ const PRISMA_DELEGATES: Record<string, Delegate> = {
   auditoria_logs: prisma.auditoriaLog as unknown as Delegate,
   tipos_nota: prisma.tipoNota as unknown as Delegate,
   modelos_nota: prisma.modeloNota as unknown as Delegate,
+  tipos_oficio: prisma.tipoOficio as unknown as Delegate,
+  modelos_oficio: prisma.modeloOficio as unknown as Delegate,
   actas: prisma.acta as unknown as Delegate,
+  oficios_respondidos: prisma.oficioRespondido as unknown as Delegate,
   categorias_legislacion: prisma.categoriaLegislacion as unknown as Delegate,
   documentos_legislacion: prisma.documentoLegislacion as unknown as Delegate,
 };

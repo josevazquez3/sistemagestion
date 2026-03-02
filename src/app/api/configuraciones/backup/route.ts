@@ -24,7 +24,10 @@ const BACKUP_KEYS = [
   "auditoria_logs",
   "tipos_nota",
   "modelos_nota",
+  "tipos_oficio",
+  "modelos_oficio",
   "actas",
+  "oficios_respondidos",
   "categorias_legislacion",
   "documentos_legislacion",
 ] as const;
@@ -65,7 +68,10 @@ export async function POST() {
     auditoria_logs: () => prisma.auditoriaLog.findMany(),
     tipos_nota: () => prisma.tipoNota.findMany(),
     modelos_nota: () => prisma.modeloNota.findMany(),
+    tipos_oficio: () => prisma.tipoOficio.findMany(),
+    modelos_oficio: () => prisma.modeloOficio.findMany(),
     actas: () => prisma.acta.findMany(),
+    oficios_respondidos: () => prisma.oficioRespondido.findMany(),
     categorias_legislacion: () => prisma.categoriaLegislacion.findMany(),
     documentos_legislacion: () => prisma.documentoLegislacion.findMany(),
   };
