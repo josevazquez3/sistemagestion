@@ -171,7 +171,7 @@ export function ModalCargaMasivaOficios({
         name: f.name,
         file: f.file,
         titulo: nombreSinExtension(f.name),
-        fechaActa: fechaDefault,
+        fechaOficio: fechaDefault,
       }));
     setRowsPaso3(rows);
     setStep(3);
@@ -199,7 +199,7 @@ export function ModalCargaMasivaOficios({
   }, []);
 
   const allHaveTituloYFecha = rowsPaso3.every(
-    (r) => r.titulo.trim() && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(r.fechaActa)
+    (r) => r.titulo.trim() && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(r.fechaOficio)
   );
   const canCargar = rowsPaso3.length >= 1 && allHaveTituloYFecha;
 
