@@ -28,6 +28,7 @@ const navItems = [
   { href: "/rrhh/vacaciones", label: "Vacaciones", icon: Calendar, parent: "rrhh" },
   { href: "/rrhh/vacaciones/historial", label: "Historial de Vacaciones", icon: FileText, parent: "rrhh" },
   { href: "/rrhh/vacaciones/admin", label: "Vacaciones (Admin)", icon: Calendar, parent: "rrhh", adminOnly: true },
+  { href: "/rrhh/novedades-liquidadores", label: "Novedades Liquidadores", icon: ClipboardList, parent: "rrhh" },
   { href: "/tesoreria", label: "Tesorería", icon: Landmark },
   { href: "/legislacion", label: "Legislación", icon: BookOpen, expandable: true },
   { href: "/legislacion", label: "Legislación", icon: BookOpen, parent: "legislacion" },
@@ -48,6 +49,7 @@ const rrhhSubItems = [
   { href: "/rrhh/vacaciones", label: "Vacaciones", icon: Calendar },
   { href: "/rrhh/vacaciones/historial", label: "Historial de Vacaciones", icon: FileText },
   { href: "/rrhh/vacaciones/admin", label: "Vacaciones (Admin)", icon: Calendar, adminOnly: true },
+  { href: "/rrhh/novedades-liquidadores", label: "Novedades Liquidadores", icon: ClipboardList },
 ];
 
 const secretariaSubItems = [

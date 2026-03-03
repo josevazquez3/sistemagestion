@@ -111,6 +111,7 @@ model Legajo {
   solicitudesVacaciones   SolicitudVacaciones[]
   licencias              Licencia[]
   certificados           Certificado[]
+  novedadesLiquidacion   NovedadLiquidacion[]
 
   @@index([dni])
   @@index([numeroLegajo])
@@ -243,6 +244,30 @@ model ObservacionLicencia {
 
   @@index([licenciaId])
   @@map("observaciones_licencia")
+}
+
+// === NOVEDADES LIQUIDADORES (RRHH) ===
+
+model NovedadLiquidacion {
+  id               String    @id @default(cuid())
+  legajoId         String
+  legajo           Legajo    @relation(fields: [legajoId], references: [id], onDelete: Cascade)
+  tipo             String    // VACACIONES, FERIADO, DIA_UTEDYC, CARPETA, ADELANTO, OTROS
+  codigo           Int?      // 2611, 2601, 2641, 2501, 7311
+  fechaDesde       DateTime
+  fechaHasta       DateTime
+  diasTotal        Int
+  observacion      String?
+  liquidado        Boolean   @default(false)
+  fechaLiquidacion DateTime?
+  periodoNombre    String?
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+
+  @@unique([legajoId, tipo, fechaDesde])
+  @@index([legajoId])
+  @@index([liquidado])
+  @@map("novedades_liquidacion")
 }
 
 model Certificado {

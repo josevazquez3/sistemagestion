@@ -556,10 +556,41 @@ export async function aprobarSolicitudVacaciones(
     const hastaStr = formatearFecha(solicitud.fechaHasta);
     const diasStr = String(solicitud.diasSolicitados);
 
+    const observacion = `${formatearFecha(solicitud.fechaDesde)} al ${formatearFecha(solicitud.fechaHasta)}`;
+    const periodoNombre =
+      `${solicitud.fechaDesde.getFullYear()}-${String(solicitud.fechaDesde.getMonth() + 1).padStart(2, "0")}__NOVEDADES`;
+
     await prisma.$transaction(async (tx) => {
       await tx.solicitudVacaciones.update({
         where: { id: solicitud.id },
         data: { estado: EstadoVacaciones.APROBADA },
+      });
+      await tx.novedadLiquidacion.upsert({
+        where: {
+          legajoId_tipo_fechaDesde: {
+            legajoId: solicitud.legajoId,
+            tipo: "VACACIONES",
+            fechaDesde: solicitud.fechaDesde,
+          },
+        },
+        update: {
+          fechaHasta: solicitud.fechaHasta,
+          diasTotal: solicitud.diasSolicitados,
+          observacion,
+          periodoNombre,
+          liquidado: false,
+        },
+        create: {
+          legajoId: solicitud.legajoId,
+          tipo: "VACACIONES",
+          codigo: 2501,
+          fechaDesde: solicitud.fechaDesde,
+          fechaHasta: solicitud.fechaHasta,
+          diasTotal: solicitud.diasSolicitados,
+          observacion,
+          periodoNombre,
+          liquidado: false,
+        },
       });
     });
 
@@ -675,6 +706,14 @@ export async function darDeBajaSolicitud(
         await tx.solicitudVacaciones.update({
           where: { id: solicitud.id },
           data: { estado: EstadoVacaciones.BAJA },
+        });
+
+        await tx.novedadLiquidacion.deleteMany({
+          where: {
+            legajoId: solicitud.legajoId,
+            tipo: "VACACIONES",
+            fechaDesde: solicitud.fechaDesde,
+          },
         });
 
         const nuevoSaldo = config
