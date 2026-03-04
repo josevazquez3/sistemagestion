@@ -92,6 +92,7 @@ export function LegajoForm({
     localidad: "",
     codigoPostal: "",
     fechaAlta: "",
+    fechaNacimiento: "",
     fechaBaja: "",
     celular: "",
     contactos: [] as Contacto[],
@@ -117,6 +118,7 @@ export function LegajoForm({
             localidad: data.localidad ?? "",
             codigoPostal: data.codigoPostal ?? "",
             fechaAlta: data.fechaAlta ? new Date(data.fechaAlta).toISOString().split("T")[0] : "",
+            fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento).toISOString().split("T")[0] : "",
             fechaBaja: data.fechaBaja ? new Date(data.fechaBaja).toISOString().split("T")[0] : "",
             celular: celularSinPrefijo(data.celular),
             contactos: (data.contactos ?? []).map((c: { nombres: string; apellidos: string; parentesco: string; calle?: string; numero?: string; casa?: string; departamento?: string; piso?: string; telefonos: { numero: string }[] }) => ({
@@ -151,6 +153,7 @@ export function LegajoForm({
         localidad: "",
         codigoPostal: "",
         fechaAlta: "",
+        fechaNacimiento: "",
         fechaBaja: "",
         celular: "",
         contactos: [],
@@ -231,6 +234,7 @@ export function LegajoForm({
         localidad: form.localidad,
         codigoPostal: form.codigoPostal,
         fechaAlta: form.fechaAlta,
+        fechaNacimiento: form.fechaNacimiento || null,
         celular: form.celular.trim() ? "+54 " + form.celular.trim() : null,
         contactos: showContactos
           ? form.contactos
@@ -375,6 +379,18 @@ export function LegajoForm({
             <div className="space-y-2">
               <Label>Fecha de Alta *</Label>
               <Input type="date" value={form.fechaAlta} onChange={(e) => setForm((f) => ({ ...f, fechaAlta: e.target.value }))} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Fecha de nacimiento</Label>
+              <Input
+                type="date"
+                value={form.fechaNacimiento}
+                onChange={(e) => setForm((f) => ({ ...f, fechaNacimiento: e.target.value }))}
+                placeholder="dd/mm/aaaa"
+              />
             </div>
           </div>
 

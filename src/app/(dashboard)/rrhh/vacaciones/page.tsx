@@ -94,10 +94,9 @@ export default function VacacionesPage() {
   const [desde, hasta] = rango;
   const diasSeleccionados =
     desde && hasta ? calcularDiasVacaciones(desde, hasta) : 0;
-  const diasRestarian = config
-    ? config.diasRestantes - diasSeleccionados
-    : 0;
-  const insuficientes = config ? diasRestarian < 0 : true;
+  const restantes = config ? Math.max(0, config.diasRestantes) : 0;
+  const diasRestarian = config ? restantes - diasSeleccionados : 0;
+  const insuficientes = config ? diasSeleccionados > restantes : true;
   const puedeGuardar =
     config &&
     desde &&
@@ -181,7 +180,7 @@ export default function VacacionesPage() {
     : [];
 
   const diasDisponiblesParaEdicion = editarModal
-    ? (config?.diasRestantes ?? 0) + editarModal.solicitud.diasSolicitados
+    ? (config?.diasRestantes ?? 0)
     : 0;
 
   if (loading) {
@@ -233,8 +232,10 @@ export default function VacacionesPage() {
                 const diasAprobados = solicitudes
                   .filter((s) => s.estado === "APROBADA")
                   .reduce((sum, s) => sum + s.diasSolicitados, 0);
-                const diasRestantes =
-                  config.diasDisponibles - diasEnTramite - diasAprobados;
+                const diasRestantes = Math.max(
+                  0,
+                  config.diasDisponibles - diasAprobados
+                );
                 return (
                   <p className="text-sm text-gray-700">
                     <span className="font-medium">Disponibles:</span>{" "}
@@ -274,7 +275,7 @@ export default function VacacionesPage() {
               {/* Contador en tiempo real */}
               <ContadorDias
                 diasSeleccionados={diasSeleccionados}
-                diasDisponibles={config.diasRestantes}
+                diasDisponibles={restantes}
                 diasRestarian={diasRestarian}
                 insuficientes={insuficientes}
               />

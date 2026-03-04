@@ -31,6 +31,7 @@ type LegajoData = {
   localidad: string;
   codigoPostal: string;
   fechaAlta: string;
+  fechaNacimiento: string | null;
   fechaBaja: string | null;
   motivoBaja: string | null;
   celular: string | null;
@@ -64,7 +65,8 @@ export function LegajoVerSheet({ legajoId, onClose }: { legajoId: string | null;
       .finally(() => setLoading(false));
   }, [legajoId]);
 
-  const formatFecha = (s: string | null) => (s ? new Date(s).toLocaleDateString("es-AR") : "-");
+  const formatFecha = (s: string | null) =>
+    s ? new Date(s).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "—";
 
   return (
     <Sheet open={!!legajoId} onOpenChange={(o) => !o && onClose()}>
@@ -95,8 +97,9 @@ export function LegajoVerSheet({ legajoId, onClose }: { legajoId: string | null;
               <h3 className="font-medium text-gray-700">Datos personales</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <span className="text-gray-500">DNI:</span><span>{legajo.dni}</span>
-                <span className="text-gray-500">CUIL:</span><span>{legajo.cuil ?? "-"}</span>
-                <span className="text-gray-500">Celular:</span><span>{legajo.celular ?? "-"}</span>
+                <span className="text-gray-500">CUIL:</span><span>{legajo.cuil ?? "—"}</span>
+                <span className="text-gray-500">Fecha de nacimiento:</span><span>{legajo.fechaNacimiento ? formatFecha(legajo.fechaNacimiento) : "—"}</span>
+                <span className="text-gray-500">Celular:</span><span>{legajo.celular ?? "—"}</span>
               </div>
             </div>
 

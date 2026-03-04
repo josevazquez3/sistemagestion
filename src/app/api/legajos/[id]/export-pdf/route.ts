@@ -96,6 +96,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   y += 6;
   doc.text(`CUIL: ${legajo.cuil ?? "-"}`, margin, y);
   y += 6;
+  const fechaNacStr = legajo.fechaNacimiento
+    ? legajo.fechaNacimiento.toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })
+    : "-";
+  doc.text(`Fecha de nacimiento: ${fechaNacStr}`, margin, y);
+  y += 6;
   doc.text(`Celular: ${legajo.celular ?? "-"}`, margin, y);
   y += 10;
 

@@ -121,18 +121,33 @@ export async function setConfiguracionVacaciones(
       };
     }
 
-    await prisma.configuracionVacaciones.upsert({
-      where: { legajoId: parsed.data.legajoId },
-      create: {
-        legajoId: parsed.data.legajoId,
-        diasDisponibles: parsed.data.diasDisponibles,
-        secretarioGeneral: parsed.data.secretarioGeneral,
-      },
-      update: {
-        diasDisponibles: parsed.data.diasDisponibles,
-        secretarioGeneral: parsed.data.secretarioGeneral,
-      },
-    });
+    await prisma.$transaction([
+      prisma.configuracionVacaciones.upsert({
+        where: { legajoId: parsed.data.legajoId },
+        create: {
+          legajoId: parsed.data.legajoId,
+          diasDisponibles: parsed.data.diasDisponibles,
+          secretarioGeneral: parsed.data.secretarioGeneral,
+        },
+        update: {
+          diasDisponibles: parsed.data.diasDisponibles,
+          secretarioGeneral: parsed.data.secretarioGeneral,
+        },
+      }),
+      prisma.solicitudVacaciones.updateMany({
+        where: {
+          legajoId: parsed.data.legajoId,
+          estado: EstadoVacaciones.PENDIENTE,
+        },
+        data: { estado: EstadoVacaciones.CANCELADA },
+      }),
+      prisma.solicitudVacaciones.deleteMany({
+        where: {
+          legajoId: parsed.data.legajoId,
+          estado: EstadoVacaciones.APROBADA,
+        },
+      }),
+    ]);
 
     return { success: true, data: undefined };
   } catch {
@@ -141,7 +156,8 @@ export async function setConfiguracionVacaciones(
 }
 
 /**
- * Calcula días restantes considerando solicitudes PENDIENTE y APROBADA.
+ * Calcula días restantes considerando SOLO solicitudes APROBADAS.
+ * Los PENDIENTES no descuentan saldo (solo informativo).
  */
 async function calcularDiasRestantes(
   legajoId: string,
@@ -155,13 +171,13 @@ async function calcularDiasRestantes(
   const solicitudes = await prisma.solicitudVacaciones.findMany({
     where: {
       legajoId,
-      estado: { in: [EstadoVacaciones.PENDIENTE, EstadoVacaciones.APROBADA] },
+      estado: EstadoVacaciones.APROBADA,
       ...(excluirSolicitudId ? { id: { not: excluirSolicitudId } } : {}),
     },
   });
 
   const totalUsado = solicitudes.reduce((sum, s) => sum + s.diasSolicitados, 0);
-  return config.diasDisponibles - totalUsado;
+  return Math.max(0, config.diasDisponibles - totalUsado);
 }
 
 export type EstadoConfigVacaciones = "sin_legajo" | "sin_config" | "ok";
@@ -211,8 +227,10 @@ export async function getMiConfiguracionVacaciones(): Promise<
         estado: { in: [EstadoVacaciones.PENDIENTE, EstadoVacaciones.APROBADA] },
       },
     });
-    const diasUtilizados = solicitudes.reduce((sum, s) => sum + s.diasSolicitados, 0);
-    const diasRestantes = config.diasDisponibles - diasUtilizados;
+    const diasAprobados = solicitudes
+      .filter((s) => s.estado === EstadoVacaciones.APROBADA)
+      .reduce((sum, s) => sum + s.diasSolicitados, 0);
+    const diasRestantes = Math.max(0, config.diasDisponibles - diasAprobados);
 
     return {
       success: true,
@@ -220,7 +238,8 @@ export async function getMiConfiguracionVacaciones(): Promise<
       data: {
         legajoId,
         diasDisponibles: config.diasDisponibles,
-        diasUtilizados,
+        // Mantengo el nombre para no romper tipos en el front: ahora significa "aprobados"
+        diasUtilizados: diasAprobados,
         diasRestantes,
         secretarioGeneral: config.secretarioGeneral,
       },
@@ -356,10 +375,10 @@ export async function crearSolicitudVacaciones(
     const diasRestantesAntes = await calcularDiasRestantes(parsed.data.legajoId);
     const diasRestantes = diasRestantesAntes - diasSolicitados;
 
-    if (diasRestantes < 0) {
+    if (diasSolicitados > diasRestantesAntes) {
       return {
         success: false,
-        error: "No tenés días suficientes disponibles para este período.",
+        error: "No tenés suficientes días disponibles.",
       };
     }
 
@@ -389,7 +408,7 @@ export async function crearSolicitudVacaciones(
       data: {
         id: solicitud.id,
         diasSolicitados: solicitud.diasSolicitados,
-        diasRestantes: solicitud.diasRestantes,
+        diasRestantes: diasRestantesAntes,
       },
     };
   } catch {
@@ -469,9 +488,9 @@ export async function editarSolicitudVacaciones(
       solicitud.legajoId,
       solicitud.id
     );
-    const nuevosRestantes = diasRestantes - diasSolicitados;
+    const nuevosRestantes = Math.max(0, diasRestantes - diasSolicitados);
 
-    if (nuevosRestantes < 0) {
+    if (diasRestantes - diasSolicitados < 0) {
       return {
         success: false,
         error: "No tenés días suficientes disponibles para este período.",
@@ -929,7 +948,9 @@ export interface HistorialResult {
 }
 
 const histAnioSchema = z.number().int().min(2000).max(2100).optional();
-const histEstadoSchema = z.enum(["PENDIENTE", "APROBADA", "BAJA", "TODOS"]).optional();
+const histEstadoSchema = z
+  .enum(["PENDIENTE", "APROBADA", "BAJA", "CANCELADA", "TODOS"])
+  .optional();
 
 /**
  * Obtiene los años únicos que tienen solicitudes para un legajo.
@@ -1071,11 +1092,12 @@ export async function getHistorialVacaciones(
         .filter((s) => s.estado === EstadoVacaciones.BAJA)
         .reduce((sum, s) => sum + s.diasSolicitados, 0);
       const diasUsados = diasPendientes + diasAprobados;
-
       const esAnioActual = anioItem === anioActual;
       const diasDisponibles = esAnioActual && configActual ? configActual.diasDisponibles : null;
       const diasRestantes =
-        diasDisponibles !== null ? diasDisponibles - diasUsados : null;
+        diasDisponibles !== null
+          ? Math.max(0, diasDisponibles - diasAprobados)
+          : null;
 
       return {
         anio: anioItem,

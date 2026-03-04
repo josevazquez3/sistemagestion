@@ -35,7 +35,7 @@ export function FiltrosHistorial({
     } else {
       setAnio(anioActual !== undefined ? String(anioActual) : "");
     }
-    if (estadoParam && ["PENDIENTE", "APROBADA", "BAJA", "TODOS"].includes(estadoParam)) {
+    if (estadoParam && ["PENDIENTE", "APROBADA", "BAJA", "CANCELADA", "TODOS"].includes(estadoParam)) {
       setEstado(estadoParam);
     } else {
       setEstado(estadoActual ?? "TODOS");
@@ -84,6 +84,7 @@ export function FiltrosHistorial({
         <option value="PENDIENTE">Pendiente</option>
         <option value="APROBADA">Aprobada</option>
         <option value="BAJA">Baja</option>
+        <option value="CANCELADA">Cancelada</option>
       </select>
       <Button
         onClick={handleBuscar}

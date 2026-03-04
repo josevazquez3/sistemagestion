@@ -34,7 +34,7 @@ export default async function HistorialVacacionesPage({
       : undefined;
   const estado =
     typeof estadoParam === "string" &&
-    ["PENDIENTE", "APROBADA", "BAJA", "TODOS"].includes(estadoParam)
+    ["PENDIENTE", "APROBADA", "BAJA", "CANCELADA", "TODOS"].includes(estadoParam)
       ? estadoParam
       : undefined;
   const legajoIdFromUrl =
@@ -71,7 +71,7 @@ export default async function HistorialVacacionesPage({
     );
   }
 
-  const estadoFiltro = (estado ?? "TODOS") as "PENDIENTE" | "APROBADA" | "BAJA" | "TODOS";
+  const estadoFiltro = (estado ?? "TODOS") as "PENDIENTE" | "APROBADA" | "BAJA" | "CANCELADA" | "TODOS";
   const [historialRes, aniosRes] = await Promise.all([
     getHistorialVacaciones({
       legajoId,

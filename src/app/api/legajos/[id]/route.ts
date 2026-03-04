@@ -41,16 +41,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const body = await req.json();
 
+    /** Convierte valor de input date (YYYY-MM-DD o "") a Date o null. Evita Invalid Date. */
+    const toDateOrNull = (val: unknown): Date | null => {
+      if (val == null || val === "") return null;
+      const s = String(val).trim();
+      if (!s) return null;
+      const d = new Date(s);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+
     const update: Record<string, unknown> = {};
     const fields = [
       "numeroLegajo", "nombres", "apellidos", "dni", "cuil", "fotoUrl",
       "calle", "numero", "casa", "departamento", "piso",
-      "localidad", "codigoPostal", "fechaAlta", "celular",
+      "localidad", "codigoPostal", "fechaAlta", "fechaNacimiento", "celular",
     ];
+    const dateFields = ["fechaAlta", "fechaNacimiento"];
     for (const f of fields) {
       if (body[f] !== undefined) {
         if (f === "numeroLegajo" || f === "numero") (update as Record<string, number>)[f] = parseInt(body[f]);
-        else if (f === "fechaAlta") (update as Record<string, Date>)[f] = new Date(body[f]);
+        else if (dateFields.includes(f)) (update as Record<string, Date | null>)[f] = toDateOrNull(body[f]);
         else (update as Record<string, string | null>)[f] = body[f] ?? null;
       }
     }
@@ -116,7 +126,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     return NextResponse.json(updated);
   } catch (e) {
-    console.error("Error actualizando legajo:", e);
-    return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[PATCH /api/legajos/[id]] Error:", e);
+    return NextResponse.json(
+      { error: "Error al actualizar", detalle: msg },
+      { status: 500 }
+    );
   }
 }

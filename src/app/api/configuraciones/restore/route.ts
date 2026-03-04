@@ -11,6 +11,7 @@ const CAMPOS_FECHA = [
   "creadoEn",
   "actualizadoEn",
   "fechaAlta",
+  "fechaNacimiento",
   "fechaBaja",
   "fechaInicio",
   "fechaFin",

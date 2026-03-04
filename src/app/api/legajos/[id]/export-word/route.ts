@@ -28,6 +28,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     new Paragraph({ text: `Nombres: ${legajo.nombres}`, spacing: { after: 100 } }),
     new Paragraph({ text: `DNI: ${legajo.dni}`, spacing: { after: 100 } }),
     new Paragraph({ text: `CUIL: ${legajo.cuil ?? "-"}`, spacing: { after: 100 } }),
+    new Paragraph({
+      text: `Fecha de nacimiento: ${legajo.fechaNacimiento ? legajo.fechaNacimiento.toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "-"}`,
+      spacing: { after: 100 },
+    }),
     new Paragraph({ text: `Celular: ${legajo.celular ?? "-"}`, spacing: { after: 300 } }),
     new Paragraph({ children: [new TextRun({ text: "DIRECCIÓN", bold: true })], spacing: { before: 200, after: 200 } }),
     new Paragraph({ text: `${legajo.calle} ${legajo.numero}${legajo.casa ? ` ${legajo.casa}` : ""}`, spacing: { after: 100 } }),

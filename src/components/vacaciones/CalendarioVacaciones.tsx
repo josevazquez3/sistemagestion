@@ -4,8 +4,7 @@ import { useCallback } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { cn } from "@/lib/utils";
-
-export type EstadoVacaciones = "PENDIENTE" | "APROBADA" | "BAJA";
+import { EstadoVacaciones } from "@prisma/client";
 
 export interface SolicitudCalendario {
   fechaDesde: Date;

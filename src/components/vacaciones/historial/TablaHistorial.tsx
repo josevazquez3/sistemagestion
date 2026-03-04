@@ -27,12 +27,14 @@ const estadoBadgeClass: Record<string, string> = {
   APROBADA: "bg-green-100 text-green-700",
   PENDIENTE: "bg-amber-100 text-amber-700",
   BAJA: "bg-red-100 text-red-700",
+  CANCELADA: "bg-gray-100 text-gray-500",
 };
 
 const estadoLabel: Record<string, string> = {
   APROBADA: "Aprobada",
   PENDIENTE: "Pendiente",
   BAJA: "Baja",
+  CANCELADA: "Cancelada",
 };
 
 type SortKey = "anio" | "fechaDesde" | "fechaHasta";

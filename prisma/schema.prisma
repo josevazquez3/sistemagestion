@@ -102,6 +102,7 @@ model Legajo {
   localidad              String
   codigoPostal           String
   fechaAlta              DateTime
+  fechaNacimiento        DateTime?
   fechaBaja              DateTime?
   motivoBaja             String?
   celular                String?
@@ -160,6 +161,7 @@ enum EstadoVacaciones {
   PENDIENTE
   APROBADA
   BAJA
+  CANCELADA
 }
 
 model ConfiguracionVacaciones {

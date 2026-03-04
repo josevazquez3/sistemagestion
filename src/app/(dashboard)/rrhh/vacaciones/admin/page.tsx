@@ -55,6 +55,7 @@ const estadoBadgeClass: Record<string, string> = {
   PENDIENTE: "bg-amber-100 text-amber-800 border-amber-300",
   APROBADA: "bg-green-100 text-green-800 border-green-300",
   BAJA: "bg-red-100 text-red-800 border-red-300 line-through",
+  CANCELADA: "bg-gray-100 text-gray-600 border-gray-300",
 };
 
 export default function VacacionesAdminPage() {
@@ -82,6 +83,7 @@ export default function VacacionesAdminPage() {
   const [solicitudesLoading, setSolicitudesLoading] = useState(false);
   const [bajaModal, setBajaModal] = useState<SolicitudAdmin | null>(null);
   const [bajaLoading, setBajaLoading] = useState(false);
+  const [confirmarConfigModal, setConfirmarConfigModal] = useState(false);
   const [aprobarLoading, setAprobarLoading] = useState<number | null>(null);
   const [usuariosVinculacion, setUsuariosVinculacion] = useState<UsuarioVinculacion[]>([]);
   const [vinculacionLoading, setVinculacionLoading] = useState(false);
@@ -216,7 +218,7 @@ export default function VacacionesAdminPage() {
     }
   }, [empleadoId, cargarConfigYSolicitudes]);
 
-  const handleGuardarConfig = async () => {
+  const handleGuardarConfigClick = () => {
     if (!empleadoId) return;
     const dias = parseInt(diasDisponibles, 10);
     if (isNaN(dias) || dias < 0) {
@@ -227,7 +229,16 @@ export default function VacacionesAdminPage() {
       setFeedback({ tipo: "error", mensaje: "El nombre del Secretario General es requerido." });
       return;
     }
+    setFeedback(null);
+    setConfirmarConfigModal(true);
+  };
 
+  const handleGuardarConfig = async () => {
+    if (!empleadoId) return;
+    const dias = parseInt(diasDisponibles, 10);
+    if (isNaN(dias) || dias < 0) return;
+
+    setConfirmarConfigModal(false);
     setGuardando(true);
     setFeedback(null);
     try {
@@ -239,6 +250,7 @@ export default function VacacionesAdminPage() {
       if (res.success) {
         setFeedback({ tipo: "success", mensaje: "Configuración guardada correctamente." });
         setConfig({ diasDisponibles: dias, secretarioGeneral: secretarioGeneral.trim() });
+        if (empleadoId) cargarConfigYSolicitudes(empleadoId);
       } else {
         setFeedback({ tipo: "error", mensaje: res.error ?? "Error al guardar." });
       }
@@ -503,7 +515,7 @@ export default function VacacionesAdminPage() {
               </div>
 
               <Button
-                onClick={handleGuardarConfig}
+                onClick={handleGuardarConfigClick}
                 disabled={guardando}
                 className="bg-[#4CAF50] hover:bg-[#388E3C]"
               >
@@ -622,6 +634,34 @@ export default function VacacionesAdminPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Modal confirmar asignar días (reset ciclo) */}
+      {confirmarConfigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-amber-700 mb-2">
+              Confirmar asignación de días
+            </h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Al asignar nuevos días se resetearán todas las solicitudes de vacaciones del empleado (pendientes y aprobadas). ¿Estás seguro?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setConfirmarConfigModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleGuardarConfig}
+                className="bg-[#4CAF50] hover:bg-[#388E3C]"
+              >
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal confirmar baja */}
