@@ -106,6 +106,11 @@ export function CalendarioVacaciones({
       const arr = Array.isArray(v) ? v : [v, v];
       const d1 = arr[0] instanceof Date ? arr[0] : null;
       const d2 = arr[1] instanceof Date ? arr[1] : null;
+      // Un solo día seleccionado (primer clic o rango de 1 día): inicio y fin = mismo día
+      if (d1 && !d2) {
+        onChange([d1, d1]);
+        return;
+      }
       onChange([d1, d2]);
     },
     [disabled, onChange]

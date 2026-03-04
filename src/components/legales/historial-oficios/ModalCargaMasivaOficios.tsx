@@ -55,7 +55,7 @@ function formatSize(bytes: number): string {
 }
 
 function nombreSinExtension(name: string): string {
-  return name.replace(/\.docx$/i, "") || name;
+  return name.replace(/\.pdf$/i, "") || name;
 }
 
 type ModalCargaMasivaOficiosProps = {
@@ -127,9 +127,11 @@ export function ModalCargaMasivaOficios({
       currentNames.add(nameLower);
       let status: "pendiente" | "invalido" = "pendiente";
       let error: string | undefined;
-      if (!nameLower.endsWith(".docx")) {
+      const esValido =
+        nameLower.endsWith(".pdf") || file.type === "application/pdf";
+      if (!esValido) {
         status = "invalido";
-        error = "Formato no permitido";
+        error = "Formato no permitido (solo PDF)";
       } else if (file.size > MAX_FILE_SIZE) {
         status = "invalido";
         error = "Supera 10 MB";
@@ -286,16 +288,16 @@ export function ModalCargaMasivaOficios({
                 <input
                   id="carga-masiva-oficios-input"
                   type="file"
-                  accept=".docx"
+                  accept=".pdf,application/pdf"
                   multiple
                   className="hidden"
                   onChange={(e) => addFiles(e.target.files)}
                 />
                 <p className="text-gray-600">
-                  Arrastrá los archivos .docx o hacé clic para seleccionar
+                  Arrastrá los archivos .pdf o hacé clic para seleccionar
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Máximo {MAX_FILES} archivos, 10 MB cada uno
+                  Solo PDF, máx. 10 MB cada uno. Máximo {MAX_FILES} archivos.
                 </p>
               </div>
 

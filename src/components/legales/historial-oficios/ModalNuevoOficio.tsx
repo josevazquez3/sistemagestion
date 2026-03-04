@@ -65,8 +65,12 @@ export function ModalNuevoOficio({
       showMessage("error", "El archivo no puede superar 10 MB.");
       return;
     }
-    if (file && !file.name.toLowerCase().endsWith(".docx")) {
-      showMessage("error", "Solo se permiten archivos .docx.");
+    if (
+      file &&
+      !file.name.toLowerCase().endsWith(".pdf") &&
+      file.type !== "application/pdf"
+    ) {
+      showMessage("error", "Solo se permiten archivos PDF.");
       return;
     }
 
@@ -100,7 +104,7 @@ export function ModalNuevoOficio({
         <DialogHeader>
           <DialogTitle>Nuevo Oficio</DialogTitle>
           <DialogDescription>
-            Título, fecha y opcionalmente el archivo .docx del oficio.
+            Título, fecha y opcionalmente el archivo PDF del oficio.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -130,7 +134,7 @@ export function ModalNuevoOficio({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Archivo .docx (opcional, máx. 10 MB)
+              Archivo PDF (opcional, máx. 10 MB)
             </label>
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
@@ -144,25 +148,31 @@ export function ModalNuevoOficio({
               onDrop={(e) => {
                 e.preventDefault();
                 setDrag(false);
-                const f = e.dataTransfer.files[0];
-                if (f?.name.toLowerCase().endsWith(".docx")) setFile(f);
+                const f0 = e.dataTransfer.files[0];
+                if (
+                  f0 &&
+                  (f0.name.toLowerCase().endsWith(".pdf") ||
+                    f0.type === "application/pdf")
+                ) {
+                  setFile(f0);
+                }
               }}
             >
               <input
                 type="file"
-                accept=".docx"
+                accept=".pdf,application/pdf"
                 className="hidden"
                 id="modal-nuevo-oficio-file"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
-              <label htmlFor="modal-nueva-acta-file" className="cursor-pointer">
+              <label htmlFor="modal-nuevo-oficio-file" className="cursor-pointer">
                 {file ? (
                   <span className="text-sm text-[#388E3C] font-medium">
                     {file.name}
                   </span>
                 ) : (
                   <span className="text-sm text-gray-500">
-                    Opcional. Podés adjuntar el archivo del oficio. Arrastrá un .docx o hacé clic para elegir.
+                    Opcional. Podés adjuntar el archivo del oficio. Arrastrá un PDF o hacé clic para elegir.
                   </span>
                 )}
               </label>

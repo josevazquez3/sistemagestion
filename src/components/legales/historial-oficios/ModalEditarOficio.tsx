@@ -83,8 +83,12 @@ export function ModalEditarOficio({
       showMessage("error", "El archivo no puede superar 10 MB.");
       return;
     }
-    if (file && !file.name.toLowerCase().endsWith(".docx")) {
-      showMessage("error", "Solo se permiten archivos .docx.");
+    if (
+      file &&
+      !file.name.toLowerCase().endsWith(".pdf") &&
+      file.type !== "application/pdf"
+    ) {
+      showMessage("error", "Solo se permiten archivos PDF.");
       return;
     }
 
@@ -176,7 +180,7 @@ export function ModalEditarOficio({
           )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {tieneArchivo ? "Reemplazar con otro .docx (opcional)" : "Adjuntar .docx (opcional)"}
+              {tieneArchivo ? "Reemplazar con otro PDF (opcional)" : "Adjuntar PDF (opcional)"}
             </label>
             <div
               className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
@@ -191,22 +195,27 @@ export function ModalEditarOficio({
                 e.preventDefault();
                 setDrag(false);
                 const f = e.dataTransfer.files[0];
-                if (f?.name.toLowerCase().endsWith(".docx")) setFile(f);
+                if (
+                  f &&
+                  (f.name.toLowerCase().endsWith(".pdf") ||
+                    f.type === "application/pdf")
+                )
+                  setFile(f);
               }}
             >
               <input
                 type="file"
-                accept=".docx"
+                accept=".pdf,application/pdf"
                 className="hidden"
                 id="modal-editar-oficio-file"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
-              <label htmlFor="modal-editar-acta-file" className="cursor-pointer">
+              <label htmlFor="modal-editar-oficio-file" className="cursor-pointer">
                 {file ? (
                   <span className="text-sm text-[#388E3C] font-medium">{file.name}</span>
                 ) : (
                   <span className="text-sm text-gray-500">
-                    Arrastrá un .docx o hacé clic para elegir
+                    Arrastrá un PDF o hacé clic para elegir
                   </span>
                 )}
               </label>

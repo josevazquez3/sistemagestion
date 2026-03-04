@@ -9,8 +9,7 @@ import { randomBytes } from "crypto";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const DOCX_MIME =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const PDF_MIME = "application/pdf";
 
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
@@ -115,20 +114,20 @@ export async function POST(req: NextRequest) {
 
     if (file && file.size > 0) {
       const name = file.name.toLowerCase();
-      if (!name.endsWith(".docx")) {
+      if (!name.endsWith(".pdf")) {
         return NextResponse.json(
-          { error: "Solo se permiten archivos .docx" },
+          { error: "Solo se permiten archivos PDF" },
           { status: 400 }
         );
       }
       const contentType = file.type?.toLowerCase() ?? "";
       const validMime =
-        contentType === DOCX_MIME ||
+        contentType === PDF_MIME ||
         contentType === "application/octet-stream" ||
         contentType === "";
       if (!validMime) {
         return NextResponse.json(
-          { error: "Tipo de archivo no válido. Debe ser .docx" },
+          { error: "Tipo de archivo no válido. Debe ser PDF" },
           { status: 400 }
         );
       }
@@ -142,7 +141,7 @@ export async function POST(req: NextRequest) {
       await mkdir(UPLOAD_DIR, { recursive: true });
       const timestamp = Date.now();
       const random = randomBytes(4).toString("hex");
-      const safeName = `oficio_${timestamp}_${random}.docx`;
+      const safeName = `oficio_${timestamp}_${random}.pdf`;
       const filePath = path.join(UPLOAD_DIR, safeName);
       const buffer = Buffer.from(await file.arrayBuffer());
       await writeFile(filePath, buffer);

@@ -7,8 +7,7 @@ import path from "path";
 import { randomBytes } from "crypto";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
-const DOCX_MIME =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const PDF_MIME = "application/pdf";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "historial-oficios");
 
@@ -78,13 +77,34 @@ export async function PUT(
     }
     if (file && file.size > 0) {
       const name = file.name.toLowerCase();
-      if (!name.endsWith(".docx")) return NextResponse.json({ error: "Solo se permiten archivos .docx" }, { status: 400 });
-      if (file.size > MAX_FILE_SIZE) return NextResponse.json({ error: "El archivo no puede superar 10 MB" }, { status: 400 });
+      if (!name.endsWith(".pdf")) {
+        return NextResponse.json(
+          { error: "Solo se permiten archivos PDF" },
+          { status: 400 }
+        );
+      }
+      const contentType = file.type?.toLowerCase() ?? "";
+      const validMime =
+        contentType === PDF_MIME ||
+        contentType === "application/octet-stream" ||
+        contentType === "";
+      if (!validMime) {
+        return NextResponse.json(
+          { error: "Tipo de archivo no válido. Debe ser PDF" },
+          { status: 400 }
+        );
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          { error: "El archivo no puede superar 10 MB" },
+          { status: 400 }
+        );
+      }
       if (oficio.urlArchivo) {
         try { await unlink(path.join(process.cwd(), "public", oficio.urlArchivo)); } catch {}
       }
       await mkdir(UPLOAD_DIR, { recursive: true });
-      const safeName = `oficio_${Date.now()}_${randomBytes(4).toString("hex")}.docx`;
+      const safeName = `oficio_${Date.now()}_${randomBytes(4).toString("hex")}.pdf`;
       const filePath = path.join(UPLOAD_DIR, safeName);
       await writeFile(filePath, Buffer.from(await file.arrayBuffer()));
       data.nombreArchivo = file.name;

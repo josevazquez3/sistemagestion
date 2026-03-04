@@ -112,11 +112,11 @@ export function DocumentosTabla({
                   {formatFechaHora(doc.creadoEn)}
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
+                  <div className="flex items-center justify-end gap-2">
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 shrink-0"
                       onClick={() => onVer(doc)}
                       title="Ver"
                     >
@@ -127,7 +127,7 @@ export function DocumentosTabla({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 w-8 p-0"
+                          className="h-8 w-8 p-0 shrink-0"
                           onClick={() => onEditar(doc)}
                           title="Editar"
                         >
@@ -136,7 +136,7 @@ export function DocumentosTabla({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                          className="h-8 w-8 p-0 shrink-0 text-red-600 hover:bg-red-50"
                           onClick={() => onEliminar(doc)}
                           title="Eliminar"
                         >
@@ -147,7 +147,7 @@ export function DocumentosTabla({
                     <Button
                       size="sm"
                       variant="link"
-                      className="h-8 p-0 text-[#388E3C]"
+                      className="h-8 shrink-0 p-0 text-[#388E3C]"
                       onClick={() => onDescargar(doc)}
                       title="Descargar"
                     >

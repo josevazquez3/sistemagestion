@@ -219,38 +219,42 @@ export function CategoriasPanel({
                           {c.activo ? "Activa" : "Inactiva"}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 mr-1"
-                          onClick={() => {
-                            setCategoriaEditar(c);
-                            setNombre(c.nombre);
-                            setDescripcion(c.descripcion || "");
-                            setModalEditar(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 mr-1"
-                          onClick={() => toggleActivo(c)}
-                        >
-                          {c.activo ? "Desactivar" : "Activar"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
-                          onClick={() => handleEliminar(c)}
-                          disabled={(c.cantidadDocumentos ?? 0) > 0}
-                          title={(c.cantidadDocumentos ?? 0) > 0 ? "Hay documentos asociados" : "Eliminar"}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <TableCell className="text-right px-2 py-2">
+                        <div className="flex items-center gap-3 justify-end">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 shrink-0"
+                            onClick={() => {
+                              setCategoriaEditar(c);
+                              setNombre(c.nombre);
+                              setDescripcion(c.descripcion || "");
+                              setModalEditar(true);
+                            }}
+                            title="Editar"
+                          >
+                            <Pencil className="h-4 w-4 text-gray-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="shrink-0 p-1.5 text-yellow-700 hover:bg-yellow-50"
+                            onClick={() => toggleActivo(c)}
+                            title={c.activo ? "Desactivar" : "Activar"}
+                          >
+                            {c.activo ? "Desactivar" : "Activar"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 shrink-0 text-red-600 hover:bg-red-50"
+                            onClick={() => handleEliminar(c)}
+                            disabled={(c.cantidadDocumentos ?? 0) > 0}
+                            title={(c.cantidadDocumentos ?? 0) > 0 ? "Hay documentos asociados" : "Eliminar"}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

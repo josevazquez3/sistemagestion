@@ -260,8 +260,7 @@ export default function VacacionesPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Calendario</CardTitle>
               <p className="text-sm text-gray-500">
-                Seleccioná el rango de fechas (cliqueá fecha inicio y luego fecha
-                fin)
+                Cliqueá un día para seleccionarlo, o cliqueá dos días para un rango
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
