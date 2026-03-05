@@ -1,11 +1,19 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { cn } from "@/lib/utils";
 import { EstadoVacaciones } from "@prisma/client";
 import { normalizarFecha } from "@/lib/vacaciones.utils";
+
+/** Formato YYYY-MM-DD para input type="date" */
+function formatoInputDate(fecha: Date): string {
+  const y = fecha.getFullYear();
+  const m = String(fecha.getMonth() + 1).padStart(2, "0");
+  const d = String(fecha.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 export interface SolicitudCalendario {
   fechaDesde: Date;
@@ -65,6 +73,21 @@ export function CalendarioVacaciones({
   locale = "es-AR",
 }: CalendarioVacacionesProps) {
   const [desde, hasta] = value;
+  const [activeStartDate, setActiveStartDate] = useState<Date>(() => {
+    const d = value[0] ?? new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+
+  useEffect(() => {
+    if (value[0]) {
+      const d = value[0];
+      setActiveStartDate((prev) => {
+        const sameMonth =
+          prev.getFullYear() === d.getFullYear() && prev.getMonth() === d.getMonth();
+        return sameMonth ? prev : new Date(d.getFullYear(), d.getMonth(), 1);
+      });
+    }
+  }, [value[0]?.getTime()]);
 
   const tileClassName = useCallback(
     ({ date, view }: { date: Date; view: string }) => {
@@ -107,10 +130,8 @@ export function CalendarioVacaciones({
       const arr = Array.isArray(v) ? v : [v, v];
       const d1 = arr[0] instanceof Date ? arr[0] : null;
       const d2 = arr[1] instanceof Date ? arr[1] : null;
-      // Normalizar a medianoche local para evitar desfases en el conteo de días
       const norm1 = d1 ? normalizarFecha(d1) : null;
       const norm2 = d2 ? normalizarFecha(d2) : null;
-      // Un solo día seleccionado (primer clic o rango de 1 día): inicio y fin = mismo día
       if (norm1 && !norm2) {
         onChange([norm1, norm1]);
         return;
@@ -120,12 +141,83 @@ export function CalendarioVacaciones({
     [disabled, onChange]
   );
 
+  const setActiveDateCalendario = useCallback((fecha: Date) => {
+    setActiveStartDate(new Date(fecha.getFullYear(), fecha.getMonth(), 1));
+  }, []);
+
+  const handleCambioDesde = useCallback(
+    (valor: string) => {
+      if (disabled) return;
+      if (!valor.trim()) {
+        onChange([null, null]);
+        return;
+      }
+      const fecha = normalizarFecha(new Date(valor + "T12:00:00"));
+      const nuevaHasta =
+        hasta && hasta >= fecha ? hasta : fecha;
+      setActiveDateCalendario(fecha);
+      onChange([fecha, nuevaHasta]);
+    },
+    [disabled, hasta, onChange, setActiveDateCalendario]
+  );
+
+  const handleCambioHasta = useCallback(
+    (valor: string) => {
+      if (disabled) return;
+      if (!valor.trim()) {
+        if (desde) {
+          onChange([desde, desde]);
+        }
+        return;
+      }
+      const fecha = normalizarFecha(new Date(valor + "T12:00:00"));
+      if (desde && fecha < desde) {
+        onChange([fecha, desde]);
+        setActiveDateCalendario(fecha);
+        return;
+      }
+      setActiveDateCalendario(fecha);
+      onChange([desde ?? fecha, fecha]);
+    },
+    [disabled, desde, onChange, setActiveDateCalendario]
+  );
+
   return (
-    <div className={cn("vacaciones-calendar", disabled && "pointer-events-none opacity-60")}>
+    <div className={cn("vacaciones-calendar space-y-3", disabled && "pointer-events-none opacity-60")}>
+      <div className="flex flex-wrap gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-1">
+            Desde
+          </label>
+          <input
+            type="date"
+            value={desde ? formatoInputDate(desde) : ""}
+            onChange={(e) => handleCambioDesde(e.target.value)}
+            disabled={disabled}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-1">
+            Hasta
+          </label>
+          <input
+            type="date"
+            value={hasta ? formatoInputDate(hasta) : ""}
+            onChange={(e) => handleCambioHasta(e.target.value)}
+            disabled={disabled}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          />
+        </div>
+      </div>
       <Calendar
         selectRange
         value={value}
         onChange={handleChange}
+        activeStartDate={activeStartDate}
+        onActiveStartDateChange={({ activeStartDate: next }) =>
+          next && setActiveStartDate(next)
+        }
         tileClassName={tileClassName}
         locale={locale}
         formatShortWeekday={(_, date) =>
