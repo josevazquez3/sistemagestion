@@ -8,20 +8,38 @@ const MESES_ES: readonly string[] = [
 ];
 
 /**
+ * Normaliza una fecha a medianoche en hora local (evita desfases por hora).
+ * Útil al recibir fechas del calendario.
+ */
+export function normalizarFecha(fecha: Date): Date {
+  return new Date(
+    fecha.getFullYear(),
+    fecha.getMonth(),
+    fecha.getDate()
+  );
+}
+
+/**
  * Calcula días corridos entre dos fechas, ambos extremos inclusive.
+ * Usa componentes de fecha (año, mes, día) y Date.UTC para evitar que
+ * el cambio de horario (DST) sume o reste un día.
  * @param desde - Fecha de inicio
  * @param hasta - Fecha de fin
  * @returns Cantidad de días (incluyendo desde y hasta)
  */
 export function calcularDiasVacaciones(desde: Date, hasta: Date): number {
-  const inicio = new Date(desde);
-  const fin = new Date(hasta);
-
-  inicio.setHours(0, 0, 0, 0);
-  fin.setHours(0, 0, 0, 0);
-
-  const diffMs = fin.getTime() - inicio.getTime();
-  const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const inicioUTC = Date.UTC(
+    desde.getFullYear(),
+    desde.getMonth(),
+    desde.getDate()
+  );
+  const finUTC = Date.UTC(
+    hasta.getFullYear(),
+    hasta.getMonth(),
+    hasta.getDate()
+  );
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const diffDias = Math.floor((finUTC - inicioUTC) / msPerDay);
 
   if (diffDias < 0) {
     return 0;

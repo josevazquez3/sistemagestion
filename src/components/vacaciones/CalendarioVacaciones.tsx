@@ -5,6 +5,7 @@ import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { cn } from "@/lib/utils";
 import { EstadoVacaciones } from "@prisma/client";
+import { normalizarFecha } from "@/lib/vacaciones.utils";
 
 export interface SolicitudCalendario {
   fechaDesde: Date;
@@ -106,12 +107,15 @@ export function CalendarioVacaciones({
       const arr = Array.isArray(v) ? v : [v, v];
       const d1 = arr[0] instanceof Date ? arr[0] : null;
       const d2 = arr[1] instanceof Date ? arr[1] : null;
+      // Normalizar a medianoche local para evitar desfases en el conteo de días
+      const norm1 = d1 ? normalizarFecha(d1) : null;
+      const norm2 = d2 ? normalizarFecha(d2) : null;
       // Un solo día seleccionado (primer clic o rango de 1 día): inicio y fin = mismo día
-      if (d1 && !d2) {
-        onChange([d1, d1]);
+      if (norm1 && !norm2) {
+        onChange([norm1, norm1]);
         return;
       }
-      onChange([d1, d2]);
+      onChange([norm1, norm2]);
     },
     [disabled, onChange]
   );
