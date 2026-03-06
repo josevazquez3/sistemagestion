@@ -208,17 +208,34 @@ export async function getMiConfiguracionVacaciones(): Promise<
       return { success: false, error: "Debés iniciar sesión." };
     }
 
-    const legajoId = (session.user as { legajoId?: string }).legajoId;
+    const userId = (session.user as { id?: string }).id;
+    if (!userId) {
+      return { success: false, error: "Sesión inválida." };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { legajoId: true },
+    });
+    const legajoId = user?.legajoId ?? null;
     if (!legajoId) {
       return { success: true, estado: "sin_legajo", data: null };
     }
 
-    const config = await prisma.configuracionVacaciones.findUnique({
+    let config = await prisma.configuracionVacaciones.findUnique({
       where: { legajoId },
     });
 
     if (!config) {
-      return { success: true, estado: "sin_config", data: { legajoId } };
+      config = await prisma.configuracionVacaciones.upsert({
+        where: { legajoId },
+        create: {
+          legajoId,
+          diasDisponibles: 0,
+          secretarioGeneral: "Secretario General",
+        },
+        update: {},
+      });
     }
 
     const solicitudes = await prisma.solicitudVacaciones.findMany({

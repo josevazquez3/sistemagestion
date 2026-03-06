@@ -27,6 +27,9 @@ interface TablaSolicitudesProps {
   onEditar: (solicitud: SolicitudTabla) => void;
   onDarDeBaja: (solicitud: SolicitudTabla) => void;
   onDescargar: (solicitudId: number) => void;
+  /** Si es true (SUPER_ADMIN), se muestra botón eliminar físico y se habilita dar de baja en APROBADA */
+  isSuperAdmin?: boolean;
+  onEliminarFisico?: (solicitud: SolicitudTabla) => void;
 }
 
 const estadoBadgeClass: Record<EstadoVacaciones, string> = {
@@ -41,6 +44,8 @@ export function TablaSolicitudes({
   onEditar,
   onDarDeBaja,
   onDescargar,
+  isSuperAdmin = false,
+  onEliminarFisico,
 }: TablaSolicitudesProps) {
   if (solicitudes.length === 0) {
     return (
@@ -94,11 +99,22 @@ export function TablaSolicitudes({
                       variant="ghost"
                       size="icon-sm"
                       onClick={() => onDarDeBaja(s)}
-                      title="Dar de baja"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      title="Dar de baja (lógica)"
+                      className="text-orange-500 hover:text-orange-600 hover:bg-orange-50"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                    {isSuperAdmin && onEliminarFisico && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => onEliminarFisico(s)}
+                        title="Eliminar permanentemente (irreversible)"
+                        className="text-red-700 hover:text-red-800 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -122,15 +138,60 @@ export function TablaSolicitudes({
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      disabled
-                      title="Solo RRHH o Admin puede cancelar una solicitud aprobada."
-                      className="text-gray-400 cursor-not-allowed opacity-60"
+                      onClick={() => isSuperAdmin ? onDarDeBaja(s) : undefined}
+                      disabled={!isSuperAdmin}
+                      title={isSuperAdmin ? "Dar de baja (lógica)" : "Solo RRHH o Admin puede cancelar una solicitud aprobada."}
+                      className={isSuperAdmin ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50" : "text-gray-400 cursor-not-allowed opacity-60"}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                    {isSuperAdmin && onEliminarFisico && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => onEliminarFisico(s)}
+                        title="Eliminar permanentemente (irreversible)"
+                        className="text-red-700 hover:text-red-800 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </>
                 )}
-                {s.estado === "BAJA" && <span className="text-gray-400">—</span>}
+                {s.estado === "BAJA" && (
+                  <>
+                    {isSuperAdmin && onEliminarFisico ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => onEliminarFisico(s)}
+                        title="Eliminar permanentemente (irreversible)"
+                        className="text-red-700 hover:text-red-800 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </>
+                )}
+                {(s.estado === "CANCELADA" || (s.estado !== "PENDIENTE" && s.estado !== "APROBADA" && s.estado !== "BAJA")) && (
+                  <>
+                    {isSuperAdmin && onEliminarFisico ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => onEliminarFisico(s)}
+                        title="Eliminar permanentemente (irreversible)"
+                        className="text-red-700 hover:text-red-800 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </>
+                )}
               </div>
             </TableCell>
           </TableRow>

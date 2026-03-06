@@ -12,11 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FilePlus, FolderUp, Search, Eye, Pencil, Trash2, Loader2 } from "lucide-react";
+import { FilePlus, FolderUp, Search, Eye, Pencil, Trash2, Loader2, FileText, FileDown } from "lucide-react";
 import { ModalNuevaActa } from "./ModalNuevaActa";
 import { ModalVerActa } from "./ModalVerActa";
 import { ModalEditarActa } from "./ModalEditarActa";
 import { ModalCargaMasivaActas } from "./ModalCargaMasivaActas";
+import { exportarActaPDF, exportarActaDOCX } from "@/lib/exportarActas";
 import type { Acta } from "./types";
 
 const TZ = "America/Argentina/Buenos_Aires";
@@ -237,7 +238,7 @@ export function ActasContent() {
                         {formatFechaHora(acta.creadoEn)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex items-center gap-2 justify-end">
                           <Button
                             size="sm"
                             variant="ghost"
@@ -270,6 +271,24 @@ export function ActasContent() {
                             title="Eliminar"
                           >
                             <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                            onClick={() => exportarActaPDF(acta)}
+                            title="Exportar PDF"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                            onClick={() => exportarActaDOCX(acta)}
+                            title="Exportar DOCX"
+                          >
+                            <FileDown className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>

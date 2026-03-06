@@ -3,9 +3,10 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { EstadoVacaciones } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FileText, Building2, CalendarDays } from "lucide-react";
+import { Users, Building2, CalendarDays } from "lucide-react";
 import { DashboardLicenciasWidget } from "@/components/licencias/DashboardLicenciasWidget";
 import { NovedadesLiquidadoresCard } from "@/components/dashboard/NovedadesLiquidadoresCard";
+import { SecretariaDashboardCard } from "@/components/dashboard/SecretariaDashboardCard";
 
 const ROLES_ADMIN = ["ADMIN", "RRHH"] as const;
 
@@ -110,18 +111,7 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         </Link>
-        <Card className="rounded-xl border shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Secretaría
-            </CardTitle>
-            <FileText className="h-4 w-4 text-[#4CAF50]" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-gray-800">Módulo</p>
-            <CardDescription>Próximamente</CardDescription>
-          </CardContent>
-        </Card>
+        <SecretariaDashboardCard />
         <Card className="rounded-xl border shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">

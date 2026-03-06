@@ -7,6 +7,11 @@ async function main() {
   // Crear roles
   const roles = await Promise.all([
     prisma.role.upsert({
+      where: { nombre: "SUPER_ADMIN" },
+      update: {},
+      create: { nombre: "SUPER_ADMIN" },
+    }),
+    prisma.role.upsert({
       where: { nombre: "ADMIN" },
       update: {},
       create: { nombre: "ADMIN" },
@@ -31,10 +36,15 @@ async function main() {
       update: {},
       create: { nombre: "EMPLEADO" },
     }),
+    prisma.role.upsert({
+      where: { nombre: "LEGALES" },
+      update: {},
+      create: { nombre: "LEGALES" },
+    }),
   ]);
 
-  const adminRole = roles[0];
-  const rrhhRole = roles[3];
+  const adminRole = roles[1]; // ADMIN
+  const rrhhRole = roles[4];   // RRHH
 
   // Crear permisos granulares por módulo (VER, CREAR, EDITAR, ELIMINAR)
   const modulos = ["RRHH", "TESORERIA", "SECRETARIA", "LEGALES", "USUARIOS"];

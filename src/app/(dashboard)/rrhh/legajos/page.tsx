@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, UserPlus, Eye, Pencil, UserMinus, FileText, FileDown, Loader2 } from "lucide-react";
+import { Search, UserPlus, Eye, Pencil, UserMinus, Trash2, FileText, FileDown, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { LegajoForm } from "./LegajoForm";
 import { LegajoVerSheet } from "./LegajoVerSheet";
+import { isSuperAdmin, canManageLegajos } from "@/lib/auth.utils";
 
 type Legajo = {
   id: string;
@@ -30,9 +31,12 @@ type Legajo = {
 
 export default function LegajosPage() {
   const { data: session } = useSession();
-  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
-  const canCreate = roles.includes("ADMIN") || roles.includes("RRHH");
+  const rolesSession = (session?.user as { roles?: unknown })?.roles ?? [];
+  const canCreate = canManageLegajos(rolesSession);
   const canBaja = canCreate;
+
+  const [rolesFromMe, setRolesFromMe] = useState<string[] | null>(null);
+  const esSuperAdmin = isSuperAdmin(rolesSession) || isSuperAdmin(rolesFromMe ?? []);
 
   const [tab, setTab] = useState<"activos" | "bajas">("activos");
   const [legajos, setLegajos] = useState<Legajo[]>([]);
@@ -46,6 +50,19 @@ export default function LegajosPage() {
   const [bajaModal, setBajaModal] = useState<{ id: string; nombre: string } | null>(null);
   const [bajaForm, setBajaForm] = useState({ fechaBaja: "", motivoBaja: "" });
   const [bajaSaving, setBajaSaving] = useState(false);
+  const [eliminarFisicoModal, setEliminarFisicoModal] = useState<{ id: string; nombre: string } | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [eliminarFisicoSaving, setEliminarFisicoSaving] = useState(false);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch("/api/me")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.roles) setRolesFromMe(data.roles);
+      })
+      .catch(() => {});
+  }, [session?.user]);
 
   const fetchLegajos = async () => {
     setLoading(true);
@@ -104,6 +121,30 @@ export default function LegajosPage() {
     }
   };
 
+  const openEliminarFisico = (l: Legajo) => {
+    setEliminarFisicoModal({ id: l.id, nombre: `${l.apellidos} ${l.nombres}` });
+    setConfirmText("");
+  };
+
+  const confirmarEliminarFisico = async () => {
+    if (!eliminarFisicoModal || confirmText !== "ELIMINAR") return;
+    setEliminarFisicoSaving(true);
+    try {
+      const r = await fetch(`/api/legajos/${eliminarFisicoModal.id}/fisico`, { method: "DELETE" });
+      if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.error ?? "Error");
+      }
+      setEliminarFisicoModal(null);
+      setConfirmText("");
+      fetchLegajos();
+    } catch (e: unknown) {
+      alert((e as Error).message);
+    } finally {
+      setEliminarFisicoSaving(false);
+    }
+  };
+
   const formatFecha = (s: string) => (s ? new Date(s).toLocaleDateString("es-AR") : "-");
 
   return (
@@ -112,6 +153,11 @@ export default function LegajosPage() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-800">Legajos</h1>
           <p className="text-gray-500 mt-1">Recursos Humanos - Gestión de legajos</p>
+          {session && !canCreate && !esSuperAdmin && (
+            <p className="text-amber-700 text-sm mt-1">
+              Para dar de baja o eliminar legajos necesitás rol <strong>ADMIN</strong>, <strong>RRHH</strong> o <strong>SUPER_ADMIN</strong>. Asignalos en Usuarios y volvé a iniciar sesión.
+            </p>
+          )}
         </div>
         {canCreate && (
           <Button onClick={() => { setEditingId(null); setShowForm(true); }} className="bg-[#4CAF50] hover:bg-[#388E3C] text-white">
@@ -173,7 +219,7 @@ export default function LegajosPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DNI</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha Alta</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase min-w-[280px]">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -199,30 +245,37 @@ export default function LegajosPage() {
                         {l.fechaBaja ? "Baja" : "Activo"}
                       </span>
                     </td>
-                    <td className="px-6 py-4 flex gap-2">
-                      <Button variant="ghost" size="icon-sm" onClick={() => setViewingId(l.id)} title="Ver">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {!l.fechaBaja && canCreate && (
-                        <Button variant="ghost" size="icon-sm" onClick={() => { setEditingId(l.id); setShowForm(true); }} title="Editar">
-                          <Pencil className="h-4 w-4" />
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setViewingId(l.id)} title="Ver">
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
-                      {!l.fechaBaja && canBaja && (
-                        <Button variant="ghost" size="icon-sm" onClick={() => openBaja(l)} className="text-red-600 hover:text-red-700" title="Dar de baja">
-                          <UserMinus className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <a href={`/api/legajos/${l.id}/export-pdf`} download className="inline-flex">
-                        <Button variant="ghost" size="icon-sm" title="Exportar PDF" className="text-[#4CAF50] hover:text-[#388E3C]">
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                      </a>
-                      <a href={`/api/legajos/${l.id}/export-word`} download className="inline-flex">
-                        <Button variant="ghost" size="icon-sm" title="Exportar DOCX" className="text-[#4CAF50] hover:text-[#388E3C]">
-                          <FileDown className="h-4 w-4" />
-                        </Button>
-                      </a>
+                        {!l.fechaBaja && canCreate && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => { setEditingId(l.id); setShowForm(true); }} title="Editar">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {!l.fechaBaja && canBaja && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => openBaja(l)} className="text-orange-500 hover:text-orange-600 hover:bg-orange-50" title="Dar de baja (lógica)">
+                            <UserMinus className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {esSuperAdmin && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => openEliminarFisico(l)} className="text-red-700 hover:text-red-800 hover:bg-red-50" title="Eliminar permanentemente (irreversible)">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <a href={`/api/legajos/${l.id}/export-pdf`} download className="inline-flex">
+                          <Button variant="ghost" size="icon-sm" title="Exportar PDF" className="text-[#4CAF50] hover:text-[#388E3C]">
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                        </a>
+                        <a href={`/api/legajos/${l.id}/export-word`} download className="inline-flex">
+                          <Button variant="ghost" size="icon-sm" title="Exportar DOCX" className="text-[#4CAF50] hover:text-[#388E3C]">
+                            <FileDown className="h-4 w-4" />
+                          </Button>
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -281,6 +334,37 @@ export default function LegajosPage() {
             <Button variant="outline" onClick={() => setBajaModal(null)}>Cancelar</Button>
             <Button variant="destructive" onClick={confirmBaja} disabled={bajaSaving || !bajaForm.motivoBaja.trim()}>
               {bajaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Dar de baja"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Eliminar permanentemente (SUPER_ADMIN) */}
+      <Dialog open={!!eliminarFisicoModal} onOpenChange={(o) => { if (!o) { setEliminarFisicoModal(null); setConfirmText(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-700">⚠️ Eliminación permanente</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                <p className="text-red-700 font-semibold">
+                  Esta acción eliminará el legajo de <strong>{eliminarFisicoModal?.nombre}</strong> y TODOS sus datos asociados (licencias, solicitudes de vacaciones, certificados) de forma irreversible.
+                </p>
+                <p>Escribí <strong>ELIMINAR</strong> para confirmar:</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="ELIMINAR"
+              className="font-mono"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEliminarFisicoModal(null); setConfirmText(""); }}>Cancelar</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={confirmarEliminarFisico} disabled={confirmText !== "ELIMINAR" || eliminarFisicoSaving}>
+              {eliminarFisicoSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar permanentemente"}
             </Button>
           </DialogFooter>
         </DialogContent>

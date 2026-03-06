@@ -65,12 +65,18 @@ const INSERT_ORDER = [
   "modelos_oficio",
   "actas",
   "oficios_respondidos",
+  "reuniones",
   "categorias_legislacion",
   "documentos_legislacion",
+  "categorias_orden_dia",
+  "documentos_orden_dia",
 ] as const;
 
 /** Orden de eliminación: dependientes antes que padres. */
 const DELETE_ORDER = [
+  "reuniones",
+  "documentos_orden_dia",
+  "categorias_orden_dia",
   "documentos_legislacion",
   "categorias_legislacion",
   "actas",
@@ -125,6 +131,9 @@ const PRISMA_DELEGATES: Record<string, Delegate> = {
   oficios_respondidos: prisma.oficioRespondido as unknown as Delegate,
   categorias_legislacion: prisma.categoriaLegislacion as unknown as Delegate,
   documentos_legislacion: prisma.documentoLegislacion as unknown as Delegate,
+  categorias_orden_dia: prisma.categoriaOrdenDia as unknown as Delegate,
+  documentos_orden_dia: prisma.documentoOrdenDia as unknown as Delegate,
+  reuniones: prisma.reunion as unknown as Delegate,
 };
 
 /** Compatibilidad con backups antiguos que usaban "usuarios" en lugar de "users". */

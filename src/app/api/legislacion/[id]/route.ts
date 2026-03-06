@@ -7,14 +7,25 @@ import path from "path";
 import { randomBytes } from "crypto";
 import { SeccionLegislacion } from "@prisma/client";
 
-const ROLES_WRITE = ["ADMIN", "SECRETARIA"] as const;
+const ROLES_WRITE = ["ADMIN", "SECRETARIA", "SUPER_ADMIN"] as const;
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PDF_MIME = "application/pdf";
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "legislacion");
 
-function canWrite(roles: string[]) {
-  return ROLES_WRITE.some((r) => roles.includes(r));
+function normalizeRole(r: unknown): string | null {
+  if (typeof r === "string") return r;
+  if (r && typeof r === "object" && "nombre" in r && typeof (r as { nombre: unknown }).nombre === "string")
+    return (r as { nombre: string }).nombre;
+  if (r && typeof r === "object" && "name" in r && typeof (r as { name: unknown }).name === "string")
+    return (r as { name: string }).name;
+  return null;
+}
+
+function canWrite(roles: unknown): boolean {
+  const list = Array.isArray(roles) ? roles : [];
+  const names = list.map(normalizeRole).filter(Boolean) as string[];
+  return ROLES_WRITE.some((r) => names.includes(r));
 }
 
 function parseId(id: string): number | null {
@@ -59,7 +70,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
-  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const roles = (session?.user as { roles?: unknown })?.roles ?? [];
   if (!canWrite(roles)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   const id = parseId((await params).id);
   if (id === null) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
@@ -152,7 +163,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
-  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const roles = (session?.user as { roles?: unknown })?.roles ?? [];
   if (!canWrite(roles)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   const id = parseId((await params).id);
   if (id === null) return NextResponse.json({ error: "ID inválido" }, { status: 400 });

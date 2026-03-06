@@ -7,12 +7,47 @@ import { cn } from "@/lib/utils";
 import { EstadoVacaciones } from "@prisma/client";
 import { normalizarFecha } from "@/lib/vacaciones.utils";
 
-/** Formato YYYY-MM-DD para input type="date" */
-function formatoInputDate(fecha: Date): string {
-  const y = fecha.getFullYear();
-  const m = String(fecha.getMonth() + 1).padStart(2, "0");
+const ANIO_MIN = 2020;
+const ANIO_MAX = 2030;
+
+function esAnioValido(fecha: Date): boolean {
+  const anio = fecha.getFullYear();
+  return anio >= ANIO_MIN && anio <= ANIO_MAX;
+}
+
+/** Formato DD/MM/YYYY para mostrar en inputs de texto */
+function formatoDDMMYYYY(fecha: Date): string {
   const d = String(fecha.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  const m = String(fecha.getMonth() + 1).padStart(2, "0");
+  const y = fecha.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+/** Auto-formatear mientras escribe: solo dígitos, agregar / en DD y MM */
+function autoFormatearFecha(valor: string): string {
+  const numeros = valor.replace(/\D/g, "").substring(0, 8);
+  if (numeros.length <= 2) return numeros;
+  if (numeros.length <= 4)
+    return `${numeros.substring(0, 2)}/${numeros.substring(2)}`;
+  return `${numeros.substring(0, 2)}/${numeros.substring(2, 4)}/${numeros.substring(4)}`;
+}
+
+/** Parsea DD/MM/YYYY (8 dígitos) y devuelve Date o null si inválida */
+function parsearFecha(valor: string, normalizar: (d: Date) => Date): Date | null {
+  const limpio = valor.replace(/\D/g, "");
+  if (limpio.length !== 8) return null;
+  const d = parseInt(limpio.substring(0, 2), 10);
+  const m = parseInt(limpio.substring(2, 4), 10) - 1;
+  const y = parseInt(limpio.substring(4, 8), 10);
+  const fecha = new Date(y, m, d);
+  if (isNaN(fecha.getTime())) return null;
+  if (
+    fecha.getFullYear() !== y ||
+    fecha.getMonth() !== m ||
+    fecha.getDate() !== d
+  )
+    return null;
+  return normalizar(fecha);
 }
 
 export interface SolicitudCalendario {
@@ -73,21 +108,39 @@ export function CalendarioVacaciones({
   locale = "es-AR",
 }: CalendarioVacacionesProps) {
   const [desde, hasta] = value;
+  const [inputDesde, setInputDesde] = useState("");
+  const [inputHasta, setInputHasta] = useState("");
+
   const [activeStartDate, setActiveStartDate] = useState<Date>(() => {
-    const d = value[0] ?? new Date();
+    const d = value[0];
+    if (!d || !esAnioValido(d)) {
+      return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    }
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
 
   useEffect(() => {
-    if (value[0]) {
-      const d = value[0];
-      setActiveStartDate((prev) => {
-        const sameMonth =
-          prev.getFullYear() === d.getFullYear() && prev.getMonth() === d.getMonth();
-        return sameMonth ? prev : new Date(d.getFullYear(), d.getMonth(), 1);
-      });
+    setInputDesde(desde ? formatoDDMMYYYY(desde) : "");
+  }, [desde?.getTime()]);
+
+  useEffect(() => {
+    setInputHasta(hasta ? formatoDDMMYYYY(hasta) : "");
+  }, [hasta?.getTime()]);
+
+  useEffect(() => {
+    const d = value[0];
+    if (!d) return;
+    if (!esAnioValido(d)) {
+      onChange([null, null]);
+      setActiveStartDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+      return;
     }
-  }, [value[0]?.getTime()]);
+    setActiveStartDate((prev) => {
+      const sameMonth =
+        prev.getFullYear() === d.getFullYear() && prev.getMonth() === d.getMonth();
+      return sameMonth ? prev : new Date(d.getFullYear(), d.getMonth(), 1);
+    });
+  }, [value[0]?.getTime(), onChange]);
 
   const tileClassName = useCallback(
     ({ date, view }: { date: Date; view: string }) => {
@@ -148,15 +201,18 @@ export function CalendarioVacaciones({
   const handleCambioDesde = useCallback(
     (valor: string) => {
       if (disabled) return;
+      const autoFormato = autoFormatearFecha(valor);
+      setInputDesde(autoFormato);
       if (!valor.trim()) {
         onChange([null, null]);
         return;
       }
-      const fecha = normalizarFecha(new Date(valor + "T12:00:00"));
-      const nuevaHasta =
-        hasta && hasta >= fecha ? hasta : fecha;
-      setActiveDateCalendario(fecha);
-      onChange([fecha, nuevaHasta]);
+      const fecha = parsearFecha(autoFormato, normalizarFecha);
+      if (fecha && esAnioValido(fecha)) {
+        const nuevaHasta = hasta && hasta >= fecha ? hasta : fecha;
+        setActiveDateCalendario(fecha);
+        onChange([fecha, nuevaHasta]);
+      }
     },
     [disabled, hasta, onChange, setActiveDateCalendario]
   );
@@ -164,20 +220,24 @@ export function CalendarioVacaciones({
   const handleCambioHasta = useCallback(
     (valor: string) => {
       if (disabled) return;
+      const autoFormato = autoFormatearFecha(valor);
+      setInputHasta(autoFormato);
       if (!valor.trim()) {
         if (desde) {
           onChange([desde, desde]);
         }
         return;
       }
-      const fecha = normalizarFecha(new Date(valor + "T12:00:00"));
-      if (desde && fecha < desde) {
-        onChange([fecha, desde]);
+      const fecha = parsearFecha(autoFormato, normalizarFecha);
+      if (fecha && esAnioValido(fecha)) {
+        if (desde && fecha < desde) {
+          onChange([fecha, desde]);
+          setActiveDateCalendario(fecha);
+          return;
+        }
         setActiveDateCalendario(fecha);
-        return;
+        onChange([desde ?? fecha, fecha]);
       }
-      setActiveDateCalendario(fecha);
-      onChange([desde ?? fecha, fecha]);
     },
     [disabled, desde, onChange, setActiveDateCalendario]
   );
@@ -190,11 +250,13 @@ export function CalendarioVacaciones({
             Desde
           </label>
           <input
-            type="date"
-            value={desde ? formatoInputDate(desde) : ""}
+            type="text"
+            placeholder="DD/MM/YYYY"
+            value={inputDesde}
             onChange={(e) => handleCambioDesde(e.target.value)}
+            maxLength={10}
             disabled={disabled}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 w-[10.5rem] rounded-md border border-input bg-background px-3 text-sm"
           />
         </div>
         <div>
@@ -202,11 +264,13 @@ export function CalendarioVacaciones({
             Hasta
           </label>
           <input
-            type="date"
-            value={hasta ? formatoInputDate(hasta) : ""}
+            type="text"
+            placeholder="DD/MM/YYYY"
+            value={inputHasta}
             onChange={(e) => handleCambioHasta(e.target.value)}
+            maxLength={10}
             disabled={disabled}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 w-[10.5rem] rounded-md border border-input bg-background px-3 text-sm"
           />
         </div>
       </div>
@@ -218,6 +282,8 @@ export function CalendarioVacaciones({
         onActiveStartDateChange={({ activeStartDate: next }) =>
           next && setActiveStartDate(next)
         }
+        minDate={new Date(ANIO_MIN, 0, 1)}
+        maxDate={new Date(ANIO_MAX, 11, 31)}
         tileClassName={tileClassName}
         locale={locale}
         formatShortWeekday={(_, date) =>

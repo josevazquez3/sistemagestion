@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { UserPlus, Loader2 } from "lucide-react";
+import { UserPlus, Loader2, Trash2 } from "lucide-react";
 
 type User = {
   id: string;
@@ -29,8 +30,14 @@ type Legajo = { id: string; numeroLegajo: number; nombres: string; apellidos: st
 type PermissionsByModule = Record<string, { id: string; accion: string }[]>;
 
 export default function UsuariosPage() {
+  const { data: session } = useSession();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  // Mostrar columna de eliminar físico si el JWT tiene SUPER_ADMIN o si el usuario actual en la lista lo tiene (por si no re-logó)
+  const [showFisicoColumn, setShowFisicoColumn] = useState(roles.includes("SUPER_ADMIN"));
+  const isSuperAdmin = showFisicoColumn;
+
   const [users, setUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [rolesList, setRolesList] = useState<Role[]>([]);
   const [legajos, setLegajos] = useState<Legajo[]>([]);
   const [permissionsByModule, setPermissionsByModule] = useState<PermissionsByModule>({});
   const [loading, setLoading] = useState(true);
@@ -49,6 +56,9 @@ export default function UsuariosPage() {
     permissionIds: [] as string[],
   });
   const [creating, setCreating] = useState(false);
+  const [eliminarFisicoModal, setEliminarFisicoModal] = useState<User | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [eliminarFisicoSaving, setEliminarFisicoSaving] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -61,15 +71,28 @@ export default function UsuariosPage() {
     }
   };
 
+  // Si el JWT no tiene SUPER_ADMIN, detectar si el usuario actual en la lista lo tiene (evita re-logar)
+  useEffect(() => {
+    if (roles.includes("SUPER_ADMIN")) {
+      setShowFisicoColumn(true);
+      return;
+    }
+    const currentId = (session?.user as { id?: string })?.id;
+    const currentEmail = (session?.user as { email?: string })?.email;
+    if (!currentId && !currentEmail || users.length === 0) return;
+    const currentUser = users.find((u) => u.id === currentId || u.email === currentEmail);
+    if (currentUser?.roles?.includes("SUPER_ADMIN")) setShowFisicoColumn(true);
+  }, [session?.user, users, roles.join(",")]);
+
   const fetchRolesAndPermissions = async () => {
     try {
       const r = await fetch("/api/roles");
       if (!r.ok) throw new Error("Error");
       const data = await r.json();
-      setRoles(data.roles ?? []);
+      setRolesList(data.roles ?? []);
       setPermissionsByModule(data.permissionsByModule ?? {});
     } catch {
-      setRoles([]);
+      setRolesList([]);
       setPermissionsByModule({});
     }
   };
@@ -163,6 +186,25 @@ export default function UsuariosPage() {
     }
   };
 
+  const confirmarEliminarFisico = async () => {
+    if (!eliminarFisicoModal || confirmText !== "ELIMINAR") return;
+    setEliminarFisicoSaving(true);
+    try {
+      const r = await fetch(`/api/usuarios/${eliminarFisicoModal.id}/fisico`, { method: "DELETE" });
+      if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.error ?? "Error");
+      }
+      setEliminarFisicoModal(null);
+      setConfirmText("");
+      fetchUsers();
+    } catch (e: unknown) {
+      alert((e as Error).message);
+    } finally {
+      setEliminarFisicoSaving(false);
+    }
+  };
+
   const createUser = async () => {
     if (!createForm.nombre || !createForm.apellido || !createForm.email || !createForm.password) {
       alert("Completá todos los campos obligatorios.");
@@ -240,6 +282,7 @@ export default function UsuariosPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roles</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Legajo vinculado</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+              {isSuperAdmin && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase min-w-[100px]">Eliminar físico</th>}
             </tr>
           </thead>
           <tbody>
@@ -272,6 +315,22 @@ export default function UsuariosPage() {
                     {user.activo ? "Activo" : "Inactivo"}
                   </span>
                 </td>
+                {isSuperAdmin && (
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="p-1.5 hover:bg-red-50 text-red-700 hover:text-red-800"
+                      title="Eliminar permanentemente (irreversible)"
+                      onClick={() => {
+                        setEliminarFisicoModal(user);
+                        setConfirmText("");
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -311,7 +370,7 @@ export default function UsuariosPage() {
             <div className="space-y-2">
               <Label>Roles</Label>
               <div className="flex flex-wrap gap-3">
-                {roles.map((r) => (
+                {rolesList.map((r) => (
                   <label key={r.id} className="flex items-center gap-2 cursor-pointer">
                     <Checkbox
                       checked={editRoleIds.includes(r.id)}
@@ -357,6 +416,51 @@ export default function UsuariosPage() {
               className="w-full sm:w-auto"
             >
               Desactivar usuario
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal eliminar usuario permanentemente (SUPER_ADMIN) */}
+      <Dialog
+        open={!!eliminarFisicoModal}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEliminarFisicoModal(null);
+            setConfirmText("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-700">Eliminación permanente</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                <p className="text-red-700 font-semibold">
+                  Esta acción eliminará al usuario y todos sus datos de forma irreversible.
+                </p>
+                <p>Escribí <strong>ELIMINAR</strong> para confirmar:</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="ELIMINAR"
+              className="font-mono"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEliminarFisicoModal(null); setConfirmText(""); }}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmarEliminarFisico}
+              disabled={confirmText !== "ELIMINAR" || eliminarFisicoSaving}
+            >
+              {eliminarFisicoSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar permanentemente"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -419,7 +523,7 @@ export default function UsuariosPage() {
             <div className="space-y-2">
               <Label>Roles</Label>
               <div className="flex flex-wrap gap-3">
-                {roles.map((r) => (
+                {rolesList.map((r) => (
                   <label key={r.id} className="flex items-center gap-2 cursor-pointer">
                     <Checkbox
                       checked={createForm.roleIds.includes(r.id)}

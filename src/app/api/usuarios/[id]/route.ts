@@ -3,11 +3,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 
-/** GET - Obtener usuario por ID con roles y permisos (solo ADMIN) */
+/** GET - Obtener usuario por ID con roles y permisos (solo ADMIN / SUPER_ADMIN) */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
-  if (!roles.includes("ADMIN")) {
+  if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -46,11 +46,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
 }
 
-/** PATCH - Actualizar usuario: roles, permisos, activo (solo ADMIN) */
+/** PATCH - Actualizar usuario: roles, permisos, activo (solo ADMIN / SUPER_ADMIN) */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
-  if (!roles.includes("ADMIN")) {
+  if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

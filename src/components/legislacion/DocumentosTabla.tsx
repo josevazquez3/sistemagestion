@@ -102,9 +102,11 @@ export function DocumentosTabla({
                     {doc.tipoArchivo === "PDF" ? (
                       <span className="text-red-600" title="PDF">PDF</span>
                     ) : (
-                      <FileText className="h-4 w-4 text-blue-600" aria-label="DOCX" />
+                      <span className="text-blue-600 inline-flex items-center gap-1">
+                        <FileText className="h-4 w-4 shrink-0" aria-hidden />
+                        {doc.tipoArchivo}
+                      </span>
                     )}
-                    {doc.tipoArchivo}
                   </span>
                 </TableCell>
                 <TableCell>{formatFecha(doc.fechaDocumento)}</TableCell>

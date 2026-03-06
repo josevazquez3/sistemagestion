@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { SolicitudModal } from "@/components/vacaciones/SolicitudModal";
 import { TablaSolicitudes, type SolicitudTabla } from "@/components/vacaciones/TablaSolicitudes";
 import { ModalEditarSolicitud } from "@/components/vacaciones/ModalEditarSolicitud";
 import { ModalConfirmarBaja } from "@/components/vacaciones/ModalConfirmarBaja";
-import { calcularDiasVacaciones } from "@/lib/vacaciones.utils";
+import { calcularDiasVacaciones, formatearFecha } from "@/lib/vacaciones.utils";
 import {
   getMiConfiguracionVacaciones,
   getSolicitudesVacaciones,
@@ -20,8 +21,24 @@ import {
 } from "@/app/actions/vacaciones";
 import { Loader2, Calendar } from "lucide-react";
 import type { RangoFechas } from "@/components/vacaciones/CalendarioVacaciones";
+import { isSuperAdmin } from "@/lib/auth.utils";
 
 export default function VacacionesPage() {
+  const { data: session } = useSession();
+  const rolesSession = (session?.user as { roles?: unknown })?.roles ?? [];
+  const [rolesFromMe, setRolesFromMe] = useState<string[] | null>(null);
+  const esSuperAdmin = isSuperAdmin(rolesSession) || isSuperAdmin(rolesFromMe ?? []);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch("/api/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.roles) setRolesFromMe(data.roles);
+      })
+      .catch(() => {});
+  }, [session?.user]);
+
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<{
     legajoId: string;
@@ -45,6 +62,8 @@ export default function VacacionesPage() {
   } | null>(null);
   const [bajaModal, setBajaModal] = useState<SolicitudTabla | null>(null);
   const [bajaLoading, setBajaLoading] = useState(false);
+  const [eliminarFisicoModal, setEliminarFisicoModal] = useState<SolicitudTabla | null>(null);
+  const [eliminarFisicoLoading, setEliminarFisicoLoading] = useState(false);
 
   const [estadoConfig, setEstadoConfig] = useState<"sin_legajo" | "sin_config" | "ok">("sin_legajo");
 
@@ -163,6 +182,28 @@ export default function VacacionesPage() {
     }
   };
 
+  const handleEliminarFisico = (s: SolicitudTabla) => {
+    setEliminarFisicoModal(s);
+  };
+
+  const handleEliminarFisicoConfirm = async () => {
+    if (!eliminarFisicoModal) return;
+    setEliminarFisicoLoading(true);
+    try {
+      const r = await fetch(`/api/vacaciones/${eliminarFisicoModal.id}/fisico`, { method: "DELETE" });
+      if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.error ?? "Error");
+      }
+      setEliminarFisicoModal(null);
+      cargarDatos();
+    } catch (e: unknown) {
+      alert((e as Error).message);
+    } finally {
+      setEliminarFisicoLoading(false);
+    }
+  };
+
   const solicitudesParaCalendario = solicitudes.map((s) => ({
     fechaDesde: s.fechaDesde,
     fechaHasta: s.fechaHasta,
@@ -255,6 +296,12 @@ export default function VacacionesPage() {
             </CardContent>
           </Card>
 
+          {config.diasDisponibles === 0 && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Si aún no tenés días asignados, contactá a RRHH para que configuren tu cupo.
+            </p>
+          )}
+
           {/* 7b. Calendario */}
           <Card>
             <CardHeader className="pb-2">
@@ -309,6 +356,8 @@ export default function VacacionesPage() {
                 }
                 onDarDeBaja={(s) => setBajaModal(s)}
                 onDescargar={handleDescargar}
+                isSuperAdmin={esSuperAdmin}
+                onEliminarFisico={handleEliminarFisico}
               />
             </CardContent>
           </Card>
@@ -353,6 +402,41 @@ export default function VacacionesPage() {
         onConfirm={handleDarDeBajaConfirm}
         loading={bajaLoading}
       />
+
+      {/* Modal eliminar solicitud permanentemente (SUPER_ADMIN) */}
+      {eliminarFisicoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-red-700 mb-2">
+              ⚠️ Eliminar solicitud permanentemente
+            </h3>
+            <p className="text-gray-600 text-sm mb-4">
+              ¿Eliminás de forma permanente la solicitud del{" "}
+              <strong>
+                {formatearFecha(eliminarFisicoModal.fechaDesde)} al{" "}
+                {formatearFecha(eliminarFisicoModal.fechaHasta)}
+              </strong>
+              ? Esta acción es irreversible.
+            </p>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setEliminarFisicoModal(null)}
+                disabled={eliminarFisicoLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleEliminarFisicoConfirm}
+                disabled={eliminarFisicoLoading}
+              >
+                {eliminarFisicoLoading ? "Eliminando..." : "Eliminar permanentemente"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

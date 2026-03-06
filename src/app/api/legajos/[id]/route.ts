@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
-
-function canManageLegajos(roles: string[]) {
-  return roles.includes("ADMIN") || roles.includes("RRHH");
-}
+import { canManageLegajos } from "@/lib/auth.utils";
 
 /** GET - Obtener legajo por ID */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -16,6 +16,7 @@ import {
   ScrollText,
   BookOpen,
   ClipboardList,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Session } from "next-auth";
@@ -30,15 +31,15 @@ const navItems = [
   { href: "/rrhh/vacaciones/admin", label: "Vacaciones (Admin)", icon: Calendar, parent: "rrhh", adminOnly: true },
   { href: "/rrhh/novedades-liquidadores", label: "Novedades Liquidadores", icon: ClipboardList, parent: "rrhh" },
   { href: "/tesoreria", label: "Tesorería", icon: Landmark },
-  { href: "/legislacion", label: "Legislación", icon: BookOpen, expandable: true },
-  { href: "/legislacion", label: "Legislación", icon: BookOpen, parent: "legislacion" },
-  { href: "/legislacion/resoluciones", label: "Resoluciones C.S.", icon: FileText, parent: "legislacion" },
+  { href: "/legislacion", label: "Legislación", icon: BookOpen },
   { href: "/legales", label: "Legales", icon: Scale, expandable: true, legalesModule: true },
   { href: "/legales/modelos-oficios", label: "Modelos de Oficios", icon: FileText, parent: "legales", legalesModule: true },
   { href: "/legales/historial-oficios", label: "Historial de Oficios", icon: ClipboardList, parent: "legales", legalesModule: true },
   { href: "/secretaria", label: "Secretaría", icon: FileText, secretariaModule: true, expandable: true },
   { href: "/secretaria/modelos-notas", label: "Modelos de Notas", icon: FileText, parent: "secretaria", secretariaModule: true },
   { href: "/secretaria/actas", label: "Actas", icon: ScrollText, parent: "secretaria", secretariaModule: true },
+  { href: "/secretaria/orden-del-dia", label: "Orden del día C.S.", icon: ClipboardList, parent: "secretaria", secretariaModule: true },
+  { href: "/secretaria/agenda", label: "Agenda", icon: CalendarDays, parent: "secretaria", secretariaModule: true },
   { href: "/usuarios", label: "Usuarios", icon: UserCog, adminOnly: true },
   { href: "/configuraciones", label: "Configuraciones", icon: Settings, configuracionesOnly: true },
 ];
@@ -55,11 +56,8 @@ const rrhhSubItems = [
 const secretariaSubItems = [
   { href: "/secretaria/modelos-notas", label: "Modelos de Notas", icon: FileText },
   { href: "/secretaria/actas", label: "Actas", icon: ScrollText },
-];
-
-const legislacionSubItems = [
-  { href: "/legislacion", label: "Legislación", icon: BookOpen },
-  { href: "/legislacion/resoluciones", label: "Resoluciones C.S.", icon: FileText },
+  { href: "/secretaria/orden-del-dia", label: "Orden del día C.S.", icon: ClipboardList },
+  { href: "/secretaria/agenda", label: "Agenda", icon: CalendarDays },
 ];
 
 const legalesSubItems = [
@@ -72,6 +70,7 @@ export function Sidebar({ user }: { user: Session["user"] }) {
   const isAdmin = (user as { roles?: string[] })?.roles?.includes("ADMIN") ?? false;
   const isRrhh = (user as { roles?: string[] })?.roles?.includes("RRHH") ?? false;
   const isSecretaria = (user as { roles?: string[] })?.roles?.includes("SECRETARIA") ?? false;
+  const isSuperAdmin = (user as { roles?: string[] })?.roles?.includes("SUPER_ADMIN") ?? false;
   const isLegales = (user as { roles?: string[] })?.roles?.includes("LEGALES") ?? false;
 
   const [rrhhAbierto, setRrhhAbierto] = useState(() =>
@@ -80,10 +79,6 @@ export function Sidebar({ user }: { user: Session["user"] }) {
 
   const [secretariaAbierta, setSecretariaAbierta] = useState(() =>
     pathname.startsWith("/secretaria")
-  );
-
-  const [legislacionAbierta, setLegislacionAbierta] = useState(() =>
-    pathname.startsWith("/legislacion")
   );
 
   const [legalesAbierta, setLegalesAbierta] = useState(() =>
@@ -103,12 +98,6 @@ export function Sidebar({ user }: { user: Session["user"] }) {
   }, [pathname]);
 
   useEffect(() => {
-    if (pathname.startsWith("/legislacion")) {
-      setLegislacionAbierta(true);
-    }
-  }, [pathname]);
-
-  useEffect(() => {
     if (pathname.startsWith("/legales")) {
       setLegalesAbierta(true);
     }
@@ -117,12 +106,12 @@ export function Sidebar({ user }: { user: Session["user"] }) {
   const items = navItems.filter((item) => {
     if ("configuracionesOnly" in item && item.configuracionesOnly && !isAdmin) return false;
     if (item.adminOnly && !isAdmin && !isRrhh) return false;
-    if ("secretariaModule" in item && item.secretariaModule && !isAdmin && !isSecretaria) return false;
+    if ("secretariaModule" in item && item.secretariaModule && !isAdmin && !isSecretaria && !isSuperAdmin) return false;
     if ("legalesModule" in item && item.legalesModule && !isAdmin && !isLegales) return false;
     return true;
   });
 
-  const showSecretaria = isAdmin || isSecretaria;
+  const showSecretaria = isAdmin || isSecretaria || isSuperAdmin;
   const showLegales = isAdmin || isLegales;
 
   return (
@@ -185,55 +174,6 @@ export function Sidebar({ user }: { user: Session["user"] }) {
                           </Link>
                         );
                       })}
-                  </div>
-                )}
-              </div>
-            );
-          }
-          if ("expandable" in item && item.expandable && item.href === "/legislacion") {
-            const ParentIcon = item.icon;
-            const isParentActive = pathname.startsWith("/legislacion");
-            return (
-              <div key={item.href} className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => setLegislacionAbierta((v) => !v)}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
-                    isParentActive
-                      ? "bg-[#E8F5E9] text-[#388E3C]"
-                      : "text-gray-600 hover:bg-[#E8F5E9] hover:text-gray-800"
-                  )}
-                >
-                  <span className="flex items-center gap-3">
-                    <ParentIcon className="h-5 w-5 shrink-0" />
-                    {item.label}
-                  </span>
-                  <ChevronDown
-                    className={cn("h-4 w-4 shrink-0 transition-transform duration-200", legislacionAbierta && "rotate-180")}
-                  />
-                </button>
-                {legislacionAbierta && (
-                  <div className="pl-6 space-y-1 overflow-hidden transition-all duration-200">
-                    {legislacionSubItems.map((sub) => {
-                      const SubIcon = sub.icon;
-                      const isActive = pathname === sub.href || pathname.startsWith(sub.href + "/");
-                      return (
-                        <Link
-                          key={sub.href}
-                          href={sub.href}
-                          className={cn(
-                            "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
-                            isActive
-                              ? "bg-[#E8F5E9] text-[#388E3C]"
-                              : "text-gray-600 hover:bg-[#E8F5E9] hover:text-gray-800"
-                          )}
-                        >
-                          <SubIcon className="h-5 w-5 shrink-0" />
-                          {sub.label}
-                        </Link>
-                      );
-                    })}
                   </div>
                 )}
               </div>
@@ -340,7 +280,6 @@ export function Sidebar({ user }: { user: Session["user"] }) {
             );
           }
           if ("parent" in item && item.parent === "rrhh") return null;
-          if ("parent" in item && item.parent === "legislacion") return null;
           if ("parent" in item && item.parent === "legales") return null;
           if ("parent" in item && item.parent === "secretaria") return null;
           const Icon = item.icon;

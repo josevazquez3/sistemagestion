@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -15,6 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ObservacionModal } from "./ObservacionModal";
@@ -32,6 +35,7 @@ import {
   type LicenciaNomina,
 } from "@/lib/exportarLicencias";
 import { Pencil, Trash2, FileText, FileDown, Loader2 } from "lucide-react";
+import { isSuperAdmin } from "@/lib/auth.utils";
 
 const OBS_TRUNCATE = 60;
 
@@ -51,6 +55,21 @@ function textoDiasRestantes(lic: LicenciaNomina): { texto: string; clase: string
 }
 
 export function NominaLicencias() {
+  const { data: session } = useSession();
+  const rolesSession = (session?.user as { roles?: unknown })?.roles ?? [];
+  const [rolesFromMe, setRolesFromMe] = useState<string[] | null>(null);
+  const esSuperAdmin = isSuperAdmin(rolesSession) || isSuperAdmin(rolesFromMe ?? []);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch("/api/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.roles) setRolesFromMe(data.roles);
+      })
+      .catch(() => {});
+  }, [session?.user]);
+
   const [licencias, setLicencias] = useState<LicenciaNomina[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorFetch, setErrorFetch] = useState<string | null>(null);
@@ -64,6 +83,9 @@ export function NominaLicencias() {
     observacionId: number;
   } | null>(null);
   const [eliminando, setEliminando] = useState(false);
+  const [eliminarFisicoModal, setEliminarFisicoModal] = useState<{ id: number; nombre: string } | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [eliminarFisicoSaving, setEliminarFisicoSaving] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -107,6 +129,25 @@ export function NominaLicencias() {
       }
     } finally {
       setEliminando(false);
+    }
+  };
+
+  const confirmarEliminarFisico = async () => {
+    if (!eliminarFisicoModal || confirmText !== "ELIMINAR") return;
+    setEliminarFisicoSaving(true);
+    try {
+      const r = await fetch(`/api/licencias/${eliminarFisicoModal.id}/fisico`, { method: "DELETE" });
+      if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.error ?? "Error");
+      }
+      setEliminarFisicoModal(null);
+      setConfirmText("");
+      cargar();
+    } catch (e: unknown) {
+      alert((e as Error).message);
+    } finally {
+      setEliminarFisicoSaving(false);
     }
   };
 
@@ -247,9 +288,27 @@ export function NominaLicencias() {
                             }
                             disabled={!tieneObs}
                             title="Eliminar observación"
+                            className="text-orange-500 hover:text-orange-600"
                           >
-                            <Trash2 className="h-4 w-4 text-red-600" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
+                          {esSuperAdmin && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() =>
+                                setEliminarFisicoModal({
+                                  id: lic.id,
+                                  nombre: `${nombreCompleto} - ${tipoLabel}`,
+                                })
+                              }
+                              title="Eliminar permanentemente (irreversible)"
+                              className="text-red-700 hover:text-red-800 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="overflow-hidden px-2 py-2">
@@ -309,6 +368,51 @@ export function NominaLicencias() {
             <Button variant="destructive" onClick={eliminarObservacion} disabled={eliminando}>
               {eliminando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal eliminar licencia permanentemente (SUPER_ADMIN) */}
+      <Dialog
+        open={!!eliminarFisicoModal}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEliminarFisicoModal(null);
+            setConfirmText("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-700">Eliminación permanente</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                <p className="text-red-700 font-semibold">
+                  Esta acción eliminará la licencia y todos sus certificados de forma irreversible.
+                </p>
+                <p>Escribí <strong>ELIMINAR</strong> para confirmar:</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="ELIMINAR"
+              className="font-mono"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEliminarFisicoModal(null); setConfirmText(""); }}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmarEliminarFisico}
+              disabled={confirmText !== "ELIMINAR" || eliminarFisicoSaving}
+            >
+              {eliminarFisicoSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar permanentemente"}
             </Button>
           </DialogFooter>
         </DialogContent>

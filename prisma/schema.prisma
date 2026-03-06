@@ -39,10 +39,12 @@ model Role {
 }
 
 enum RoleNombre {
+  SUPER_ADMIN
   ADMIN
   SECRETARIA
   TESORERO
   RRHH
+  LEGALES
   EMPLEADO
 }
 
@@ -419,6 +421,62 @@ model DocumentoLegislacion {
   categoria       CategoriaLegislacion? @relation(fields: [categoriaId], references: [id])
 
   @@map("documentos_legislacion")
+}
+
+// === SECRETARÍA - ORDEN DEL DÍA C.S. ===
+
+model CategoriaOrdenDia {
+  id             Int                   @id @default(autoincrement())
+  nombre         String
+  descripcion    String?
+  activo         Boolean               @default(true)
+  creadoEn       DateTime              @default(now())
+  actualizadoEn  DateTime              @updatedAt
+  documentos     DocumentoOrdenDia[]
+
+  @@map("categorias_orden_dia")
+}
+
+model DocumentoOrdenDia {
+  id              Int                 @id @default(autoincrement())
+  categoriaId     Int?
+  titulo          String
+  descripcion     String?
+  nombreArchivo   String
+  urlArchivo      String
+  tipoArchivo     String              // PDF o DOCX
+  fechaDocumento  DateTime?
+  creadoEn        DateTime            @default(now())
+  actualizadoEn   DateTime            @updatedAt
+  categoria       CategoriaOrdenDia?  @relation(fields: [categoriaId], references: [id])
+
+  @@map("documentos_orden_dia")
+}
+
+// === SECRETARÍA - AGENDA ===
+
+enum EstadoReunion {
+  PENDIENTE
+  FINALIZADA
+}
+
+model Reunion {
+  id                Int            @id @default(autoincrement())
+  fechaCarga        DateTime       @default(now())
+  organismo         String
+  fechaReunion      DateTime
+  hora              String?
+  observacion       String?
+  estado            EstadoReunion  @default(PENDIENTE)
+  contactoNombre    String?
+  contactoApellido  String?
+  contactoCargo     String?
+  contactoTelefono String?
+  contactoMail      String?
+  creadoEn          DateTime       @default(now())
+  actualizadoEn     DateTime       @updatedAt
+
+  @@map("reuniones")
 }
 
 // === LEGALES - MODELOS DE OFICIOS ===

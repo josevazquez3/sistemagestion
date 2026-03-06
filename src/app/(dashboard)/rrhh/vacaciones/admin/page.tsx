@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatearFecha } from "@/lib/vacaciones.utils";
+import { isSuperAdmin, canManageLegajos } from "@/lib/auth.utils";
 import { Loader2, Settings, Users, Search, FileDown, Trash2, Link2, Unlink, Check } from "lucide-react";
 
 type Legajo = {
@@ -60,8 +61,20 @@ const estadoBadgeClass: Record<string, string> = {
 
 export default function VacacionesAdminPage() {
   const { data: session } = useSession();
-  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
-  const esAdmin = roles.includes("ADMIN") || roles.includes("RRHH");
+  const rolesSession = (session?.user as { roles?: unknown })?.roles ?? [];
+  const [rolesFromMe, setRolesFromMe] = useState<string[] | null>(null);
+  const esSuperAdmin = isSuperAdmin(rolesSession) || isSuperAdmin(rolesFromMe ?? []);
+  const esAdmin = canManageLegajos(rolesSession) || canManageLegajos(rolesFromMe ?? []);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch("/api/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.roles) setRolesFromMe(data.roles);
+      })
+      .catch(() => {});
+  }, [session?.user]);
 
   const [legajos, setLegajos] = useState<Legajo[]>([]);
   const [legajosLoading, setLegajosLoading] = useState(true);
@@ -85,6 +98,8 @@ export default function VacacionesAdminPage() {
   const [bajaLoading, setBajaLoading] = useState(false);
   const [confirmarConfigModal, setConfirmarConfigModal] = useState(false);
   const [aprobarLoading, setAprobarLoading] = useState<number | null>(null);
+  const [eliminarFisicoModal, setEliminarFisicoModal] = useState<SolicitudAdmin | null>(null);
+  const [eliminarFisicoLoading, setEliminarFisicoLoading] = useState(false);
   const [usuariosVinculacion, setUsuariosVinculacion] = useState<UsuarioVinculacion[]>([]);
   const [vinculacionLoading, setVinculacionLoading] = useState(false);
   const [vinculandoId, setVinculandoId] = useState<string | null>(null);
@@ -300,6 +315,28 @@ export default function VacacionesAdminPage() {
       "_blank",
       "noopener,noreferrer"
     );
+  };
+
+  const handleEliminarFisico = (s: SolicitudAdmin) => {
+    setEliminarFisicoModal(s);
+  };
+
+  const handleConfirmarEliminarFisico = async () => {
+    if (!eliminarFisicoModal) return;
+    setEliminarFisicoLoading(true);
+    try {
+      const r = await fetch(`/api/vacaciones/${eliminarFisicoModal.id}/fisico`, { method: "DELETE" });
+      if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.error ?? "Error");
+      }
+      setEliminarFisicoModal(null);
+      if (empleadoId) cargarConfigYSolicitudes(empleadoId);
+    } catch (e: unknown) {
+      alert((e as Error).message);
+    } finally {
+      setEliminarFisicoLoading(false);
+    }
   };
 
   if (!esAdmin) {
@@ -620,7 +657,18 @@ export default function VacacionesAdminPage() {
                               size="icon-sm"
                               onClick={() => handleDarDeBaja(s)}
                               title="Dar de baja"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {esSuperAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleEliminarFisico(s)}
+                              title="Eliminar permanentemente (irreversible)"
+                              className="text-red-700 hover:text-red-800 hover:bg-red-50"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -689,6 +737,36 @@ export default function VacacionesAdminPage() {
                 disabled={bajaLoading}
               >
                 {bajaLoading ? "Procesando..." : "Dar de baja"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal eliminar solicitud permanentemente (SUPER_ADMIN) */}
+      {eliminarFisicoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-red-700 mb-2">
+              Eliminación permanente
+            </h3>
+            <p className="text-gray-600 text-sm mb-4">
+              ¿Eliminar esta solicitud de vacaciones de forma permanente? Se borrará del sistema sin posibilidad de recuperación.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEliminarFisicoModal(null)}
+                disabled={eliminarFisicoLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleConfirmarEliminarFisico}
+                disabled={eliminarFisicoLoading}
+              >
+                {eliminarFisicoLoading ? "Procesando..." : "Eliminar permanentemente"}
               </Button>
             </div>
           </div>

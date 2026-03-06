@@ -4,7 +4,10 @@ import { LegislacionContent } from "@/components/legislacion/LegislacionContent"
 export default async function LegislacionPage() {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
-  const canEdit = roles.includes("ADMIN") || roles.includes("SECRETARIA");
+  const canEdit =
+    roles.includes("ADMIN") ||
+    roles.includes("SECRETARIA") ||
+    roles.includes("SUPER_ADMIN");
 
   return (
     <div className="max-w-6xl mx-auto">

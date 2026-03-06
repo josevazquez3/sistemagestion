@@ -4,11 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import bcrypt from "bcryptjs";
 
-/** GET - Listar todos los usuarios (solo ADMIN) */
+/** GET - Listar todos los usuarios (solo ADMIN / SUPER_ADMIN) */
 export async function GET() {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
-  if (!roles.includes("ADMIN")) {
+  if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -41,11 +41,11 @@ export async function GET() {
   );
 }
 
-/** POST - Crear nuevo usuario (solo ADMIN) */
+/** POST - Crear nuevo usuario (solo ADMIN / SUPER_ADMIN) */
 export async function POST(req: Request) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
-  if (!roles.includes("ADMIN")) {
+  if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
