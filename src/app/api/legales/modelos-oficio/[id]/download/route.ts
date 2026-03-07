@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { esBlobUrl } from "@/lib/blob";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -26,6 +27,10 @@ export async function GET(
   if (id === null) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const modelo = await prisma.modeloOficio.findUnique({ where: { id } });
   if (!modelo) return NextResponse.json({ error: "Modelo no encontrado" }, { status: 404 });
+  if (esBlobUrl(modelo.urlArchivo)) {
+    return NextResponse.redirect(modelo.urlArchivo);
+  }
+
   let buffer: Buffer;
   if (modelo.contenido && modelo.contenido.length > 0) {
     buffer = Buffer.from(modelo.contenido);

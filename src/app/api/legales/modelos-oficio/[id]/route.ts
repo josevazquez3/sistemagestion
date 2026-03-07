@@ -3,15 +3,14 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import type { Prisma } from "@prisma/client";
-import { writeFile, mkdir, unlink } from "fs/promises";
+import { subirArchivo, eliminarArchivo } from "@/lib/blob";
 import path from "path";
 import { randomBytes } from "crypto";
+import { unlink } from "fs/promises";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "modelos-oficios");
-
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
@@ -69,12 +68,11 @@ export async function PUT(
         const name = file.name.toLowerCase();
         if (!name.endsWith(".docx")) return NextResponse.json({ error: "Solo se permiten archivos .docx" }, { status: 400 });
         if (file.size > MAX_FILE_SIZE) return NextResponse.json({ error: "El archivo no puede superar 10 MB" }, { status: 400 });
-        await mkdir(UPLOAD_DIR, { recursive: true });
         const safeName = `modelooficio_${Date.now()}_${randomBytes(4).toString("hex")}.docx`;
         const buffer = Buffer.from(await file.arrayBuffer());
-        await writeFile(path.join(UPLOAD_DIR, safeName), buffer);
+        const contentType = file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        data.urlArchivo = await subirArchivo("modelos-oficios", safeName, buffer, contentType);
         data.nombreArchivo = file.name;
-        data.urlArchivo = `/uploads/modelos-oficios/${safeName}`;
         data.contenido = buffer;
       }
       const updated = await prisma.modeloOficio.update({
@@ -132,9 +130,12 @@ export async function DELETE(
   if (id === null) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const modelo = await prisma.modeloOficio.findUnique({ where: { id } });
   if (!modelo) return NextResponse.json({ error: "Modelo no encontrado" }, { status: 404 });
-  try {
-    await unlink(path.join(process.cwd(), "public", modelo.urlArchivo));
-  } catch {}
+  await eliminarArchivo(modelo.urlArchivo);
+  if (modelo.urlArchivo.startsWith("/")) {
+    try {
+      await unlink(path.join(process.cwd(), "public", modelo.urlArchivo));
+    } catch {}
+  }
   await prisma.modeloOficio.delete({ where: { id } });
   const user = session?.user as { id?: string; name?: string; email?: string };
   await registrarAuditoria({

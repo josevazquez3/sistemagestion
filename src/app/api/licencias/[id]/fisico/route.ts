@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { isSuperAdmin } from "@/lib/auth.utils";
+import { eliminarArchivo } from "@/lib/blob";
 import path from "path";
 import { unlink } from "fs/promises";
 
@@ -65,12 +66,14 @@ export async function DELETE(
   }
 
   for (const url of urlsToDelete) {
-    if (url?.startsWith("/")) {
+    if (!url) continue;
+    await eliminarArchivo(url);
+    if (url.startsWith("/")) {
       try {
-        const filePath = path.join(process.cwd(), url.replace(/^\//, ""));
+        const filePath = path.join(process.cwd(), "public", url.replace(/^\//, ""));
         await unlink(filePath);
       } catch {
-        // Ignorar si el archivo no existe
+        // Ignorar si el archivo no existe (legacy)
       }
     }
   }

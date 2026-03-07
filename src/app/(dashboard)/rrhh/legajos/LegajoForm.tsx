@@ -74,6 +74,7 @@ export function LegajoForm({
   onSuccess: () => void;
 }) {
   const [saving, setSaving] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [showContactos, setShowContactos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -162,12 +163,31 @@ export function LegajoForm({
     }
   }, [open, editingId]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => setForm((f) => ({ ...f, fotoUrl: reader.result as string }));
-    reader.readAsDataURL(file);
+    if (!file) return;
+    const tiposPermitidos = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!tiposPermitidos.includes(file.type)) {
+      alert("Solo se permiten JPG, PNG o WEBP.");
+      return;
+    }
+    setSubiendoFoto(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/legajos/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "Error al subir la foto");
+        return;
+      }
+      setForm((f) => ({ ...f, fotoUrl: data.url }));
+    } catch {
+      alert("Error al subir la foto");
+    } finally {
+      setSubiendoFoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const addContacto = () => setForm((f) => ({ ...f, contactos: [...f.contactos, emptyContacto()] }));
@@ -280,19 +300,51 @@ export function LegajoForm({
         </DialogHeader>
         <div className="space-y-4 py-4 overflow-y-auto flex-1 min-h-0">
           {/* Foto */}
-          <div className="flex items-center gap-4">
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="h-24 w-24 rounded-full bg-[#C8E6C9] flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 border-2 border-dashed border-[#4CAF50]"
-            >
-              {form.fotoUrl ? (
-                <img src={form.fotoUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <User className="h-10 w-10 text-[#388E3C]" />
-              )}
+          <div className="flex flex-col items-start gap-2">
+            <div className="flex items-center gap-4">
+              <div
+                onClick={() => !subiendoFoto && fileInputRef.current?.click()}
+                className={`h-24 w-24 rounded-full bg-[#C8E6C9] flex items-center justify-center overflow-hidden border-2 border-dashed border-[#4CAF50] ${
+                  subiendoFoto ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:opacity-80"
+                }`}
+              >
+                {form.fotoUrl ? (
+                  <img src={form.fotoUrl} alt="Foto de perfil" className="h-full w-full object-cover" />
+                ) : subiendoFoto ? (
+                  <Loader2 className="h-10 w-10 text-[#388E3C] animate-spin" />
+                ) : (
+                  <User className="h-10 w-10 text-[#388E3C]" />
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                className="hidden"
+                disabled={subiendoFoto}
+                onChange={handlePhotoChange}
+              />
+              <div className="flex flex-col gap-1">
+                <span
+                  className={`text-sm px-3 py-1.5 rounded border w-fit ${
+                    subiendoFoto ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "hover:bg-gray-50 text-gray-600 cursor-pointer"
+                  }`}
+                  onClick={() => !subiendoFoto && fileInputRef.current?.click()}
+                >
+                  {subiendoFoto ? "Subiendo..." : "Seleccionar foto"}
+                </span>
+                <span className="text-xs text-gray-500">JPG, PNG o WEBP. Máx. 5 MB.</span>
+              </div>
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-            <span className="text-sm text-gray-500">Clic para subir foto</span>
+            {form.fotoUrl && !subiendoFoto && (
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, fotoUrl: "" }))}
+                className="text-xs text-red-500 hover:underline"
+              >
+                Quitar foto
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

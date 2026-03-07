@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { subirArchivo, esBlobUrl } from "@/lib/blob";
+import { readFile } from "fs/promises";
 import path from "path";
 import mammoth from "mammoth";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "modelos-oficios");
 
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
@@ -42,6 +42,10 @@ export async function GET(
   let buffer: Buffer;
   if (modelo.contenido && modelo.contenido.length > 0) {
     buffer = Buffer.from(modelo.contenido);
+  } else if (esBlobUrl(modelo.urlArchivo)) {
+    const res = await fetch(modelo.urlArchivo);
+    if (!res.ok) return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
+    buffer = Buffer.from(await res.arrayBuffer());
   } else {
     const filePath = path.join(process.cwd(), "public", modelo.urlArchivo);
     try {
@@ -104,12 +108,13 @@ export async function POST(
     const doc = new Document({ sections: [{ children }] });
     const buffer = Buffer.from(await Packer.toBuffer(doc));
 
-    await mkdir(UPLOAD_DIR, { recursive: true });
     const safeName = `${Date.now()}-${modelo.nombreArchivo.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const filePath = path.join(UPLOAD_DIR, safeName);
-    await writeFile(filePath, buffer);
-
-    const urlArchivo = `/uploads/modelos-oficios/${safeName}`;
+    const urlArchivo = await subirArchivo(
+      "modelos-oficios",
+      safeName,
+      buffer,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
 
     await prisma.modeloOficio.update({
       where: { id },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { esBlobUrl } from "@/lib/blob";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -41,6 +42,10 @@ export async function GET(
       { error: "Esta acta no tiene archivo adjunto" },
       { status: 404 }
     );
+  }
+
+  if (esBlobUrl(acta.urlArchivo)) {
+    return NextResponse.redirect(acta.urlArchivo);
   }
 
   const filePath = path.join(process.cwd(), "public", acta.urlArchivo);

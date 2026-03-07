@@ -3,8 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import type { Prisma } from "@prisma/client";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { subirArchivo } from "@/lib/blob";
 import { randomBytes } from "crypto";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
@@ -14,8 +13,6 @@ const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingm
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
-
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "modelos-oficios");
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -84,12 +81,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "El archivo no puede superar 10 MB" }, { status: 400 });
     }
 
-    await mkdir(UPLOAD_DIR, { recursive: true });
     const safeName = `modelooficio_${Date.now()}_${randomBytes(4).toString("hex")}.docx`;
-    const filePath = path.join(UPLOAD_DIR, safeName);
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(filePath, buffer);
-    const urlArchivo = `/uploads/modelos-oficios/${safeName}`;
+    const contentType = file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const urlArchivo = await subirArchivo("modelos-oficios", safeName, buffer, contentType);
 
     const modelo = await prisma.modeloOficio.create({
       data: { tipoOficioId, nombre, nombreArchivo: file.name, urlArchivo, contenido: buffer },

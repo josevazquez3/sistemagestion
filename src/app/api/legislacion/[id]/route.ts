@@ -2,17 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { mkdir, unlink, writeFile } from "fs/promises";
+import { subirArchivo, eliminarArchivo } from "@/lib/blob";
 import path from "path";
 import { randomBytes } from "crypto";
 import { SeccionLegislacion } from "@prisma/client";
+import { unlink } from "fs/promises";
 
 const ROLES_WRITE = ["ADMIN", "SECRETARIA", "SUPER_ADMIN"] as const;
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PDF_MIME = "application/pdf";
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "legislacion");
-
 function normalizeRole(r: unknown): string | null {
   if (typeof r === "string") return r;
   if (r && typeof r === "object" && "nombre" in r && typeof (r as { nombre: unknown }).nombre === "string")
@@ -100,9 +99,10 @@ export async function PUT(
     if (fechaDocumentoStr !== undefined) data.fechaDocumento = fd ?? null;
 
     if (quitarArchivo && doc.urlArchivo) {
-      try {
-        await unlink(path.join(process.cwd(), "public", doc.urlArchivo));
-      } catch {}
+      await eliminarArchivo(doc.urlArchivo);
+      if (doc.urlArchivo.startsWith("/")) {
+        try { await unlink(path.join(process.cwd(), "public", doc.urlArchivo)); } catch {}
+      }
       if (!file || file.size === 0) {
         return NextResponse.json(
           { error: "Debe seleccionar un archivo para reemplazar al quitar el actual" },
@@ -122,17 +122,16 @@ export async function PUT(
         return NextResponse.json({ error: "El archivo no puede superar 20 MB" }, { status: 400 });
       }
       if (doc.urlArchivo) {
-        try {
-          await unlink(path.join(process.cwd(), "public", doc.urlArchivo));
-        } catch {}
+        await eliminarArchivo(doc.urlArchivo);
+        if (doc.urlArchivo.startsWith("/")) {
+          try { await unlink(path.join(process.cwd(), "public", doc.urlArchivo)); } catch {}
+        }
       }
-      await mkdir(UPLOAD_DIR, { recursive: true });
       const ext = isPdf ? "pdf" : "docx";
       const safeName = `leg_${Date.now()}_${randomBytes(4).toString("hex")}.${ext}`;
-      const filePath = path.join(UPLOAD_DIR, safeName);
-      await writeFile(filePath, Buffer.from(await file.arrayBuffer()));
+      const contentType = isPdf ? PDF_MIME : DOCX_MIME;
+      data.urlArchivo = await subirArchivo("legislacion", safeName, file, contentType);
       data.nombreArchivo = file.name;
-      data.urlArchivo = `/uploads/legislacion/${safeName}`;
       data.tipoArchivo = isPdf ? "PDF" : "DOCX";
     }
 
@@ -170,9 +169,10 @@ export async function DELETE(
   const doc = await prisma.documentoLegislacion.findUnique({ where: { id } });
   if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
   if (doc.urlArchivo) {
-    try {
-      await unlink(path.join(process.cwd(), "public", doc.urlArchivo));
-    } catch {}
+    await eliminarArchivo(doc.urlArchivo);
+    if (doc.urlArchivo.startsWith("/")) {
+      try { await unlink(path.join(process.cwd(), "public", doc.urlArchivo)); } catch {}
+    }
   }
   await prisma.documentoLegislacion.delete({ where: { id } });
   const user = session?.user as { id?: string; name?: string; email?: string };

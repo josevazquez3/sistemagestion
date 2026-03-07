@@ -2,15 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { writeFile, mkdir, unlink } from "fs/promises";
+import { subirArchivo, eliminarArchivo } from "@/lib/blob";
 import path from "path";
 import { randomBytes } from "crypto";
+import { unlink } from "fs/promises";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
 const PDF_MIME = "application/pdf";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "historial-oficios");
-
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
@@ -71,7 +70,10 @@ export async function PUT(
     const fechaOficio = parseFechaArgentina(fechaOficioStr ?? "");
     if (fechaOficio) data.fechaOficio = fechaOficio;
     if (quitarArchivo && oficio.urlArchivo) {
-      try { await unlink(path.join(process.cwd(), "public", oficio.urlArchivo)); } catch {}
+      await eliminarArchivo(oficio.urlArchivo);
+      if (oficio.urlArchivo.startsWith("/")) {
+        try { await unlink(path.join(process.cwd(), "public", oficio.urlArchivo)); } catch {}
+      }
       data.nombreArchivo = null;
       data.urlArchivo = null;
     }
@@ -101,14 +103,15 @@ export async function PUT(
         );
       }
       if (oficio.urlArchivo) {
-        try { await unlink(path.join(process.cwd(), "public", oficio.urlArchivo)); } catch {}
+        await eliminarArchivo(oficio.urlArchivo);
+        if (oficio.urlArchivo.startsWith("/")) {
+          try { await unlink(path.join(process.cwd(), "public", oficio.urlArchivo)); } catch {}
+        }
       }
-      await mkdir(UPLOAD_DIR, { recursive: true });
       const safeName = `oficio_${Date.now()}_${randomBytes(4).toString("hex")}.pdf`;
-      const filePath = path.join(UPLOAD_DIR, safeName);
-      await writeFile(filePath, Buffer.from(await file.arrayBuffer()));
+      const mime = file.type || PDF_MIME;
+      data.urlArchivo = await subirArchivo("historial-oficios", safeName, file, mime);
       data.nombreArchivo = file.name;
-      data.urlArchivo = `/uploads/historial-oficios/${safeName}`;
     }
     const updated = await prisma.oficioRespondido.update({ where: { id }, data });
     const user = session?.user as { id?: string; name?: string; email?: string };
@@ -136,7 +139,10 @@ export async function DELETE(
   const oficio = await prisma.oficioRespondido.findUnique({ where: { id } });
   if (!oficio) return NextResponse.json({ error: "Oficio no encontrado" }, { status: 404 });
   if (oficio.urlArchivo) {
-    try { await unlink(path.join(process.cwd(), "public", oficio.urlArchivo)); } catch {}
+    await eliminarArchivo(oficio.urlArchivo);
+    if (oficio.urlArchivo.startsWith("/")) {
+      try { await unlink(path.join(process.cwd(), "public", oficio.urlArchivo)); } catch {}
+    }
   }
   await prisma.oficioRespondido.delete({ where: { id } });
   const user = session?.user as { id?: string; name?: string; email?: string };

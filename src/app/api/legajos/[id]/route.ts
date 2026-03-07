@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { canManageLegajos } from "@/lib/auth.utils";
+import { eliminarArchivo, esBlobUrl } from "@/lib/blob";
 
 /** GET - Obtener legajo por ID */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -73,6 +74,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         where: { dni: String(body.dni), id: { not: id } },
       });
       if (exist) return NextResponse.json({ error: "El DNI ya está registrado" }, { status: 400 });
+    }
+
+    // Si se actualiza la foto y la anterior era de Blob, eliminarla
+    if (body.fotoUrl !== undefined && body.fotoUrl !== legajo.fotoUrl && legajo.fotoUrl && esBlobUrl(legajo.fotoUrl)) {
+      await eliminarArchivo(legajo.fotoUrl);
     }
 
     const contactos = body.contactos;

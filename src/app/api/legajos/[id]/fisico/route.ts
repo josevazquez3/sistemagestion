@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { isSuperAdmin } from "@/lib/auth.utils";
+import { eliminarArchivo } from "@/lib/blob";
 import path from "path";
 import { unlink } from "fs/promises";
 
@@ -63,12 +64,15 @@ export async function DELETE(
       prisma.legajo.delete({ where: { id } }),
     ]);
 
-    if (legajo.fotoUrl?.startsWith("/")) {
-      try {
-        const filePath = path.join(process.cwd(), legajo.fotoUrl.replace(/^\//, ""));
-        await unlink(filePath);
-      } catch {
-        // Ignorar si el archivo no existe
+    if (legajo.fotoUrl) {
+      await eliminarArchivo(legajo.fotoUrl);
+      if (legajo.fotoUrl.startsWith("/")) {
+        try {
+          const filePath = path.join(process.cwd(), "public", legajo.fotoUrl.replace(/^\//, ""));
+          await unlink(filePath);
+        } catch {
+          // Ignorar si el archivo no existe (legacy)
+        }
       }
     }
 

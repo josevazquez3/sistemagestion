@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { subirArchivo } from "@/lib/blob";
 import { EtapaCertificado, TipoArchivo } from "@prisma/client";
 
 const ROLES_LICENCIAS = ["ADMIN", "RRHH"] as const;
@@ -79,14 +78,6 @@ export async function POST(
     return NextResponse.json({ error: "No se enviaron archivos" }, { status: 400 });
   }
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "certificados");
-  try {
-    await mkdir(uploadDir, { recursive: true });
-  } catch (e) {
-    console.error("Error creando directorio uploads:", e);
-    return NextResponse.json({ error: "Error al crear directorio de subida" }, { status: 500 });
-  }
-
   const creados: { id: number; nombreArchivo: string; urlArchivo: string }[] = [];
 
   for (const file of files) {
@@ -108,14 +99,12 @@ export async function POST(
 
     const ext = mime === "application/pdf" ? "pdf" : "jpg";
     const safeName = `${id}-${etapa}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const filePath = path.join(uploadDir, safeName);
-    const urlArchivo = `/uploads/certificados/${safeName}`;
 
+    let urlArchivo: string;
     try {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await writeFile(filePath, buffer);
+      urlArchivo = await subirArchivo("certificados", safeName, file, mime);
     } catch (e) {
-      console.error("Error escribiendo archivo:", e);
+      console.error("Error subiendo archivo:", e);
       return NextResponse.json({ error: "Error al guardar el archivo" }, { status: 500 });
     }
 

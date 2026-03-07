@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { esBlobUrl } from "@/lib/blob";
 import { readFile } from "fs/promises";
 import path from "path";
 import archiver from "archiver";
@@ -53,6 +54,14 @@ export async function POST(req: NextRequest) {
       let buffer: Buffer;
       if (m.contenido && m.contenido.length > 0) {
         buffer = Buffer.from(m.contenido);
+      } else if (esBlobUrl(m.urlArchivo)) {
+        try {
+          const res = await fetch(m.urlArchivo);
+          if (!res.ok) continue;
+          buffer = Buffer.from(await res.arrayBuffer());
+        } catch {
+          continue;
+        }
       } else {
         try {
           buffer = await readFile(path.join(process.cwd(), "public", m.urlArchivo));

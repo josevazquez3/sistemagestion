@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { subirArchivo } from "@/lib/blob";
 import { randomBytes } from "crypto";
 
 const ROLES = ["ADMIN", "SECRETARIA"] as const;
@@ -14,8 +13,6 @@ const DOCX_MIME =
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
-
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "modelos-notas");
 
 /** GET - Listar modelos con búsqueda y filtros */
 export async function GET(req: NextRequest) {
@@ -129,16 +126,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await mkdir(UPLOAD_DIR, { recursive: true });
-
     const timestamp = Date.now();
     const random = randomBytes(4).toString("hex");
     const safeName = `modelonota_${timestamp}_${random}.docx`;
-    const filePath = path.join(UPLOAD_DIR, safeName);
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(filePath, buffer);
-
-    const urlArchivo = `/uploads/modelos-notas/${safeName}`;
+    const mime = file.type || DOCX_MIME;
+    const urlArchivo = await subirArchivo("modelos-notas", safeName, buffer, mime);
 
     const modelo = await prisma.modeloNota.create({
       data: {

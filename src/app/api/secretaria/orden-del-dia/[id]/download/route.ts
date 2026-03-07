@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { esBlobUrl } from "@/lib/blob";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -34,6 +35,10 @@ export async function GET(
       { error: "Este documento no tiene archivo" },
       { status: 404 }
     );
+  }
+
+  if (esBlobUrl(doc.urlArchivo)) {
+    return NextResponse.redirect(doc.urlArchivo);
   }
 
   const filePath = path.join(process.cwd(), "public", doc.urlArchivo);

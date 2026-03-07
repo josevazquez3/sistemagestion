@@ -3,8 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import type { Prisma } from "@prisma/client";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { subirArchivo } from "@/lib/blob";
 import { randomBytes } from "crypto";
 
 const ROLES = ["ADMIN", "SECRETARIA"] as const;
@@ -15,8 +14,6 @@ const DOCX_MIME =
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
-
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "actas");
 
 /** GET - Listar actas con búsqueda, filtro de fechas y paginación */
 export async function GET(req: NextRequest) {
@@ -130,15 +127,12 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      await mkdir(UPLOAD_DIR, { recursive: true });
       const timestamp = Date.now();
       const random = randomBytes(4).toString("hex");
       const safeName = `acta_${timestamp}_${random}.docx`;
-      const filePath = path.join(UPLOAD_DIR, safeName);
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await writeFile(filePath, buffer);
+      const mime = file.type || DOCX_MIME;
+      urlArchivo = await subirArchivo("actas", safeName, file, mime);
       nombreArchivo = file.name;
-      urlArchivo = `/uploads/actas/${safeName}`;
     }
 
     const acta = await prisma.acta.create({

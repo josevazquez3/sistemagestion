@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { subirArchivo } from "@/lib/blob";
 import { randomBytes } from "crypto";
 import type { Prisma } from "@prisma/client";
 
@@ -27,8 +26,6 @@ function canWrite(roles: unknown): boolean {
   const names = list.map(normalizeRole).filter(Boolean) as string[];
   return ROLES_WRITE.some((r) => names.includes(r));
 }
-
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "orden-del-dia");
 
 function parseFechaArgentina(str: string): Date | null {
   if (!str) return null;
@@ -177,16 +174,12 @@ export async function POST(req: NextRequest) {
 
     const fechaDocumento = parseFechaArgentina(fechaDocumentoStr ?? "") ?? null;
 
-    await mkdir(UPLOAD_DIR, { recursive: true });
     const ext = isPdf ? "pdf" : "docx";
     const timestamp = Date.now();
     const random = randomBytes(4).toString("hex");
     const safeName = `ordendel_${timestamp}_${random}.${ext}`;
-    const filePath = path.join(UPLOAD_DIR, safeName);
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(filePath, buffer);
-
-    const urlArchivo = `/uploads/orden-del-dia/${safeName}`;
+    const mime = isPdf ? PDF_MIME : DOCX_MIME;
+    const urlArchivo = await subirArchivo("orden-del-dia", safeName, file, mime);
     const tipoArchivo = isPdf ? "PDF" : "DOCX";
 
     const doc = await prisma.documentoOrdenDia.create({

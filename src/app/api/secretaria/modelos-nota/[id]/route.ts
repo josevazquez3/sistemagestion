@@ -2,16 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { writeFile, mkdir, unlink } from "fs/promises";
+import { subirArchivo, eliminarArchivo } from "@/lib/blob";
 import path from "path";
 import { randomBytes } from "crypto";
+import { unlink } from "fs/promises";
 
 const ROLES = ["ADMIN", "SECRETARIA"] as const;
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "modelos-notas");
-
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
@@ -109,15 +108,13 @@ export async function PUT(
         if (file.size > MAX_FILE_SIZE) {
           return NextResponse.json({ error: "El archivo no puede superar 10 MB" }, { status: 400 });
         }
-        await mkdir(UPLOAD_DIR, { recursive: true });
         const timestamp = Date.now();
         const random = randomBytes(4).toString("hex");
         const safeName = `modelonota_${timestamp}_${random}.docx`;
-        const filePath = path.join(UPLOAD_DIR, safeName);
         const buffer = Buffer.from(await file.arrayBuffer());
-        await writeFile(filePath, buffer);
+        const mime = file.type || DOCX_MIME;
+        data.urlArchivo = await subirArchivo("modelos-notas", safeName, buffer, mime);
         data.nombreArchivo = file.name;
-        data.urlArchivo = `/uploads/modelos-notas/${safeName}`;
         data.contenido = buffer;
       }
 
@@ -184,11 +181,14 @@ export async function DELETE(
     return NextResponse.json({ error: "Modelo no encontrado" }, { status: 404 });
   }
 
-  const filePath = path.join(process.cwd(), "public", modelo.urlArchivo);
-  try {
-    await unlink(filePath);
-  } catch {
-    // ignorar si el archivo no existe
+  await eliminarArchivo(modelo.urlArchivo);
+  if (modelo.urlArchivo.startsWith("/")) {
+    try {
+      const filePath = path.join(process.cwd(), "public", modelo.urlArchivo);
+      await unlink(filePath);
+    } catch {
+      // ignorar si el archivo no existe (legacy)
+    }
   }
 
   await prisma.modeloNota.delete({ where: { id } });

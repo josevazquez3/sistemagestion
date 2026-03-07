@@ -3,8 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import type { Prisma } from "@prisma/client";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { subirArchivo } from "@/lib/blob";
 import { randomBytes } from "crypto";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
@@ -14,8 +13,6 @@ const PDF_MIME = "application/pdf";
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
-
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "historial-oficios");
 
 function parseFechaArgentina(str: string): Date | null {
   if (!str) return null;
@@ -138,15 +135,12 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      await mkdir(UPLOAD_DIR, { recursive: true });
       const timestamp = Date.now();
       const random = randomBytes(4).toString("hex");
       const safeName = `oficio_${timestamp}_${random}.pdf`;
-      const filePath = path.join(UPLOAD_DIR, safeName);
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await writeFile(filePath, buffer);
+      const mime = file.type || PDF_MIME;
+      urlArchivo = await subirArchivo("historial-oficios", safeName, file, mime);
       nombreArchivo = file.name;
-      urlArchivo = `/uploads/historial-oficios/${safeName}`;
     }
 
     const oficio = await prisma.oficioRespondido.create({

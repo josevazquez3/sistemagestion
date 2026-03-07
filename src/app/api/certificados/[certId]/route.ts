@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { unlink } from "fs/promises";
+import { eliminarArchivo } from "@/lib/blob";
 import path from "path";
+import { unlink } from "fs/promises";
 
 const ROLES_LICENCIAS = ["ADMIN", "RRHH"] as const;
 
@@ -29,13 +30,16 @@ export async function DELETE(
   if (!cert) return NextResponse.json({ error: "Certificado no encontrado" }, { status: 404 });
 
   const urlArchivo = cert.urlArchivo;
-  if (urlArchivo.startsWith("/")) {
-    const filePath = path.join(process.cwd(), "public", urlArchivo);
-    try {
-      await unlink(filePath);
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
-        console.error("Error eliminando archivo certificado:", e);
+  if (urlArchivo) {
+    await eliminarArchivo(urlArchivo);
+    if (urlArchivo.startsWith("/")) {
+      const filePath = path.join(process.cwd(), "public", urlArchivo);
+      try {
+        await unlink(filePath);
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+          console.error("Error eliminando archivo certificado:", e);
+        }
       }
     }
   }
