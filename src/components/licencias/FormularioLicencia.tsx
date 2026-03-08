@@ -509,7 +509,7 @@ export function FormularioLicencia({ onSuccess, onCancel, licenciaIdEditar }: Fo
                           </span>
                           <div className="flex items-center gap-1 shrink-0">
                             <a
-                              href={c.urlArchivo}
+                              href={`/api/certificados/${c.id}/download`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-green-600 hover:underline text-xs"

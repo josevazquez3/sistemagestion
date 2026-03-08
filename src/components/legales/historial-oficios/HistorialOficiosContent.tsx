@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FilePlus, FolderUp, Search, Eye, Pencil, Trash2, Loader2 } from "lucide-react";
+import { FilePlus, FolderUp, Search, Eye, Pencil, Trash2, Printer, Loader2 } from "lucide-react";
 import { ModalNuevoOficio } from "./ModalNuevoOficio";
 import { ModalVerOficio } from "./ModalVerOficio";
 import { ModalEditarOficio } from "./ModalEditarOficio";
@@ -126,6 +126,18 @@ export function HistorialOficiosContent() {
 
   const handleDownload = (oficio: OficioRespondido) => {
     window.open(`/api/legales/historial-oficios/${oficio.id}/download`, "_blank");
+  };
+
+  const handleImprimir = (oficio: OficioRespondido) => {
+    const ventana = window.open(
+      `/api/legales/historial-oficios/${oficio.id}/download?inline=true`,
+      "_blank"
+    );
+    if (ventana) {
+      ventana.addEventListener("load", () => {
+        ventana.print();
+      });
+    }
   };
 
   return (
@@ -271,6 +283,17 @@ export function HistorialOficiosContent() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
+                          {oficio.urlArchivo && oficio.nombreArchivo && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100"
+                              onClick={() => handleImprimir(oficio)}
+                              title={`Imprimir ${oficio.nombreArchivo}`}
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -5,6 +5,7 @@ import type { NextConfig } from "next";
  * Si no está configurada manualmente, se usa la URL del deployment.
  */
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.0.39"],
   env: {
     NEXTAUTH_URL:
       process.env.NEXTAUTH_URL ||

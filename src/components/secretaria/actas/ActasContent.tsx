@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FilePlus, FolderUp, Search, Eye, Pencil, Trash2, Loader2, FileText, FileDown } from "lucide-react";
+import { FilePlus, FolderUp, Search, Eye, Pencil, Trash2, Printer, Loader2, FileText, FileDown } from "lucide-react";
 import { ModalNuevaActa } from "./ModalNuevaActa";
 import { ModalVerActa } from "./ModalVerActa";
 import { ModalEditarActa } from "./ModalEditarActa";
@@ -127,6 +127,22 @@ export function ActasContent() {
 
   const handleDownload = (acta: Acta) => {
     window.open(`/api/secretaria/actas/${acta.id}/download`, "_blank");
+  };
+
+  const handleImprimir = (acta: Acta) => {
+    if (!acta.urlArchivo || !acta.nombreArchivo) return;
+    const esPdf = acta.nombreArchivo.toLowerCase().endsWith(".pdf");
+    if (esPdf) {
+      const ventana = window.open(
+        `/api/secretaria/actas/${acta.id}/download?inline=true`,
+        "_blank"
+      );
+      if (ventana) {
+        ventana.addEventListener("load", () => ventana.print());
+      }
+    } else {
+      window.open(`/api/secretaria/actas/${acta.id}/print`, "_blank");
+    }
   };
 
   return (
@@ -290,6 +306,17 @@ export function ActasContent() {
                           >
                             <FileDown className="h-4 w-4" />
                           </Button>
+                          {acta.urlArchivo && acta.nombreArchivo && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100"
+                              onClick={() => handleImprimir(acta)}
+                              title={`Imprimir ${acta.nombreArchivo}`}
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

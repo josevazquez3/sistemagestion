@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { esBlobUrl } from "@/lib/blob";
+import { esBlobUrl, servirBlobDesdeApi } from "@/lib/blob";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -16,9 +16,9 @@ function parseId(id: string): number | null {
   return isNaN(n) ? null : n;
 }
 
-/** GET - Descargar .docx del acta */
+/** GET - Descargar archivo del acta (.docx o .pdf). ?inline=true → abrir en navegador (imprimir). */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -44,8 +44,21 @@ export async function GET(
     );
   }
 
+  const { searchParams } = new URL(req.url);
+  const inline = searchParams.get("inline") === "true";
+  const filename = acta.nombreArchivo || "acta.docx";
+  const esPdf = filename.toLowerCase().endsWith(".pdf");
+  const contentType = esPdf
+    ? "application/pdf"
+    : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
   if (esBlobUrl(acta.urlArchivo)) {
-    return NextResponse.redirect(acta.urlArchivo);
+    return servirBlobDesdeApi(
+      acta.urlArchivo,
+      filename,
+      contentType,
+      inline
+    );
   }
 
   const filePath = path.join(process.cwd(), "public", acta.urlArchivo);
@@ -59,12 +72,13 @@ export async function GET(
     );
   }
 
-  const filename = acta.nombreArchivo || "acta.docx";
+  const disposition = inline
+    ? `inline; filename="${encodeURIComponent(filename)}"`
+    : `attachment; filename="${encodeURIComponent(filename)}"`;
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
+      "Content-Type": contentType,
+      "Content-Disposition": disposition,
     },
   });
 }

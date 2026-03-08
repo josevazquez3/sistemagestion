@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { esBlobUrl } from "@/lib/blob";
+import { esBlobUrl, servirBlobDesdeApi } from "@/lib/blob";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -17,7 +17,7 @@ function parseId(id: string): number | null {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -30,9 +30,20 @@ export async function GET(
   if (!oficio.urlArchivo) {
     return NextResponse.json({ error: "Este oficio no tiene archivo adjunto" }, { status: 404 });
   }
+
+  const { searchParams } = new URL(req.url);
+  const inline = searchParams.get("inline") === "true";
+
   if (esBlobUrl(oficio.urlArchivo)) {
-    return NextResponse.redirect(oficio.urlArchivo);
+    const filename = oficio.nombreArchivo || "oficio.pdf";
+    return servirBlobDesdeApi(
+      oficio.urlArchivo,
+      filename,
+      "application/pdf",
+      inline
+    );
   }
+
   const filePath = path.join(process.cwd(), "public", oficio.urlArchivo);
   let buffer: Buffer;
   try {
@@ -41,10 +52,13 @@ export async function GET(
     return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
   }
   const filename = oficio.nombreArchivo || "oficio.pdf";
+  const disposition = inline
+    ? `inline; filename="${encodeURIComponent(filename)}"`
+    : `attachment; filename="${encodeURIComponent(filename)}"`;
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
+      "Content-Disposition": disposition,
     },
   });
 }

@@ -103,7 +103,7 @@ export function HistorialCertificados() {
                     <TableCell>{c.etapa === "INICIO" ? "Inicio" : "Cierre"}</TableCell>
                     <TableCell>
                       <a
-                        href={c.urlArchivo}
+                        href={`/api/certificados/${c.id}/download`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-green-600 hover:underline text-sm"

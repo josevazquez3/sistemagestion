@@ -301,7 +301,7 @@ function CertificadosModal({
               <li key={c.id} className="flex items-center justify-between gap-2">
                 <span className="text-sm truncate">{c.nombreArchivo}</span>
                 <a
-                  href={c.urlArchivo}
+                  href={`/api/certificados/${c.id}/download`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-green-600 text-sm shrink-0"

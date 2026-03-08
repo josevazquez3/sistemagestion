@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { subirArchivo, esBlobUrl } from "@/lib/blob";
+import { subirArchivo, esBlobUrl, sanitizarNombreArchivo } from "@/lib/blob";
 import { readFile } from "fs/promises";
 import path from "path";
 import mammoth from "mammoth";
@@ -108,7 +108,13 @@ export async function POST(
     const doc = new Document({ sections: [{ children }] });
     const buffer = Buffer.from(await Packer.toBuffer(doc));
 
-    const safeName = `${Date.now()}-${modelo.nombreArchivo.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const base = sanitizarNombreArchivo(
+      modelo.nombreArchivo.replace(/\.[^/.]+$/, "") || "modelo"
+    );
+    const ext = modelo.nombreArchivo.includes(".")
+      ? modelo.nombreArchivo.split(".").pop() ?? "docx"
+      : "docx";
+    const safeName = `${base}_${Date.now()}.${ext}`;
     const urlArchivo = await subirArchivo(
       "modelos-oficios",
       safeName,

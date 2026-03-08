@@ -1,4 +1,59 @@
 import { put, del } from "@vercel/blob";
+import { NextResponse } from "next/server";
+
+/**
+ * Sanitiza el nombre de archivo para evitar caracteres que Chrome bloquea en descargas.
+ * Quita acentos, espacios y caracteres especiales.
+ */
+export function sanitizarNombreArchivo(nombre: string): string {
+  return nombre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // quitar acentos
+    .replace(/\s+/g, "_") // espacios → guiones bajos
+    .replace(/[()[\]{}]/g, "") // quitar paréntesis y corchetes
+    .replace(/[^a-zA-Z0-9._-]/g, "_") // otros caracteres → _
+    .replace(/_+/g, "_") // múltiples _ → uno solo
+    .toLowerCase();
+}
+
+/**
+ * Descarga el archivo desde una URL de Vercel Blob y devuelve una Response
+ * servida desde la API (mismo origen) para evitar el aviso de Chrome
+ * "Se bloqueó una descarga no segura".
+ */
+export async function servirBlobDesdeApi(
+  urlArchivo: string,
+  nombreArchivo: string,
+  contentType: string,
+  inline: boolean
+): Promise<NextResponse> {
+  const response = await fetch(urlArchivo);
+  if (!response.ok) {
+    return NextResponse.json(
+      { error: "Archivo no encontrado" },
+      { status: 404 }
+    );
+  }
+  const buffer = await response.arrayBuffer();
+  const contentTypeFinal =
+    response.headers.get("content-type") ?? contentType;
+  const nombreSeguro = encodeURIComponent(nombreArchivo)
+    .replace(/'/g, "%27")
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29");
+  const disposition = inline
+    ? `inline; filename="${nombreSeguro}"; filename*=UTF-8''${nombreSeguro}`
+    : `attachment; filename="${nombreSeguro}"; filename*=UTF-8''${nombreSeguro}`;
+
+  return new NextResponse(buffer, {
+    headers: {
+      "Content-Type": contentTypeFinal,
+      "Content-Disposition": disposition,
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
 
 /**
  * Sube un archivo a Vercel Blob

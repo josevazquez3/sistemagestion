@@ -117,8 +117,27 @@ export function LegislacionContent({ seccion, canEdit }: LegislacionContentProps
       .catch(() => showMessage("error", "Error de conexión"));
   };
 
-  const handleDownload = (doc: DocumentoLegislacion) => {
-    window.open(`/api/legislacion/${doc.id}/download`, "_blank");
+  const handleDescargar = (doc: DocumentoLegislacion) => {
+    const a = document.createElement("a");
+    a.href = `/api/legislacion/${doc.id}/download`;
+    a.download = doc.nombreArchivo ?? "documento";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleImprimir = (doc: DocumentoLegislacion) => {
+    if (doc.tipoArchivo === "PDF") {
+      const ventana = window.open(
+        `/api/legislacion/${doc.id}/download?inline=true`,
+        "_blank"
+      );
+      if (ventana) {
+        ventana.addEventListener("load", () => ventana.print());
+      }
+    } else {
+      window.open(`/api/legislacion/${doc.id}/print`, "_blank");
+    }
   };
 
   return (
@@ -219,7 +238,8 @@ export function LegislacionContent({ seccion, canEdit }: LegislacionContentProps
             onVer={(d) => { setDocVer(d); setModalVerOpen(true); }}
             onEditar={(d) => { setDocEditar(d); setModalEditarOpen(true); }}
             onEliminar={handleDelete}
-            onDescargar={handleDownload}
+            onDescargar={handleDescargar}
+            onImprimir={handleImprimir}
           />
 
           {totalPages > 1 && (

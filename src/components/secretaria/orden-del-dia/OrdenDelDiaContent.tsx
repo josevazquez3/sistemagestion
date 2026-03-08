@@ -109,8 +109,27 @@ export function OrdenDelDiaContent({ canEdit }: OrdenDelDiaContentProps) {
       .catch(() => showMessage("error", "Error de conexión"));
   };
 
-  const handleDownload = (doc: DocumentoOrdenDia) => {
-    window.open(`${API_BASE}/${doc.id}/download`, "_blank");
+  const handleDescargar = (doc: DocumentoOrdenDia) => {
+    const a = document.createElement("a");
+    a.href = `${API_BASE}/${doc.id}/download`;
+    a.download = doc.nombreArchivo ?? "documento";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleImprimir = (doc: DocumentoOrdenDia) => {
+    if (doc.tipoArchivo === "PDF") {
+      const ventana = window.open(
+        `${API_BASE}/${doc.id}/download?inline=true`,
+        "_blank"
+      );
+      if (ventana) {
+        ventana.addEventListener("load", () => ventana.print());
+      }
+    } else {
+      window.open(`${API_BASE}/${doc.id}/print`, "_blank");
+    }
   };
 
   return (
@@ -211,7 +230,8 @@ export function OrdenDelDiaContent({ canEdit }: OrdenDelDiaContentProps) {
             onVer={(d) => { setDocVer(d); setModalVerOpen(true); }}
             onEditar={(d) => { setDocEditar(d); setModalEditarOpen(true); }}
             onEliminar={handleDelete}
-            onDescargar={handleDownload}
+            onDescargar={handleDescargar}
+            onImprimir={handleImprimir}
           />
 
           {totalPages > 1 && (

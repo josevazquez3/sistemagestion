@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, Pencil, Trash2, Loader2, FileText } from "lucide-react";
+import { Eye, Pencil, Trash2, Download, Printer, Loader2, FileText } from "lucide-react";
 import type { DocumentoOrdenDia } from "./types";
 
 const TZ = "America/Argentina/Buenos_Aires";
@@ -51,6 +51,7 @@ type DocumentosOrdenDiaTablaProps = {
   onEditar: (doc: DocumentoOrdenDia) => void;
   onEliminar: (doc: DocumentoOrdenDia) => void;
   onDescargar: (doc: DocumentoOrdenDia) => void;
+  onImprimir: (doc: DocumentoOrdenDia) => void;
 };
 
 export function DocumentosOrdenDiaTabla({
@@ -61,6 +62,7 @@ export function DocumentosOrdenDiaTabla({
   onEditar,
   onEliminar,
   onDescargar,
+  onImprimir,
 }: DocumentosOrdenDiaTablaProps) {
   return (
     <div className="border rounded-lg overflow-hidden">
@@ -148,12 +150,25 @@ export function DocumentosOrdenDiaTabla({
                     )}
                     <Button
                       size="sm"
-                      variant="link"
-                      className="h-8 shrink-0 p-0 text-[#388E3C]"
+                      variant="ghost"
+                      className={`h-8 w-8 p-0 shrink-0 ${
+                        doc.tipoArchivo === "PDF"
+                          ? "text-red-600 hover:bg-red-50"
+                          : "text-blue-600 hover:bg-blue-50"
+                      }`}
                       onClick={() => onDescargar(doc)}
-                      title="Descargar"
+                      title={`Descargar ${doc.nombreArchivo}`}
                     >
-                      {doc.nombreArchivo}
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 shrink-0 text-gray-600 hover:bg-gray-100"
+                      onClick={() => onImprimir(doc)}
+                      title={`Imprimir ${doc.nombreArchivo}`}
+                    >
+                      <Printer className="h-4 w-4" />
                     </Button>
                   </div>
                 </TableCell>

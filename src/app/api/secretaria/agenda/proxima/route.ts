@@ -25,10 +25,12 @@ export async function GET() {
     return NextResponse.json({ proxima: null, totalPendientes: 0 });
   }
 
+  // Hoy en Argentina (YYYY-MM-DD) → inicio del día UTC para comparar fechaReunion
   const hoy = new Date();
-  const hoyNorm = new Date(
-    hoy.toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" })
-  );
+  const hoyStr = hoy.toLocaleDateString("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  });
+  const hoyNorm = new Date(hoyStr + "T00:00:00.000Z");
 
   const [proxima, totalPendientes] = await Promise.all([
     prisma.reunion.findFirst({

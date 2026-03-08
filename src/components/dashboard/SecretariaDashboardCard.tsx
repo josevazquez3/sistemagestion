@@ -42,35 +42,35 @@ export function SecretariaDashboardCard() {
     <Card
       className={
         tieneProxima
-          ? "rounded-xl border-2 border-amber-400 bg-amber-50 shadow-sm hover:shadow-md transition-shadow"
+          ? "rounded-xl border-2 border-yellow-300 bg-yellow-50 shadow-sm hover:shadow-md transition-shadow"
           : "rounded-xl border shadow-sm hover:shadow-md transition-shadow"
       }
     >
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle
-          className={`text-sm font-medium ${tieneProxima ? "text-amber-800" : "text-gray-600"}`}
+          className={`text-sm font-medium ${tieneProxima ? "text-yellow-800" : "text-gray-600"}`}
         >
           Secretaría
         </CardTitle>
         <FileText
-          className={`h-4 w-4 shrink-0 ${tieneProxima ? "text-amber-600" : "text-[#4CAF50]"}`}
+          className={`h-4 w-4 shrink-0 ${tieneProxima ? "text-yellow-600" : "text-[#4CAF50]"}`}
         />
       </CardHeader>
       <CardContent>
         {tieneProxima && data?.proxima ? (
           <div>
-            <p className="text-xs font-semibold text-amber-700 uppercase mb-1">
+            <p className="text-xs font-semibold text-yellow-700 uppercase mb-1">
               📅 Próxima reunión
             </p>
             <p className="font-bold text-gray-800 text-sm truncate">{data.proxima.organismo}</p>
             <p className="text-sm text-gray-600">
               {formatearFecha(data.proxima.fechaReunion)}
               {data.proxima.hora && (
-                <span className="ml-2 text-amber-700 font-medium">{data.proxima.hora} hs</span>
+                <span className="ml-2 text-yellow-700 font-medium">{data.proxima.hora} hs</span>
               )}
             </p>
             {data.totalPendientes > 1 && (
-              <p className="text-xs text-amber-600 mt-1">
+              <p className="text-xs text-yellow-600 mt-1">
                 Y {data.totalPendientes - 1} reunión(es) más pendiente(s)
               </p>
             )}

@@ -108,6 +108,7 @@
   }
   html {
     font-size: 1.375rem; /* Base ~22px */
+    zoom: 0.75; /* Interfaz al 75% por defecto (equivale a Ctrl+- al 75%) */
   }
   body {
     @apply bg-background text-foreground;

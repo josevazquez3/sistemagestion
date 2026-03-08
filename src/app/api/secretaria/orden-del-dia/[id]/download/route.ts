@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { esBlobUrl } from "@/lib/blob";
+import { esBlobUrl, servirBlobDesdeApi } from "@/lib/blob";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -10,9 +10,9 @@ function parseId(id: string): number | null {
   return isNaN(n) ? null : n;
 }
 
-/** GET - Descargar archivo del documento */
+/** GET - Descargar archivo del documento. ?inline=true → abrir en navegador (imprimir). */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -37,8 +37,23 @@ export async function GET(
     );
   }
 
+  const { searchParams } = new URL(req.url);
+  const inline = searchParams.get("inline") === "true";
+
   if (esBlobUrl(doc.urlArchivo)) {
-    return NextResponse.redirect(doc.urlArchivo);
+    const filename =
+      doc.nombreArchivo ||
+      `documento.${doc.tipoArchivo?.toLowerCase() || "pdf"}`;
+    const contentType =
+      doc.tipoArchivo === "PDF"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    return servirBlobDesdeApi(
+      doc.urlArchivo,
+      filename,
+      contentType,
+      inline
+    );
   }
 
   const filePath = path.join(process.cwd(), "public", doc.urlArchivo);
@@ -57,11 +72,14 @@ export async function GET(
       ? "application/pdf"
       : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   const filename = doc.nombreArchivo || `documento.${doc.tipoArchivo?.toLowerCase() || "pdf"}`;
+  const disposition = inline
+    ? "inline"
+    : `attachment; filename="${encodeURIComponent(filename)}"`;
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": contentType,
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
+      "Content-Disposition": disposition,
     },
   });
 }
