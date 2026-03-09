@@ -17,6 +17,7 @@ import {
   BookOpen,
   ClipboardList,
   CalendarDays,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Session } from "next-auth";
@@ -30,7 +31,9 @@ const navItems = [
   { href: "/rrhh/vacaciones/historial", label: "Historial de Vacaciones", icon: FileText, parent: "rrhh" },
   { href: "/rrhh/vacaciones/admin", label: "Vacaciones (Admin)", icon: Calendar, parent: "rrhh", adminOnly: true },
   { href: "/rrhh/novedades-liquidadores", label: "Novedades Liquidadores", icon: ClipboardList, parent: "rrhh" },
-  { href: "/tesoreria", label: "Tesorería", icon: Landmark },
+  { href: "/tesoreria", label: "Tesorería", icon: Landmark, expandable: true, tesoreriaModule: true },
+  { href: "/tesoreria/cuentas-bancarias", label: "Cuentas Bancarias", icon: Landmark, parent: "tesoreria", tesoreriaModule: true },
+  { href: "/tesoreria/extracto-banco", label: "Extracto Banco", icon: Wallet, parent: "tesoreria", tesoreriaModule: true },
   { href: "/legislacion", label: "Legislación", icon: BookOpen },
   { href: "/legales", label: "Legales", icon: Scale, expandable: true, legalesModule: true },
   { href: "/legales/modelos-oficios", label: "Modelos de Oficios", icon: FileText, parent: "legales", legalesModule: true },
@@ -65,6 +68,11 @@ const legalesSubItems = [
   { href: "/legales/historial-oficios", label: "Historial de Oficios", icon: ClipboardList },
 ];
 
+const tesoreriaSubItems = [
+  { href: "/tesoreria/cuentas-bancarias", label: "Cuentas Bancarias", icon: Landmark },
+  { href: "/tesoreria/extracto-banco", label: "Extracto Banco", icon: Wallet },
+];
+
 export function Sidebar({ user }: { user: Session["user"] }) {
   const pathname = usePathname();
   const isAdmin = (user as { roles?: string[] })?.roles?.includes("ADMIN") ?? false;
@@ -72,6 +80,7 @@ export function Sidebar({ user }: { user: Session["user"] }) {
   const isSecretaria = (user as { roles?: string[] })?.roles?.includes("SECRETARIA") ?? false;
   const isSuperAdmin = (user as { roles?: string[] })?.roles?.includes("SUPER_ADMIN") ?? false;
   const isLegales = (user as { roles?: string[] })?.roles?.includes("LEGALES") ?? false;
+  const isTesorero = (user as { roles?: string[] })?.roles?.includes("TESORERO") ?? false;
 
   const [rrhhAbierto, setRrhhAbierto] = useState(() =>
     pathname.startsWith("/rrhh")
@@ -83,6 +92,10 @@ export function Sidebar({ user }: { user: Session["user"] }) {
 
   const [legalesAbierta, setLegalesAbierta] = useState(() =>
     pathname.startsWith("/legales")
+  );
+
+  const [tesoreriaAbierta, setTesoreriaAbierta] = useState(() =>
+    pathname.startsWith("/tesoreria")
   );
 
   useEffect(() => {
@@ -103,16 +116,24 @@ export function Sidebar({ user }: { user: Session["user"] }) {
     }
   }, [pathname]);
 
+  useEffect(() => {
+    if (pathname.startsWith("/tesoreria")) {
+      setTesoreriaAbierta(true);
+    }
+  }, [pathname]);
+
   const items = navItems.filter((item) => {
     if ("configuracionesOnly" in item && item.configuracionesOnly && !isAdmin) return false;
     if (item.adminOnly && !isAdmin && !isRrhh) return false;
     if ("secretariaModule" in item && item.secretariaModule && !isAdmin && !isSecretaria && !isSuperAdmin) return false;
     if ("legalesModule" in item && item.legalesModule && !isAdmin && !isLegales) return false;
+    if ("tesoreriaModule" in item && item.tesoreriaModule && !isAdmin && !isTesorero && !isSuperAdmin) return false;
     return true;
   });
 
   const showSecretaria = isAdmin || isSecretaria || isSuperAdmin;
   const showLegales = isAdmin || isLegales;
+  const showTesoreria = isAdmin || isTesorero || isSuperAdmin;
 
   return (
     <aside className="w-64 border-r border-gray-200 bg-white shadow-sm flex flex-col fixed h-full">
@@ -279,9 +300,60 @@ export function Sidebar({ user }: { user: Session["user"] }) {
               </div>
             );
           }
+          if ("expandable" in item && item.expandable && item.href === "/tesoreria") {
+            if (!showTesoreria) return null;
+            const ParentIcon = item.icon;
+            const isParentActive = pathname.startsWith("/tesoreria");
+            return (
+              <div key={item.href} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setTesoreriaAbierta((v) => !v)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
+                    isParentActive
+                      ? "bg-[#E8F5E9] text-[#388E3C]"
+                      : "text-gray-600 hover:bg-[#E8F5E9] hover:text-gray-800"
+                  )}
+                >
+                  <span className="flex items-center gap-3">
+                    <ParentIcon className="h-5 w-5 shrink-0" />
+                    {item.label}
+                  </span>
+                  <ChevronDown
+                    className={cn("h-4 w-4 shrink-0 transition-transform duration-200", tesoreriaAbierta && "rotate-180")}
+                  />
+                </button>
+                {tesoreriaAbierta && (
+                  <div className="pl-6 space-y-1 overflow-hidden transition-all duration-200">
+                    {tesoreriaSubItems.map((sub) => {
+                      const SubIcon = sub.icon;
+                      const isActive = pathname === sub.href || pathname.startsWith(sub.href + "/");
+                      return (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          className={cn(
+                            "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
+                            isActive
+                              ? "bg-[#E8F5E9] text-[#388E3C]"
+                              : "text-gray-600 hover:bg-[#E8F5E9] hover:text-gray-800"
+                          )}
+                        >
+                          <SubIcon className="h-5 w-5 shrink-0" />
+                          {sub.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
           if ("parent" in item && item.parent === "rrhh") return null;
           if ("parent" in item && item.parent === "legales") return null;
           if ("parent" in item && item.parent === "secretaria") return null;
+          if ("parent" in item && item.parent === "tesoreria") return null;
           const Icon = item.icon;
           const isActive =
             pathname === item.href ||

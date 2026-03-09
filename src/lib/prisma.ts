@@ -4,18 +4,22 @@ import { PrismaClient } from "@prisma/client";
  * Cliente Prisma singleton para Next.js.
  * En desarrollo evita múltiples instancias por el hot-reload.
  *
- * Para Neon/Vercel serverless: connection_limit=1 evita el error
- * "Error in PostgreSQL connection: Error { kind: Closed }" al reutilizar
- * conexiones cerradas entre invocaciones.
+ * Para Neon (serverless):
+ * - Usar la URL "pooled" del dashboard (host con -pooler).
+ * - connection_limit=1 evita reutilizar conexiones cerradas.
+ * - connect_timeout ayuda a no colgar si la conexión cayó (Error kind: Closed).
  */
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL ?? "";
   if (!url) return url;
-  if (url.includes("connection_limit=")) return url;
-  const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}connection_limit=1`;
+  const sep = url.indexOf("?");
+  const base = sep >= 0 ? url.slice(0, sep) : url;
+  const params = new URLSearchParams(sep >= 0 ? url.slice(sep + 1) : "");
+  if (!params.has("connection_limit")) params.set("connection_limit", "1");
+  if (!params.has("connect_timeout")) params.set("connect_timeout", "15");
+  return `${base}?${params.toString()}`;
 }
 
 export const prisma =

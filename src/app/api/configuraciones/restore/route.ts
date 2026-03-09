@@ -20,6 +20,7 @@ const CAMPOS_FECHA = [
   "fechaActa",
   "fechaOficio",
   "fechaDocumento",
+  "fecha",
   "deletedAt",
   "createdAt",
   "updatedAt",
@@ -37,6 +38,20 @@ function transformarFila(key: string, row: Record<string, unknown>): Record<stri
     const c = resultado.contenido as { type?: string; data?: number[] };
     if (c.type === "Buffer" && Array.isArray(c.data)) {
       resultado.contenido = Buffer.from(c.data);
+    }
+  }
+  if (key === "movimientos_extracto") {
+    for (const field of ["importePesos", "saldoPesos"]) {
+      const v = resultado[field];
+      if (typeof v === "number") continue;
+      if (typeof v === "object" && v != null) {
+        const o = v as Record<string, unknown>;
+        if (typeof o.$numberDecimal === "string") {
+          resultado[field] = parseFloat(o.$numberDecimal as string);
+        } else if (typeof (o as { toNumber?: () => number }).toNumber === "function") {
+          resultado[field] = (o as { toNumber: () => number }).toNumber();
+        }
+      }
     }
   }
   return resultado;
@@ -70,10 +85,14 @@ const INSERT_ORDER = [
   "documentos_legislacion",
   "categorias_orden_dia",
   "documentos_orden_dia",
+  "cuentas_bancarias",
+  "movimientos_extracto",
 ] as const;
 
 /** Orden de eliminación: dependientes antes que padres. */
 const DELETE_ORDER = [
+  "movimientos_extracto",
+  "cuentas_bancarias",
   "reuniones",
   "documentos_orden_dia",
   "categorias_orden_dia",
@@ -134,6 +153,8 @@ const PRISMA_DELEGATES: Record<string, Delegate> = {
   categorias_orden_dia: prisma.categoriaOrdenDia as unknown as Delegate,
   documentos_orden_dia: prisma.documentoOrdenDia as unknown as Delegate,
   reuniones: prisma.reunion as unknown as Delegate,
+  cuentas_bancarias: prisma.cuentaBancaria as unknown as Delegate,
+  movimientos_extracto: prisma.movimientoExtracto as unknown as Delegate,
 };
 
 /** Compatibilidad con backups antiguos que usaban "usuarios" en lugar de "users". */
