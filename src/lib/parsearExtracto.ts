@@ -23,15 +23,16 @@ export function parsearImporteAR(str: string): number {
   return negativo ? -valor : valor;
 }
 
-/** DD/MM/YYYY → ISO string (YYYY-MM-DD) */
+/** DD/MM/YYYY → ISO string fijo en mediodía de Argentina */
 export function parsearFechaAR(str: string): string {
   const [d, m, y] = str.trim().split("/");
   if (!d || !m || !y) return "";
-  return `${y}-${m}-${d}`;
+  // Evita corrimientos de día por timezone al persistir/mostrar.
+  return `${y}-${m}-${d}T12:00:00.000-03:00`;
 }
 
 export type MovimientoRaw = {
-  fecha: string; // ISO YYYY-MM-DD
+  fecha: string; // ISO con offset de Argentina
   sucOrigen?: string;
   descSucursal?: string;
   codOperativo?: string;

@@ -167,12 +167,16 @@ export function ImportarCuentas({
     const res = await fetch("/api/tesoreria/cuentas-bancarias/todas");
     const data = await res.json();
     if (!res.ok) return;
-    const codigosExistentes = new Set((data as { codigo: string }[]).map((c) => c.codigo));
-    setFilas((prev) =>
-      prev.map((f) => ({ ...f, duplicado: codigosExistentes.has(f.codigo.trim()) }))
-    );
+    const existentes = (data as { codigo: string; codOperativo?: string | null }[]) ?? [];
+    const esDuplicado = (f: FilaCuenta) =>
+      existentes.some(
+        (c) =>
+          c.codigo === f.codigo.trim() &&
+          (c.codOperativo ?? "") === (f.codOperativo ?? "").trim()
+      );
+    setFilas((prev) => prev.map((f) => ({ ...f, duplicado: esDuplicado(f) })));
     const indicesNoDup = filasActuales
-      .map((f, i) => (codigosExistentes.has(f.codigo.trim()) ? -1 : i))
+      .map((f, i) => (esDuplicado(f) ? -1 : i))
       .filter((i) => i >= 0) as number[];
     setSeleccionados(new Set(indicesNoDup));
   }, []);
@@ -215,7 +219,11 @@ export function ImportarCuentas({
       const res = await fetch("/api/tesoreria/cuentas-bancarias", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(c),
+        body: JSON.stringify({
+          codigo: c.codigo,
+          codOperativo: c.codOperativo,
+          nombre: c.nombre,
+        }),
       });
       if (res.ok) ok++;
       else errores++;

@@ -9,7 +9,7 @@ function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
 
-/** POST - Validar duplicados: mismo fecha + referencia + importePesos */
+/** POST - Validar duplicados: misma referencia + importePesos */
 export async function POST(req: NextRequest) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
@@ -30,18 +30,13 @@ export async function POST(req: NextRequest) {
 
   const resultados = await Promise.all(
     body.map(async (m) => {
-      const fecha = new Date(m.fecha);
-      const start = new Date(fecha);
-      start.setUTCHours(0, 0, 0, 0);
-      const end = new Date(fecha);
-      end.setUTCHours(23, 59, 59, 999);
       const ref = (m.referencia ?? "").trim();
+      if (!ref) return { ...m, duplicado: false };
       const imp = new Decimal(m.importePesos ?? 0);
 
       const existente = await prisma.movimientoExtracto.findFirst({
         where: {
-          fecha: { gte: start, lte: end },
-          referencia: ref || null,
+          referencia: ref,
           importePesos: imp,
         },
       });

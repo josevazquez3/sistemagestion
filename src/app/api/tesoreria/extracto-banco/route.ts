@@ -11,6 +11,14 @@ function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
 
+function parseFechaExtracto(fecha: string): Date {
+  const raw = (fecha ?? "").trim();
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? `${raw}T12:00:00.000-03:00`
+    : raw;
+  return new Date(normalized);
+}
+
 /** GET - Listar movimientos con filtros y paginación */
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -115,8 +123,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Se requiere un array de movimientos" }, { status: 400 });
   }
 
+  const fechaInvalida = body.find((m) => Number.isNaN(parseFechaExtracto(m.fecha).getTime()));
+  if (fechaInvalida) {
+    return NextResponse.json({ error: "Hay movimientos con fecha inválida" }, { status: 400 });
+  }
+
   const data = body.map((m) => ({
-    fecha: new Date(m.fecha),
+    fecha: parseFechaExtracto(m.fecha),
     sucOrigen: m.sucOrigen ?? null,
     descSucursal: m.descSucursal ?? null,
     codOperativo: m.codOperativo ?? null,

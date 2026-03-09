@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -19,11 +20,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FolderUp, Loader2 } from "lucide-react";
+import { FolderUp, Loader2, Pencil } from "lucide-react";
 import { parsearArchivoExtracto, formatearImporteAR, type MovimientoRaw } from "@/lib/parsearExtracto";
 import { SelectorCuenta } from "./SelectorCuenta";
 
-type MovimientoConDuplicado = MovimientoRaw & { duplicado?: boolean; cuentaId?: number | null; codigoCuenta?: string; nombreCuenta?: string };
+type CuentaBancaria = { id: number; codigo: string; codOperativo?: string | null; nombre: string };
+
+type MovimientoConDuplicado = MovimientoRaw & {
+  duplicado?: boolean;
+  cuentaId?: number | null;
+  codigoCuenta?: string;
+  nombreCuenta?: string;
+  cuentaAutocompletada?: boolean;
+};
+
+function buscarCuentaPorCodOperativo(
+  codOperativo: string | undefined,
+  cuentas: CuentaBancaria[]
+): CuentaBancaria | null {
+  if (!codOperativo) return null;
+  return cuentas.find((c) => c.codOperativo?.trim() === codOperativo.trim()) ?? null;
+}
 
 type ModalImportarExtractoProps = {
   open: boolean;
@@ -32,9 +49,19 @@ type ModalImportarExtractoProps = {
   showMessage: (tipo: "ok" | "error", text: string) => void;
 };
 
-function formatFecha(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
+const TZ = "America/Argentina/Buenos_Aires";
+
+function formatFecha(fecha: string): string {
+  try {
+    return new Date(fecha).toLocaleDateString("es-AR", {
+      timeZone: TZ,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return fecha;
+  }
 }
 
 export function ModalImportarExtracto({
@@ -48,6 +75,15 @@ export function ModalImportarExtracto({
   const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
+  const [cuentas, setCuentas] = useState<CuentaBancaria[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/tesoreria/cuentas-bancarias/todas")
+      .then((r) => r.json())
+      .then((data) => setCuentas(Array.isArray(data) ? data : data?.data ?? []))
+      .catch(() => {});
+  }, [open]);
 
   const reset = useCallback(() => {
     setPaso(1);
@@ -85,7 +121,15 @@ export function ModalImportarExtracto({
             setLoading(false);
             return;
           }
-          setMovimientos(parsed.map((m) => ({ ...m, cuentaId: null, codigoCuenta: "", nombreCuenta: "" })));
+          setMovimientos(
+            parsed.map((m) => ({
+              ...m,
+              cuentaId: null,
+              codigoCuenta: "",
+              nombreCuenta: "",
+              cuentaAutocompletada: false,
+            }))
+          );
           setPaso(2);
         } catch (err) {
           setErrorArchivo(err instanceof Error ? err.message : "Error al parsear.");
@@ -101,6 +145,24 @@ export function ModalImportarExtracto({
     },
     [showMessage]
   );
+
+  useEffect(() => {
+    if (paso !== 2 || movimientos.length === 0 || cuentas.length === 0) return;
+    setMovimientos((prev) =>
+      prev.map((mov) => {
+        if (mov.cuentaAutocompletada) return mov;
+        const found = buscarCuentaPorCodOperativo(mov.codOperativo, cuentas);
+        if (!found) return mov;
+        return {
+          ...mov,
+          cuentaId: found.id,
+          codigoCuenta: found.codigo,
+          nombreCuenta: found.nombre,
+          cuentaAutocompletada: true,
+        };
+      })
+    );
+  }, [paso, movimientos.length, cuentas.length]); // run when we have both; only update rows without cuentaAutocompletada
 
   useEffect(() => {
     if (paso !== 2 || movimientos.length === 0) return;
@@ -133,16 +195,38 @@ export function ModalImportarExtracto({
 
   const toggleTodos = useCallback(() => {
     const noDup = movimientos.map((m, i) => (m.duplicado ? -1 : i)).filter((i) => i >= 0) as number[];
-    if (seleccionados.size >= noDup.length) setSeleccionados(new Set());
-    else setSeleccionados(new Set(noDup));
-  }, [movimientos, seleccionados.size]);
+    const allNoDupSelected = noDup.every((idx) => seleccionados.has(idx));
+    if (allNoDupSelected) {
+      setSeleccionados((prev) => {
+        const next = new Set(prev);
+        noDup.forEach((idx) => next.delete(idx));
+        return next;
+      });
+    } else {
+      setSeleccionados((prev) => {
+        const next = new Set(prev);
+        noDup.forEach((idx) => next.add(idx));
+        return next;
+      });
+    }
+  }, [movimientos, seleccionados]);
 
   const toggleFila = useCallback((i: number) => {
-    if (movimientos[i]?.duplicado) return;
     setSeleccionados((prev) => {
       const next = new Set(prev);
       if (next.has(i)) next.delete(i);
       else next.add(i);
+      return next;
+    });
+  }, []);
+
+  const seleccionarTodosDuplicados = useCallback(() => {
+    const duplicados = movimientos
+      .map((m, i) => (m.duplicado ? i : -1))
+      .filter((i) => i >= 0) as number[];
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      duplicados.forEach((idx) => next.add(idx));
       return next;
     });
   }, [movimientos]);
@@ -159,14 +243,26 @@ export function ModalImportarExtracto({
   const actualizarCuenta = useCallback((index: number, cuentaId: number | null, codigo: string, nombre: string) => {
     setMovimientos((prev) =>
       prev.map((m, i) =>
-        i === index ? { ...m, cuentaId, codigoCuenta: codigo, nombreCuenta: nombre } : m
+        i === index
+          ? { ...m, cuentaId, codigoCuenta: codigo, nombreCuenta: nombre, cuentaAutocompletada: false }
+          : m
+      )
+    );
+  }, []);
+
+  const desbloquearCuenta = useCallback((index: number) => {
+    setMovimientos((prev) =>
+      prev.map((m, i) =>
+        i === index
+          ? { ...m, cuentaAutocompletada: false, cuentaId: null, codigoCuenta: "", nombreCuenta: "" }
+          : m
       )
     );
   }, []);
 
   const handleImportar = useCallback(async () => {
     const aImportar = Array.from(seleccionados)
-      .filter((i) => i >= 0 && i < movimientos.length && !movimientos[i].duplicado)
+      .filter((i) => i >= 0 && i < movimientos.length)
       .map((i) => {
         const m = movimientos[i];
         return {
@@ -206,6 +302,13 @@ export function ModalImportarExtracto({
     onSuccess();
   }, [handleCerrar, onSuccess]);
 
+  const totalDuplicados = movimientos.filter((m) => m.duplicado).length;
+  const totalNoDuplicados = movimientos.filter((m) => !m.duplicado).length;
+  const noDuplicadosSeleccionados = movimientos
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) => !m.duplicado)
+    .every(({ i }) => seleccionados.has(i));
+
   return (
     <Dialog open={open} onOpenChange={handleCerrar}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -213,7 +316,21 @@ export function ModalImportarExtracto({
           <DialogTitle>Importar extracto bancario</DialogTitle>
           <DialogDescription>
             {paso === 1 && "Seleccioná un archivo .csv o .xls (delimitado por ; o tab). Encoding: Latin-1."}
-            {paso === 2 && "Vista previa. Los duplicados se marcan en amarillo. Asigná cuenta si corresponde."}
+            {paso === 2 && (
+              <span>
+                Vista previa. Los duplicados se marcan en amarillo. Asigná cuenta si corresponde.
+                {movimientos.filter((m) => m.cuentaAutocompletada).length > 0 && (
+                  <span className="text-green-600 ml-1">
+                    {movimientos.filter((m) => m.cuentaAutocompletada).length} cuenta(s) asignadas automáticamente.
+                  </span>
+                )}
+                {movimientos.filter((m) => !m.duplicado && (m.cuentaId == null || m.cuentaId === undefined)).length > 0 && (
+                  <span className="text-yellow-600 ml-1">
+                    {movimientos.filter((m) => !m.duplicado && (m.cuentaId == null || m.cuentaId === undefined)).length} movimiento(s) sin cuenta asignada.
+                  </span>
+                )}
+              </span>
+            )}
             {paso === 3 && "Confirmá la importación."}
             {paso === 4 && "Importación finalizada."}
           </DialogDescription>
@@ -239,19 +356,34 @@ export function ModalImportarExtracto({
 
         {paso === 2 && (
           <div className="space-y-2">
-            <p className="text-sm text-gray-600">
-              Seleccionados: {seleccionados.size} / {movimientos.filter((m) => !m.duplicado).length}
-            </p>
+            {totalDuplicados > 0 && (
+              <div className="bg-yellow-50 border border-yellow-300 rounded px-3 py-2 text-sm text-yellow-800 mb-2">
+                ⚠️ {totalDuplicados} movimiento(s) ya existen en la base de datos (marcados en amarillo).
+                Están deseleccionados por defecto. Podés seleccionarlos manualmente si querés importarlos de
+                todas formas.
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-gray-600">
+                Seleccionados: {seleccionados.size} / {movimientos.length}
+              </p>
+              {totalDuplicados > 0 && (
+                <button
+                  type="button"
+                  onClick={seleccionarTodosDuplicados}
+                  className="text-xs border border-yellow-400 text-yellow-700 hover:bg-yellow-50 px-2 py-1 rounded"
+                >
+                  Incluir duplicados ({totalDuplicados})
+                </button>
+              )}
+            </div>
             <div className="border rounded-lg overflow-auto max-h-[50vh]">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10">
                       <Checkbox
-                        checked={
-                          movimientos.filter((m) => !m.duplicado).length > 0 &&
-                          seleccionados.size >= movimientos.filter((m) => !m.duplicado).length
-                        }
+                        checked={totalNoDuplicados > 0 && noDuplicadosSeleccionados}
                         onCheckedChange={toggleTodos}
                       />
                     </TableHead>
@@ -267,12 +399,10 @@ export function ModalImportarExtracto({
                   {movimientos.map((m, i) => (
                     <TableRow key={i} className={m.duplicado ? "bg-yellow-50" : ""}>
                       <TableCell>
-                        {!m.duplicado && (
-                          <Checkbox
-                            checked={seleccionados.has(i)}
-                            onCheckedChange={() => toggleFila(i)}
-                          />
-                        )}
+                        <Checkbox
+                          checked={seleccionados.has(i)}
+                          onCheckedChange={() => toggleFila(i)}
+                        />
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{formatFecha(m.fecha)}</TableCell>
                       <TableCell>{m.referencia ?? "—"}</TableCell>
@@ -285,18 +415,50 @@ export function ModalImportarExtracto({
                         $ {formatearImporteAR(m.importePesos)}
                       </TableCell>
                       <TableCell>
-                        {!m.duplicado && (
-                          <SelectorCuenta
-                            cuentaId={m.cuentaId ?? null}
-                            codigoInicial={m.codigoCuenta}
-                            nombreInicial={m.nombreCuenta}
-                            onSelect={(cuentaId, codigo, nombre) =>
-                              actualizarCuenta(i, cuentaId, codigo, nombre)
-                            }
-                            placeholderCodigo="Código"
-                            placeholderNombre="Nombre"
-                          />
-                        )}
+                        {!m.duplicado &&
+                          (m.cuentaAutocompletada ? (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <Input
+                                type="text"
+                                value={m.codigoCuenta ?? ""}
+                                readOnly
+                                className="w-24 h-8 text-sm bg-green-50 text-green-700 border-green-300 cursor-default"
+                                placeholder="Código"
+                              />
+                              <Input
+                                type="text"
+                                value={m.nombreCuenta ?? ""}
+                                readOnly
+                                className="min-w-[120px] flex-1 h-8 text-sm bg-green-50 text-green-700 border-green-300 cursor-default"
+                                placeholder="Nombre"
+                              />
+                              <span
+                                title="Cuenta asignada automáticamente por Cod. Operativo"
+                                className="text-green-500 text-xs"
+                              >
+                                ✓
+                              </span>
+                              <button
+                                type="button"
+                                title="Cambiar cuenta"
+                                onClick={() => desbloquearCuenta(i)}
+                                className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <SelectorCuenta
+                              cuentaId={m.cuentaId ?? null}
+                              codigoInicial={m.codigoCuenta}
+                              nombreInicial={m.nombreCuenta}
+                              onSelect={(cuentaId, codigo, nombre) =>
+                                actualizarCuenta(i, cuentaId, codigo, nombre)
+                              }
+                              placeholderCodigo="Código"
+                              placeholderNombre="Nombre"
+                            />
+                          ))}
                       </TableCell>
                       <TableCell>
                         {m.duplicado ? (

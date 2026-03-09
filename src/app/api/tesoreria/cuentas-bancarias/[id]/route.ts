@@ -43,16 +43,19 @@ export async function PUT(
 
   const codigo = (body.codigo ?? cuenta.codigo).trim();
   const nombre = (body.nombre ?? cuenta.nombre).trim();
-  const codOperativo = (body.codOperativo ?? "").trim() || null;
+  const codOperativo = body.codOperativo !== undefined ? ((body.codOperativo ?? "").trim() || null) : cuenta.codOperativo;
   if (!codigo || !nombre) {
     return NextResponse.json({ error: "Código y nombre son obligatorios" }, { status: 400 });
   }
 
-  if (codigo !== cuenta.codigo) {
-    const existente = await prisma.cuentaBancaria.findUnique({ where: { codigo } });
-    if (existente) {
-      return NextResponse.json({ error: "Ya existe una cuenta con ese código" }, { status: 409 });
-    }
+  const existente = await prisma.cuentaBancaria.findFirst({
+    where: { codigo, codOperativo, NOT: { id } },
+  });
+  if (existente) {
+    return NextResponse.json(
+      { error: "Ya existe otra cuenta con ese código y código operativo" },
+      { status: 409 }
+    );
   }
 
   const actualizada = await prisma.cuentaBancaria.update({

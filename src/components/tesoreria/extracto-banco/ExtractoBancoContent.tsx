@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, FolderUp, Loader2 } from "lucide-react";
+import { Search, FolderUp, Trash2 } from "lucide-react";
 import { TablaMovimientos, type MovimientoExtracto } from "./TablaMovimientos";
 import { ModalImportarExtracto } from "./ModalImportarExtracto";
 import { ModalEditarCuentaMovimiento } from "./ModalEditarCuentaMovimiento";
@@ -26,6 +26,8 @@ export function ExtractoBancoContent() {
   const [modalImportarOpen, setModalImportarOpen] = useState(false);
   const [modalEditarCuentaOpen, setModalEditarCuentaOpen] = useState(false);
   const [movimientoEditar, setMovimientoEditar] = useState<MovimientoExtracto | null>(null);
+  const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set());
+  const [confirmEliminar, setConfirmEliminar] = useState(false);
 
   const fetchMovimientos = useCallback(async () => {
     setLoading(true);
@@ -42,6 +44,7 @@ export function ExtractoBancoContent() {
       if (res.ok) {
         setData(json.data ?? []);
         setTotal(json.total ?? 0);
+        setSeleccionados(new Set());
       }
     } finally {
       setLoading(false);
@@ -51,6 +54,14 @@ export function ExtractoBancoContent() {
   useEffect(() => {
     fetchMovimientos();
   }, [fetchMovimientos]);
+
+  useEffect(() => {
+    setSeleccionados(new Set());
+  }, [search, desde, hasta, cuentaId, page]);
+
+  useEffect(() => {
+    if (seleccionados.size === 0) setConfirmEliminar(false);
+  }, [seleccionados.size]);
 
   useEffect(() => {
     fetch("/api/tesoreria/cuentas-bancarias/todas")
@@ -90,6 +101,62 @@ export function ExtractoBancoContent() {
       })
       .catch(() => showMessage("error", "Error de conexión"));
   };
+
+  const toggleSeleccion = useCallback((id: number) => {
+    setSeleccionados((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(id)) nuevo.delete(id);
+      else nuevo.add(id);
+      return nuevo;
+    });
+  }, []);
+
+  const toggleTodos = useCallback(() => {
+    if (data.length === 0) return;
+    const todosLosIds = data.map((m) => m.id);
+    const todosSeleccionados = todosLosIds.every((id) => seleccionados.has(id));
+    if (todosSeleccionados) {
+      setSeleccionados(new Set());
+    } else {
+      setSeleccionados(new Set(todosLosIds));
+    }
+  }, [data, seleccionados]);
+
+  const eliminarSeleccionados = useCallback(() => {
+    if (seleccionados.size === 0) return;
+    setConfirmEliminar(true);
+  }, [seleccionados.size]);
+
+  const confirmarEliminarSeleccionados = useCallback(async () => {
+    try {
+      const ids = Array.from(seleccionados);
+      const resultados = await Promise.allSettled(
+        ids.map(async (id) => {
+          const res = await fetch(`${API_BASE}/${id}`, { method: "DELETE" });
+          return { ok: res.ok };
+        })
+      );
+
+      const ok = resultados.filter(
+        (r) => r.status === "fulfilled" && r.value.ok
+      ).length;
+      const errores = resultados.length - ok;
+
+      setSeleccionados(new Set());
+      setConfirmEliminar(false);
+      await fetchMovimientos();
+
+      if (errores === 0) {
+        showMessage("ok", `${ok} movimiento(s) eliminado(s).`);
+      } else if (ok > 0) {
+        showMessage("error", `Se eliminaron ${ok} movimiento(s), pero ${errores} fallaron.`);
+      } else {
+        showMessage("error", "No se pudieron eliminar los movimientos seleccionados.");
+      }
+    } catch {
+      showMessage("error", "Error al eliminar los movimientos seleccionados.");
+    }
+  }, [seleccionados, fetchMovimientos, showMessage]);
 
   return (
     <div className="space-y-6 mt-6">
@@ -151,11 +218,35 @@ export function ExtractoBancoContent() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {seleccionados.size > 0 && (
+            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded px-4 py-2 mb-2">
+              <span className="text-sm text-red-700 font-medium">
+                {seleccionados.size} movimiento(s) seleccionado(s)
+              </span>
+              <button
+                onClick={eliminarSeleccionados}
+                className="flex items-center gap-1 bg-red-600 text-white text-sm px-3 py-1.5 rounded hover:bg-red-700"
+              >
+                <Trash2 className="w-3 h-3" />
+                Eliminar seleccionados
+              </button>
+              <button
+                onClick={() => setSeleccionados(new Set())}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+
           <TablaMovimientos
             data={data}
             loading={loading}
             onEditarCuenta={handleEditarCuenta}
             onEliminar={handleEliminar}
+            seleccionados={seleccionados}
+            onToggleSeleccion={toggleSeleccion}
+            onToggleTodos={toggleTodos}
           />
 
           {totalPages > 1 && (
@@ -189,6 +280,32 @@ export function ExtractoBancoContent() {
         onSuccess={fetchMovimientos}
         showMessage={showMessage}
       />
+
+      {confirmEliminar && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="font-semibold text-gray-900 mb-2">⚠️ Eliminar movimientos</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              ¿Estás seguro de que querés eliminar{" "}
+              <strong>{seleccionados.size} movimiento(s)</strong>? Esta acción es irreversible.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmEliminar(false)}
+                className="px-3 py-2 text-sm border rounded hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEliminarSeleccionados}
+                className="px-3 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

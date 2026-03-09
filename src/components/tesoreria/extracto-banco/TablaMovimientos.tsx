@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   Table,
   TableBody,
@@ -49,6 +50,9 @@ type TablaMovimientosProps = {
   loading: boolean;
   onEditarCuenta: (m: MovimientoExtracto) => void;
   onEliminar: (m: MovimientoExtracto) => void;
+  seleccionados: Set<number>;
+  onToggleSeleccion: (id: number) => void;
+  onToggleTodos: () => void;
 };
 
 export function TablaMovimientos({
@@ -56,12 +60,35 @@ export function TablaMovimientos({
   loading,
   onEditarCuenta,
   onEliminar,
+  seleccionados,
+  onToggleSeleccion,
+  onToggleTodos,
 }: TablaMovimientosProps) {
+  const headerCheckboxRef = useRef<HTMLInputElement | null>(null);
+  const seleccionadosEnPagina = data.filter((m) => seleccionados.has(m.id)).length;
+  const allSelected = data.length > 0 && seleccionadosEnPagina === data.length;
+  const isIndeterminate = seleccionadosEnPagina > 0 && seleccionadosEnPagina < data.length;
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = isIndeterminate;
+    }
+  }, [isIndeterminate]);
+
   return (
     <div className="border rounded-lg overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-8">
+              <input
+                ref={headerCheckboxRef}
+                type="checkbox"
+                checked={allSelected}
+                onChange={onToggleTodos}
+                className="rounded"
+              />
+            </TableHead>
             <TableHead>Fecha</TableHead>
             <TableHead>Suc.</TableHead>
             <TableHead>Desc. Sucursal</TableHead>
@@ -77,19 +104,27 @@ export function TablaMovimientos({
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center py-8">
+              <TableCell colSpan={11} className="text-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
               </TableCell>
             </TableRow>
           ) : data.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+              <TableCell colSpan={11} className="text-center py-8 text-gray-500">
                 No hay movimientos.
               </TableCell>
             </TableRow>
           ) : (
             data.map((m) => (
               <TableRow key={m.id}>
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    checked={seleccionados.has(m.id)}
+                    onChange={() => onToggleSeleccion(m.id)}
+                    className="rounded"
+                  />
+                </TableCell>
                 <TableCell className="whitespace-nowrap">{formatFecha(m.fecha)}</TableCell>
                 <TableCell className="text-gray-600">{m.sucOrigen ?? "—"}</TableCell>
                 <TableCell className="max-w-[120px] truncate" title={m.descSucursal ?? ""}>

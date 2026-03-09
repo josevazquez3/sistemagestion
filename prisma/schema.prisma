@@ -510,15 +510,16 @@ model ModeloOficio {
 // === TESORERÍA ===
 
 model CuentaBancaria {
-  id              Int                   @id @default(autoincrement())
-  codigo          String                @unique
+  id              Int                 @id @default(autoincrement())
+  codigo          String
   codOperativo    String?
   nombre          String
-  activo          Boolean               @default(true)
-  creadoEn        DateTime             @default(now())
-  actualizadoEn   DateTime             @updatedAt
+  activo          Boolean              @default(true)
+  creadoEn        DateTime            @default(now())
+  actualizadoEn   DateTime            @updatedAt
   movimientos     MovimientoExtracto[]
 
+  @@unique([codigo, codOperativo])
   @@map("cuentas_bancarias")
 }
 

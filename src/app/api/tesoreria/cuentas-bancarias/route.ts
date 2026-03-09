@@ -64,19 +64,39 @@ export async function POST(req: NextRequest) {
   }
 
   const codigo = (body.codigo ?? "").trim();
-  const codOperativo = (body.codOperativo ?? "").trim() || null;
   const nombre = (body.nombre ?? "").trim();
+  const codOperativo = (body.codOperativo ?? "").trim() || null;
   if (!codigo || !nombre) {
     return NextResponse.json({ error: "Código y nombre son obligatorios" }, { status: 400 });
   }
 
-  const existente = await prisma.cuentaBancaria.findUnique({ where: { codigo } });
+  const existente = await prisma.cuentaBancaria.findFirst({
+    where: { codigo, codOperativo },
+  });
   if (existente) {
-    return NextResponse.json({ error: "Ya existe una cuenta con ese código" }, { status: 409 });
+    return NextResponse.json(
+      { error: "Ya existe una cuenta con ese código y código operativo" },
+      { status: 409 }
+    );
   }
 
-  const cuenta = await prisma.cuentaBancaria.create({
-    data: { codigo, codOperativo, nombre },
-  });
-  return NextResponse.json(cuenta, { status: 201 });
+  try {
+    const cuenta = await prisma.cuentaBancaria.create({
+      data: { codigo, codOperativo, nombre },
+    });
+    return NextResponse.json(cuenta, { status: 201 });
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    if (code === "P2002") {
+      return NextResponse.json(
+        { error: "Ya existe una cuenta con ese código y código operativo" },
+        { status: 409 }
+      );
+    }
+    console.error("POST cuentas-bancarias:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Error al crear la cuenta" },
+      { status: 500 }
+    );
+  }
 }
