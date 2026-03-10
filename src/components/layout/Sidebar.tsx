@@ -71,6 +71,7 @@ const legalesSubItems = [
 const tesoreriaSubItems = [
   { href: "/tesoreria/cuentas-bancarias", label: "Cuentas Bancarias", icon: Landmark },
   { href: "/tesoreria/extracto-banco", label: "Extracto Banco", icon: Wallet },
+  { href: "/tesoreria/fondo-fijo", label: "Fondo Fijo", icon: Wallet },
 ];
 
 export function Sidebar({ user }: { user: Session["user"] }) {

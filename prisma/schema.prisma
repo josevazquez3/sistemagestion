@@ -541,3 +541,38 @@ model MovimientoExtracto {
 
   @@map("movimientos_extracto")
 }
+
+enum TipoMovimientoFondo {
+  INGRESO
+  GASTO
+}
+
+model FondoFijo {
+  id            Int                   @id @default(autoincrement())
+  fecha         DateTime
+  concepto      String
+  importePesos  Decimal               @db.Decimal(15, 2)
+  saldoPesos    Decimal               @db.Decimal(15, 2)
+  mes           Int
+  anio          Int
+  tipo          TipoMovimientoFondo
+  codOperativo  String?
+  importado     Boolean               @default(false)
+  creadoEn      DateTime              @default(now())
+  actualizadoEn DateTime              @updatedAt
+
+  @@map("fondo_fijo")
+}
+
+model ConfigFondoFijo {
+  id            Int       @id @default(autoincrement())
+  codOperativo  String?
+  saldoAnterior Decimal?  @db.Decimal(15, 2)
+  mes           Int
+  anio          Int
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  @@unique([mes, anio])
+  @@map("config_fondo_fijo")
+}

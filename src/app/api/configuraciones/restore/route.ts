@@ -40,7 +40,7 @@ function transformarFila(key: string, row: Record<string, unknown>): Record<stri
       resultado.contenido = Buffer.from(c.data);
     }
   }
-  if (key === "movimientos_extracto") {
+  if (key === "movimientos_extracto" || key === "fondo_fijo") {
     for (const field of ["importePesos", "saldoPesos"]) {
       const v = resultado[field];
       if (typeof v === "number") continue;
@@ -51,6 +51,15 @@ function transformarFila(key: string, row: Record<string, unknown>): Record<stri
         } else if (typeof (o as { toNumber?: () => number }).toNumber === "function") {
           resultado[field] = (o as { toNumber: () => number }).toNumber();
         }
+      }
+    }
+  }
+  if (key === "config_fondo_fijo") {
+    const v = resultado.saldoAnterior;
+    if (v != null && typeof v !== "number") {
+      const o = v as Record<string, unknown>;
+      if (typeof o?.$numberDecimal === "string") {
+        resultado.saldoAnterior = parseFloat(o.$numberDecimal as string);
       }
     }
   }
@@ -87,6 +96,8 @@ const INSERT_ORDER = [
   "documentos_orden_dia",
   "cuentas_bancarias",
   "movimientos_extracto",
+  "config_fondo_fijo",
+  "fondo_fijo",
 ] as const;
 
 /** Orden de eliminación: dependientes antes que padres. */
@@ -155,6 +166,8 @@ const PRISMA_DELEGATES: Record<string, Delegate> = {
   reuniones: prisma.reunion as unknown as Delegate,
   cuentas_bancarias: prisma.cuentaBancaria as unknown as Delegate,
   movimientos_extracto: prisma.movimientoExtracto as unknown as Delegate,
+  config_fondo_fijo: prisma.configFondoFijo as unknown as Delegate,
+  fondo_fijo: prisma.fondoFijo as unknown as Delegate,
 };
 
 /** Compatibilidad con backups antiguos que usaban "usuarios" en lugar de "users". */

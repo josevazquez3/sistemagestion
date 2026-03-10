@@ -35,6 +35,8 @@ const BACKUP_KEYS = [
   "reuniones",
   "cuentas_bancarias",
   "movimientos_extracto",
+  "config_fondo_fijo",
+  "fondo_fijo",
 ] as const;
 
 function nombreZip() {
@@ -84,6 +86,8 @@ export async function POST() {
     reuniones: () => prisma.reunion.findMany(),
     cuentas_bancarias: () => prisma.cuentaBancaria.findMany(),
     movimientos_extracto: () => prisma.movimientoExtracto.findMany(),
+    config_fondo_fijo: () => prisma.configFondoFijo.findMany(),
+    fondo_fijo: () => prisma.fondoFijo.findMany(),
   };
 
   const tablas: Record<string, unknown[]> = {};
