@@ -576,3 +576,31 @@ model ConfigFondoFijo {
   @@unique([mes, anio])
   @@map("config_fondo_fijo")
 }
+
+model CobroCertificacion {
+  id              String   @id @default(cuid())
+  fecha           DateTime
+  concepto        String
+  importe         Decimal  @db.Decimal(15, 2)
+  saldo           Decimal  @db.Decimal(15, 2)
+  mes             Int
+  anio            Int
+  codigoOperativo String?
+  importado       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("cobro_certificaciones")
+}
+
+model ConfigCobroCertificacion {
+  id                 String   @id @default(cuid())
+  mes                Int
+  anio               Int
+  codigosOperativos  String[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([mes, anio])
+  @@map("config_cobro_certificacion")
+}
