@@ -6,9 +6,7 @@ import { Input } from "@/components/ui/input";
 import {
   Calendar,
   DollarSign,
-  Hash,
   Pencil,
-  Check,
   X,
   RefreshCw,
   MinusCircle,
@@ -22,6 +20,7 @@ import {
 import { formatearImporteAR, parsearArchivoExtracto } from "@/lib/parsearExtracto";
 import { ModalGasto } from "./ModalGasto";
 import { ModalEditarMovimiento, type MovimientoFondoFijo } from "./ModalEditarMovimiento";
+import { MultiCodigoInput } from "../MultiCodigoInput";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -49,7 +48,7 @@ function formatFecha(iso: string): string {
 type ConfigFondo = {
   mes: number;
   anio: number;
-  codOperativo: string | null;
+  codigosOperativos: string[];
   saldoAnterior: number | null;
 };
 
@@ -61,7 +60,7 @@ export function FondoFijoContent() {
   const [config, setConfig] = useState<ConfigFondo>({
     mes: 0,
     anio: 0,
-    codOperativo: null,
+    codigosOperativos: [],
     saldoAnterior: null,
   });
   const [loading, setLoading] = useState(true);
@@ -74,13 +73,12 @@ export function FondoFijoContent() {
   const pickerRef = useRef<HTMLDivElement>(null);
   const [saldoPopoverOpen, setSaldoPopoverOpen] = useState(false);
   const [saldoAnteriorInput, setSaldoAnteriorInput] = useState("");
-  const [editandoCodOp, setEditandoCodOp] = useState(false);
-  const [codOpInput, setCodOpInput] = useState("");
   const [menuExportarOpen, setMenuExportarOpen] = useState(false);
   const [buscar, setBuscar] = useState("");
   const [cargandoActualizar, setCargandoActualizar] = useState(false);
   const [importando, setImportando] = useState(false);
   const inputImportarRef = useRef<HTMLInputElement>(null);
+  const [saldoTotal, setSaldoTotal] = useState<number>(0);
 
   const fetchMovimientos = useCallback(async () => {
     setLoading(true);
@@ -89,9 +87,22 @@ export function FondoFijoContent() {
       if (buscar) params.set("buscar", buscar);
       const res = await fetch(`/api/tesoreria/fondo-fijo?${params}`);
       const data = await res.json();
-      if (res.ok) setMovimientos(Array.isArray(data) ? data : []);
+      if (res.ok) {
+        const lista = Array.isArray(data) ? data : [];
+        setMovimientos(lista);
+        // Saldo del último movimiento del período (la API devuelve orden fecha asc)
+        if (lista.length > 0) {
+          setSaldoTotal(lista[lista.length - 1].saldoPesos ?? 0);
+        } else {
+          setSaldoTotal(0);
+        }
+      } else {
+        setMovimientos([]);
+        setSaldoTotal(0);
+      }
     } catch {
       setMovimientos([]);
+      setSaldoTotal(0);
     } finally {
       setLoading(false);
     }
@@ -107,11 +118,11 @@ export function FondoFijoContent() {
         setConfig({
           mes: data.mes ?? mes,
           anio: data.anio ?? anio,
-          codOperativo: data.codOperativo ?? null,
+          codigosOperativos: Array.isArray(data.codigosOperativos) ? data.codigosOperativos : [],
           saldoAnterior: data.saldoAnterior ?? null,
         });
     } catch {
-      setConfig((c) => ({ ...c, codOperativo: null, saldoAnterior: null }));
+      setConfig((c) => ({ ...c, codigosOperativos: [], saldoAnterior: null }));
     }
   }, [mes, anio]);
 
@@ -192,20 +203,17 @@ export function FondoFijoContent() {
     }
   };
 
-  const guardarCodOp = async () => {
-    const cod = codOpInput.trim() || null;
+  const guardarCodigos = async (codigos: string[]) => {
     try {
       const res = await fetch("/api/tesoreria/fondo-fijo/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mes, anio, codOperativo: cod }),
+        body: JSON.stringify({ mes, anio, codigosOperativos: codigos }),
       });
       if (res.ok) {
-        setConfig((c) => ({ ...c, codOperativo: cod }));
-        setEditandoCodOp(false);
-        setCodOpInput("");
+        setConfig((c) => ({ ...c, codigosOperativos: codigos }));
         fetchConfig();
-        showMessage("ok", "Código operativo guardado.");
+        showMessage("ok", "Códigos operativos guardados.");
       } else {
         const data = await res.json();
         showMessage("error", data.error || "Error al guardar");
@@ -216,8 +224,8 @@ export function FondoFijoContent() {
   };
 
   const actualizarIngresos = async () => {
-    if (!config.codOperativo) {
-      showMessage("error", "Configurá el código operativo primero.");
+    if (config.codigosOperativos.length === 0) {
+      showMessage("error", "Agregá al menos un código operativo.");
       return;
     }
     setCargandoActualizar(true);
@@ -225,17 +233,13 @@ export function FondoFijoContent() {
       const res = await fetch("/api/tesoreria/fondo-fijo/actualizar-ingresos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mes,
-          anio,
-          codOperativo: config.codOperativo,
-        }),
+        body: JSON.stringify({ mes, anio }),
       });
       const data = await res.json();
       if (res.ok) {
         const n = data.importados ?? 0;
         if (n > 0) showMessage("ok", `${n} ingreso(s) importados.`);
-        else showMessage("ok", "No se encontraron movimientos para ese período y código operativo.");
+        else showMessage("ok", "No se encontraron movimientos para ese período y códigos operativos.");
         fetchMovimientos();
       } else {
         showMessage("error", data.error || "Error al actualizar ingresos.");
@@ -550,53 +554,17 @@ export function FondoFijoContent() {
           )}
         </div>
 
-        <div className="flex items-center gap-1">
-          {editandoCodOp ? (
-            <>
-              <input
-                value={codOpInput}
-                onChange={(e) => setCodOpInput(e.target.value)}
-                placeholder="Ej: 1252"
-                className="border rounded px-2 py-1.5 text-sm w-24"
-              />
-              <button
-                type="button"
-                onClick={guardarCodOp}
-                className="bg-green-600 text-white text-sm px-2 py-1.5 rounded"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditandoCodOp(false);
-                  setCodOpInput("");
-                }}
-                className="text-gray-400 hover:text-red-500 text-sm px-1 py-1.5"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setEditandoCodOp(true);
-                setCodOpInput(config.codOperativo ?? "");
-              }}
-              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm px-4 py-2 rounded-lg border border-slate-300"
-            >
-              <Hash className="w-4 h-4" />
-              Cód. Operativo: {config.codOperativo ?? "Sin configurar"}
-              <Pencil className="w-3 h-3 text-slate-400" />
-            </button>
-          )}
-        </div>
+        <MultiCodigoInput
+          codigos={config.codigosOperativos}
+          onCodigosChange={(codigos) => setConfig((c) => ({ ...c, codigosOperativos: codigos }))}
+          onSave={guardarCodigos}
+          placeholder="Agregar código..."
+        />
 
         <button
           type="button"
           onClick={actualizarIngresos}
-          disabled={!config.codOperativo || cargandoActualizar}
+          disabled={config.codigosOperativos.length === 0 || cargandoActualizar}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg"
         >
           <RefreshCw className={`w-4 h-4 ${cargandoActualizar ? "animate-spin" : ""}`} />
@@ -615,7 +583,14 @@ export function FondoFijoContent() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
-          <CardTitle>Movimientos</CardTitle>
+          <div className="flex items-center gap-4">
+            <CardTitle>Movimientos</CardTitle>
+            {saldoTotal > 0 && (
+              <span className="text-green-700 font-semibold text-xl">
+                Saldo Total: $ {formatearImporteAR(saldoTotal)}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />

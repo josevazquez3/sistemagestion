@@ -565,13 +565,14 @@ model FondoFijo {
 }
 
 model ConfigFondoFijo {
-  id            Int       @id @default(autoincrement())
-  codOperativo  String?
-  saldoAnterior Decimal?  @db.Decimal(15, 2)
-  mes           Int
-  anio          Int
-  creadoEn      DateTime  @default(now())
-  actualizadoEn DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  codOperativo       String?   // legacy: se usa si codigosOperativos está vacío
+  codigosOperativos  String[]  @default([])
+  saldoAnterior      Decimal?  @db.Decimal(15, 2)
+  mes                Int
+  anio               Int
+  creadoEn           DateTime  @default(now())
+  actualizadoEn      DateTime  @updatedAt
 
   @@unique([mes, anio])
   @@map("config_fondo_fijo")
@@ -603,4 +604,19 @@ model ConfigCobroCertificacion {
 
   @@unique([mes, anio])
   @@map("config_cobro_certificacion")
+}
+
+model ComisionCertificacion {
+  id             Int      @id @default(autoincrement())
+  mes            Int
+  anio           Int
+  fechaDesde     DateTime
+  fechaHasta     DateTime
+  saldoPeriodo   Float
+  porcentaje     Float
+  totalComision  Float
+  legajos        Json     // Array de { legajoId, nombre, monto }
+  creadoEn       DateTime @default(now())
+
+  @@map("comision_certificacion")
 }

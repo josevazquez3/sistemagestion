@@ -68,9 +68,17 @@ export function parsearArchivoExtracto(contenido: string): MovimientoRaw[] {
 
     const importeStr = cols[6]?.trim() ?? "0";
     const saldoStr = cols[7]?.trim() ?? "0";
+    const tipoStr = (cols[8] ?? "").trim().toUpperCase();
 
     const fechaIso = parsearFechaAR(fechaStr);
     if (!fechaIso) continue;
+
+    let importePesos = parsearImporteAR(importeStr);
+    const esDebito =
+      importeStr.trim().startsWith("(") && importeStr.trim().endsWith(")") ||
+      /^D(EBITO)?$/.test(tipoStr) ||
+      /^DEBE$/.test(tipoStr);
+    if (esDebito && importePesos > 0) importePesos = -importePesos;
 
     movimientos.push({
       fecha: fechaIso,
@@ -79,7 +87,7 @@ export function parsearArchivoExtracto(contenido: string): MovimientoRaw[] {
       codOperativo: cols[3]?.trim() || undefined,
       referencia: cols[4]?.trim() || undefined,
       concepto: cols[5]?.trim() ?? "",
-      importePesos: parsearImporteAR(importeStr),
+      importePesos,
       saldoPesos: parsearImporteAR(saldoStr),
     });
   }

@@ -11,7 +11,7 @@ function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
 
-/** GET - Obtener config por mes/anio (codOperativo, saldoAnterior) */
+/** GET - Obtener config por mes/anio (codigosOperativos, saldoAnterior). Compatible con legacy codOperativo. */
 export async function GET(req: NextRequest) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
@@ -35,18 +35,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       mes,
       anio,
-      codOperativo: null,
+      codigosOperativos: [],
       saldoAnterior: null,
     });
   }
 
+  const codigosOperativos =
+    config.codigosOperativos?.length > 0
+      ? config.codigosOperativos
+      : config.codOperativo?.trim()
+        ? [config.codOperativo.trim()]
+        : [];
+
   return NextResponse.json({
     ...config,
+    codigosOperativos,
     saldoAnterior: config.saldoAnterior != null ? Number(config.saldoAnterior) : null,
   });
 }
 
-/** PUT - Crear o actualizar config (codOperativo, saldoAnterior) */
+/** PUT - Crear o actualizar config (codigosOperativos: string[], saldoAnterior) */
 export async function PUT(req: NextRequest) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
@@ -54,7 +62,12 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  let body: { mes?: number; anio?: number; codOperativo?: string | null; saldoAnterior?: number | null };
+  let body: {
+    mes?: number;
+    anio?: number;
+    codigosOperativos?: string[];
+    saldoAnterior?: number | null;
+  };
   try {
     body = await req.json();
   } catch {
@@ -71,10 +84,10 @@ export async function PUT(req: NextRequest) {
     where: { mes_anio: { mes, anio } },
   });
 
-  const codOperativo =
-    body.codOperativo !== undefined
-      ? ((body.codOperativo ?? "").trim() || null)
-      : existente?.codOperativo ?? null;
+  const codigosOperativos = Array.isArray(body.codigosOperativos)
+    ? body.codigosOperativos.map((c) => String(c).trim()).filter(Boolean)
+    : existente?.codigosOperativos ?? [];
+
   const saldoAnterior =
     body.saldoAnterior !== undefined
       ? (body.saldoAnterior != null ? new Decimal(Number(body.saldoAnterior)) : null)
@@ -82,8 +95,8 @@ export async function PUT(req: NextRequest) {
 
   const config = await prisma.configFondoFijo.upsert({
     where: { mes_anio: { mes, anio } },
-    create: { mes, anio, codOperativo, saldoAnterior },
-    update: { codOperativo, saldoAnterior },
+    create: { mes, anio, codigosOperativos, saldoAnterior },
+    update: { codigosOperativos, codOperativo: null, saldoAnterior },
   });
 
   await recalcularSaldos(prisma, mes, anio);
@@ -99,19 +112,27 @@ export async function PUT(req: NextRequest) {
         modulo: "Tesorería",
       });
     }
-    if (codOperativo != null) {
+    if (codigosOperativos.length > 0) {
       await registrarAuditoria({
         userId: user?.id ?? "",
         userNombre: user?.name ?? "",
         userEmail: user?.email ?? "",
-        accion: `Configuró Código Operativo del Fondo Fijo: ${codOperativo}`,
+        accion: `Configuró códigos operativos Fondo Fijo (${mes}/${anio}): ${codigosOperativos.join(", ")}`,
         modulo: "Tesorería",
       });
     }
   } catch {}
 
+  const outCodigos =
+    config.codigosOperativos?.length > 0
+      ? config.codigosOperativos
+      : config.codOperativo?.trim()
+        ? [config.codOperativo.trim()]
+        : [];
+
   return NextResponse.json({
     ...config,
+    codigosOperativos: outCodigos,
     saldoAnterior: config.saldoAnterior != null ? Number(config.saldoAnterior) : null,
   });
 }

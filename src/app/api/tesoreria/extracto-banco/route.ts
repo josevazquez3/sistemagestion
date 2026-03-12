@@ -94,6 +94,45 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ data: serialized, total, page, perPage });
 }
 
+/** DELETE - Eliminar movimientos por IDs (borrado en BDD) */
+export async function DELETE(req: NextRequest) {
+  const session = await auth();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  if (!canAccess(roles)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  let body: { ids?: number[] };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Cuerpo inválido. Se espera { ids: number[] }" }, { status: 400 });
+  }
+
+  const ids = Array.isArray(body?.ids) ? body.ids.filter((id) => Number.isInteger(id) && id > 0) : [];
+  if (ids.length === 0) {
+    return NextResponse.json({ error: "Se requiere un array de ids válidos" }, { status: 400 });
+  }
+
+  const result = await prisma.movimientoExtracto.deleteMany({
+    where: { id: { in: ids } },
+  });
+
+  const user = session?.user as { id?: string; name?: string; email?: string };
+  try {
+    await registrarAuditoria({
+      userId: user?.id ?? "",
+      userNombre: user?.name ?? "",
+      userEmail: user?.email ?? "",
+      accion: "Eliminó movimientos del extracto bancario",
+      modulo: "Tesorería",
+      detalle: `${result.count} movimiento(s): ${ids.slice(0, 10).join(", ")}${ids.length > 10 ? "…" : ""}`,
+    });
+  } catch {}
+
+  return NextResponse.json({ ok: true, deleted: result.count });
+}
+
 /** POST - Importar movimientos */
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -128,6 +167,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Hay movimientos con fecha inválida" }, { status: 400 });
   }
 
+  const cuentaId = body[0]?.cuentaId ?? null;
+  const fechasParsed = body.map((m) => parseFechaExtracto(m.fecha));
+  const primerFechaArchivo = new Date(
+    Math.min(...fechasParsed.map((d) => d.getTime()))
+  );
+
+  // Inicio del primer día del archivo en ART (00:00 -03:00) para no excluir movimientos del día anterior por timezone
+  const artOffsetMs = 3 * 60 * 60 * 1000;
+  const artDate = new Date(primerFechaArchivo.getTime() - artOffsetMs);
+  const inicioPrimerDiaART = new Date(
+    Date.UTC(
+      artDate.getUTCFullYear(),
+      artDate.getUTCMonth(),
+      artDate.getUTCDate(),
+      3,
+      0,
+      0,
+      0
+    )
+  );
+
+  // Último saldo antes del primer día del archivo: solo por cuentaId y fecha (sin codOperativo)
+  const where =
+    cuentaId != null
+      ? { cuentaId, fecha: { lt: inicioPrimerDiaART } }
+      : { fecha: { lt: inicioPrimerDiaART } };
+
+  const ultimoMovimiento = await prisma.movimientoExtracto.findFirst({
+    where,
+    orderBy: [{ fecha: "desc" }, { id: "desc" }],
+  });
+  const saldoInicial =
+    ultimoMovimiento != null ? Number(ultimoMovimiento.saldoPesos) : 0;
+
   const data = body.map((m) => ({
     fecha: parseFechaExtracto(m.fecha),
     sucOrigen: m.sucOrigen ?? null,
@@ -136,10 +209,19 @@ export async function POST(req: NextRequest) {
     referencia: m.referencia ?? null,
     concepto: m.concepto ?? "",
     importePesos: new Decimal(m.importePesos ?? 0),
-    saldoPesos: new Decimal(m.saldoPesos ?? 0),
+    saldoPesos: new Decimal(0),
     cuentaId: m.cuentaId ?? null,
     importado: true,
   }));
+
+  data.sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+
+  let saldoAcumulado = saldoInicial;
+  for (const fila of data) {
+    const importe = Number(fila.importePesos);
+    saldoAcumulado += importe;
+    fila.saldoPesos = new Decimal(Math.round(saldoAcumulado * 100) / 100);
+  }
 
   await prisma.movimientoExtracto.createMany({ data });
   const count = data.length;

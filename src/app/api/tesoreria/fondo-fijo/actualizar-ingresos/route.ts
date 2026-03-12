@@ -12,7 +12,7 @@ function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
 
-/** POST - Importar ingresos desde movimientos_extracto por codOperativo y período */
+/** POST - Importar ingresos desde movimientos_extracto por codigosOperativos del config y período */
 export async function POST(req: NextRequest) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  let body: { mes?: number; anio?: number; codOperativo?: string };
+  let body: { mes?: number; anio?: number };
   try {
     body = await req.json();
   } catch {
@@ -29,13 +29,27 @@ export async function POST(req: NextRequest) {
 
   const mes = body.mes ?? 0;
   const anio = body.anio ?? 0;
-  const codOperativo = (body.codOperativo ?? "").trim();
 
   if (!mes || !anio || mes < 1 || mes > 12) {
     return NextResponse.json({ error: "mes y anio son obligatorios (mes 1-12)" }, { status: 400 });
   }
-  if (!codOperativo) {
-    return NextResponse.json({ error: "codOperativo es obligatorio" }, { status: 400 });
+
+  const config = await prisma.configFondoFijo.findUnique({
+    where: { mes_anio: { mes, anio } },
+  });
+
+  const codigosOperativos =
+    config?.codigosOperativos?.length > 0
+      ? config.codigosOperativos
+      : config?.codOperativo?.trim()
+        ? [config.codOperativo.trim()]
+        : [];
+
+  if (codigosOperativos.length === 0) {
+    return NextResponse.json(
+      { error: "Configurá al menos un código operativo para este mes/año." },
+      { status: 400 }
+    );
   }
 
   const fechaInicio = new Date(Date.UTC(anio, mes - 1, 1, 3, 0, 0));
@@ -43,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   const movExtracto = await prisma.movimientoExtracto.findMany({
     where: {
-      codOperativo,
+      codOperativo: { in: codigosOperativos },
       fecha: { gte: fechaInicio, lt: fechaFin },
     },
     orderBy: { fecha: "asc" },

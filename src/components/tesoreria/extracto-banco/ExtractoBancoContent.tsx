@@ -128,30 +128,24 @@ export function ExtractoBancoContent() {
   }, [seleccionados.size]);
 
   const confirmarEliminarSeleccionados = useCallback(async () => {
+    if (seleccionados.size === 0) return;
     try {
       const ids = Array.from(seleccionados);
-      const resultados = await Promise.allSettled(
-        ids.map(async (id) => {
-          const res = await fetch(`${API_BASE}/${id}`, { method: "DELETE" });
-          return { ok: res.ok };
-        })
-      );
-
-      const ok = resultados.filter(
-        (r) => r.status === "fulfilled" && r.value.ok
-      ).length;
-      const errores = resultados.length - ok;
+      const res = await fetch(API_BASE, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const json = await res.json().catch(() => ({}));
 
       setSeleccionados(new Set());
       setConfirmEliminar(false);
       await fetchMovimientos();
 
-      if (errores === 0) {
-        showMessage("ok", `${ok} movimiento(s) eliminado(s).`);
-      } else if (ok > 0) {
-        showMessage("error", `Se eliminaron ${ok} movimiento(s), pero ${errores} fallaron.`);
+      if (res.ok && json.deleted != null) {
+        showMessage("ok", `${json.deleted} movimiento(s) eliminado(s) de la base de datos.`);
       } else {
-        showMessage("error", "No se pudieron eliminar los movimientos seleccionados.");
+        showMessage("error", json.error || "No se pudieron eliminar los movimientos en la base de datos.");
       }
     } catch {
       showMessage("error", "Error al eliminar los movimientos seleccionados.");

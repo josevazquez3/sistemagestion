@@ -16,9 +16,11 @@ import {
   ChevronDown,
   Trash2,
   FileText,
+  Percent,
 } from "lucide-react";
 import { formatearImporteAR, parsearArchivoExtracto } from "@/lib/parsearExtracto";
 import { ModalEditarMovimiento, type MovimientoCobroCertificacion } from "./ModalEditarMovimiento";
+import { ModalComisiones } from "./ModalComisiones";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -72,6 +74,7 @@ export function CobroCertificacionesContent() {
   const [cargandoActualizar, setCargandoActualizar] = useState(false);
   const [importando, setImportando] = useState(false);
   const inputImportarRef = useRef<HTMLInputElement>(null);
+  const [modalComisionesOpen, setModalComisionesOpen] = useState(false);
 
   const fetchMovimientos = useCallback(async () => {
     setLoading(true);
@@ -500,6 +503,15 @@ export function CobroCertificacionesContent() {
           <RefreshCw className={`w-4 h-4 ${cargandoActualizar ? "animate-spin" : ""}`} />
           {cargandoActualizar ? "Actualizando…" : "Actualizar Cobros"}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setModalComisionesOpen(true)}
+          className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm px-4 py-2 rounded-lg"
+        >
+          <Percent className="w-4 h-4" />
+          Comisiones
+        </button>
       </div>
 
       <Card>
@@ -657,6 +669,15 @@ export function CobroCertificacionesContent() {
         onOpenChange={setModalEditar}
         movimiento={movimientoEditar}
         onSuccess={fetchMovimientos}
+        showMessage={showMessage}
+      />
+
+      <ModalComisiones
+        isOpen={modalComisionesOpen}
+        onClose={() => setModalComisionesOpen(false)}
+        mes={mes}
+        anio={anio}
+        movimientos={movimientos}
         showMessage={showMessage}
       />
     </div>
