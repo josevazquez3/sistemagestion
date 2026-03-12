@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
   });
 
   const codigosOperativos =
-    config?.codigosOperativos?.length > 0
-      ? config.codigosOperativos
+    (config?.codigosOperativos?.length ?? 0) > 0
+      ? config!.codigosOperativos
       : config?.codOperativo?.trim()
         ? [config.codOperativo.trim()]
         : [];
