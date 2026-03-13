@@ -18,6 +18,7 @@ import {
   FileText,
 } from "lucide-react";
 import { formatearImporteAR, parsearArchivoExtracto } from "@/lib/parsearExtracto";
+import { parsearExcelGenerico, type MovimientoImportado } from "@/lib/tesoreria/parsearImportFlex";
 import { ModalGasto } from "./ModalGasto";
 import { ModalEditarMovimiento, type MovimientoFondoFijo } from "./ModalEditarMovimiento";
 import { MultiCodigoInput } from "../MultiCodigoInput";
@@ -281,31 +282,71 @@ export function FondoFijoContent() {
       }
 
       const movs = data.movimientos ?? [];
-      console.log("Movimientos:", movs.length);
-
       const nombreMesAnio = `FondoFijo_${nombreMes}_${anio}`;
 
       const saldoAnt = Number(data.saldoAnterior ?? 0);
       const saldoAntFormato = data.saldoAnteriorFormato ?? formatearImporteAR(saldoAnt);
 
       if (formato === "xlsx") {
+        type MovExport = {
+          fecha: string;
+          concepto: string;
+          importe: number;
+          saldo: number;
+        };
+        const hasSaldoAnt = saldoAnt !== 0;
+        const firstDataRowExcel = hasSaldoAnt ? 5 : 4;
+        const lastDataRowExcel = firstDataRowExcel + movs.length - 1;
+        const totalRowExcel = lastDataRowExcel + 2;
+        const numFormat = "#,##0.00";
+
         const filas: (string | number)[][] = [
           [data.titulo],
           [],
           ["Fecha", "Concepto", "Importe", "Saldo"],
-          ...(saldoAnt !== 0 ? [["", "Saldo Anterior", saldoAntFormato, saldoAntFormato]] : []),
-          ...movs.map((m: { fecha: string; concepto: string; importeFormato: string; saldoFormato: string }) => [
-            m.fecha,
-            m.concepto,
-            m.importeFormato,
-            m.saldoFormato,
-          ]),
+          ...(hasSaldoAnt ? [["", "Saldo Anterior", saldoAnt, saldoAnt] as (string | number)[]] : []),
+          ...(movs as MovExport[]).map((m) => [m.fecha, m.concepto, m.importe, m.saldo]),
           [],
-          ["Total ingresos", data.totalIngresosFormato ?? ""],
-          ["Total gastos", data.totalGastosFormato ?? ""],
-          ["Saldo final", data.saldoFinalFormato ?? ""],
+          ["Total ingresos", "", ""],
+          ["Total gastos", "", ""],
+          ["Saldo final", "", ""],
         ];
         const ws = XLSX.utils.aoa_to_sheet(filas);
+
+        for (let excelRow = firstDataRowExcel; excelRow <= lastDataRowExcel; excelRow++) {
+          const rowIdx = excelRow - 1;
+          const cCell = ws[XLSX.utils.encode_cell({ r: rowIdx, c: 2 })];
+          const dCell = ws[XLSX.utils.encode_cell({ r: rowIdx, c: 3 })];
+          if (cCell && cCell.t === "n") cCell.z = numFormat;
+          if (dCell && dCell.t === "n") dCell.z = numFormat;
+        }
+        if (hasSaldoAnt) {
+          const r = 3;
+          const cCell = ws[XLSX.utils.encode_cell({ r, c: 2 })];
+          const dCell = ws[XLSX.utils.encode_cell({ r, c: 3 })];
+          if (cCell && cCell.t === "n") cCell.z = numFormat;
+          if (dCell && dCell.t === "n") dCell.z = numFormat;
+        }
+
+        const cTotalIng = XLSX.utils.encode_cell({ r: totalRowExcel - 1, c: 2 });
+        const cTotalGas = XLSX.utils.encode_cell({ r: totalRowExcel, c: 2 });
+        const dSaldoFin = XLSX.utils.encode_cell({ r: totalRowExcel + 1, c: 3 });
+        ws[cTotalIng] = {
+          t: "n",
+          f: `SUMIF(C${firstDataRowExcel}:C${lastDataRowExcel},">0")`,
+          z: numFormat,
+        };
+        ws[cTotalGas] = {
+          t: "n",
+          f: `ABS(SUMIF(C${firstDataRowExcel}:C${lastDataRowExcel},"<0"))`,
+          z: numFormat,
+        };
+        ws[dSaldoFin] = {
+          t: "n",
+          f: `D${lastDataRowExcel}`,
+          z: numFormat,
+        };
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Fondo Fijo");
         const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -371,55 +412,89 @@ export function FondoFijoContent() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    const nombre = file.name.toLowerCase();
-    if (!nombre.endsWith(".csv") && !nombre.endsWith(".xls") && !nombre.endsWith(".txt")) {
-      showMessage("error", "Solo se permiten archivos .csv o .xls (texto delimitado).");
+
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const esExcel = extension === "xls" || extension === "xlsx";
+    const esTexto = extension === "csv" || extension === "txt";
+    if (!esExcel && !esTexto) {
+      showMessage("error", "Solo se permiten archivos .csv, .xls, .xlsx o .txt.");
       return;
     }
+
     setImportando(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const text = (reader.result as string) || "";
-        const parsed = parsearArchivoExtracto(text);
-        if (parsed.length === 0) {
-          showMessage("error", "No se encontraron movimientos en el archivo.");
-          setImportando(false);
-          return;
-        }
-        if (!confirm(`¿Importar ${parsed.length} movimiento(s) como ingresos en ${nombreMes} ${anio}?`)) {
-          setImportando(false);
-          return;
-        }
-        let ok = 0;
-        for (const m of parsed) {
+    try {
+      let movimientosParsados: MovimientoImportado[] = [];
+
+      if (esExcel) {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: "array", cellDates: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const filas: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+          header: 1,
+          defval: null,
+        });
+        movimientosParsados = parsearExcelGenerico(filas);
+      } else {
+        const texto = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve((ev.target?.result as string) ?? "");
+          reader.onerror = reject;
+          reader.readAsText(file, "ISO-8859-1");
+        });
+        const parseados = parsearArchivoExtracto(texto);
+        movimientosParsados = parseados.map((m) => ({
+          fecha: new Date(m.fecha),
+          concepto: m.concepto ?? "",
+          importePesos: Number(m.importePesos) || 0,
+          tipo:
+            Number(m.importePesos) >= 0 || Number.isNaN(Number(m.importePesos))
+              ? "INGRESO"
+              : "GASTO",
+        }));
+      }
+
+      if (movimientosParsados.length === 0) {
+        showMessage("error", "No se encontraron movimientos válidos en el archivo.");
+        return;
+      }
+
+      if (
+        !confirm(
+          `¿Importar ${movimientosParsados.length} movimiento(s) en ${nombreMes} ${anio}?`
+        )
+      ) {
+        return;
+      }
+
+      let importados = 0;
+      for (const m of movimientosParsados) {
+        try {
           const res = await fetch("/api/tesoreria/fondo-fijo", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              fecha: m.fecha,
+              fecha: m.fecha.toISOString(),
               concepto: m.concepto,
-              importePesos: Math.abs(Number(m.importePesos)),
+              importePesos: m.importePesos,
               mes,
               anio,
-              tipo: "INGRESO",
+              tipo: m.tipo,
             }),
           });
-          if (res.ok) ok++;
+          if (res.ok) importados++;
+        } catch {
+          // ignorar error por fila
         }
-        showMessage("ok", `${ok} ingreso(s) importados.`);
-        fetchMovimientos();
-      } catch (err) {
-        showMessage("error", err instanceof Error ? err.message : "Error al importar.");
-      } finally {
-        setImportando(false);
       }
-    };
-    reader.onerror = () => {
-      showMessage("error", "Error al leer el archivo.");
+
+      showMessage("ok", `Se importaron ${importados} movimiento(s) correctamente.`);
+      fetchMovimientos();
+    } catch (err) {
+      console.error("Error al importar:", err);
+      showMessage("error", "Error al importar el archivo. Verificá el formato.");
+    } finally {
       setImportando(false);
-    };
-    reader.readAsText(file, "ISO-8859-1");
+    }
   };
 
   return (
@@ -604,7 +679,7 @@ export function FondoFijoContent() {
             <input
               ref={inputImportarRef}
               type="file"
-              accept=".csv,.xls,.txt"
+              accept=".csv,.xls,.xlsx,.txt"
               className="hidden"
               onChange={handleImportar}
             />

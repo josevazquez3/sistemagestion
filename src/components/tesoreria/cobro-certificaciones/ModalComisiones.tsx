@@ -234,6 +234,7 @@ export function ModalComisiones({
       const movs = movimientosEnRango();
       const nombreMes = MESES[mes - 1];
       const nombreArchivo = `CobroCertificaciones_${nombreMes}_${anio}.xlsx`;
+      const numFormat = "#,##0.00";
 
       const filas: (string | number)[][] = [];
       filas.push([`Cobro Certificaciones - ${nombreMes} ${anio}`]);
@@ -245,24 +246,56 @@ export function ModalComisiones({
         filas.push([
           formatFechaDDMMYYYY(m.fecha),
           m.concepto,
-          formatearImporteAR(m.importe),
-          formatearImporteAR(m.saldo),
+          m.importe,
+          m.saldo,
         ]);
       });
-      filas.push(["Total ingresos", formatearImporteAR(saldoPeriodo)]);
+      filas.push(["Total ingresos", "", saldoPeriodo, ""]);
       filas.push([], []);
-      filas.push(["Total:", formatearImporteAR(saldoPeriodo)]);
-      filas.push([`Comisión ${pct}%`, formatearImporteAR(total)]);
+      filas.push(["Total:", "", saldoPeriodo, ""]);
+      filas.push([`Comisión ${pct}%`, "", total, ""]);
+      filas.push(["Legajo / Nombre", "Comisión"]);
       legajosConMonto.forEach((l) => {
         const pctLegajo = legajos.length > 0 ? (pct / legajos.length).toFixed(1) : "0";
-        filas.push([`${l.nombre} ${pctLegajo}%`, formatearImporteAR(l.monto)]);
+        filas.push([`${l.nombre} ${pctLegajo}%`, l.monto]);
       });
+      filas.push(["Total", ""]);
 
       const ws = XLSX.utils.aoa_to_sheet(filas);
       ws["!merges"] = [
         { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
         { s: { r: 2, c: 0 }, e: { r: 2, c: 3 } },
       ];
+
+      const firstDataRow = 4;
+      const lastDataRow = 3 + movs.length;
+      for (let r = firstDataRow; r <= lastDataRow; r++) {
+        const cCell = ws[XLSX.utils.encode_cell({ r, c: 2 })];
+        const dCell = ws[XLSX.utils.encode_cell({ r, c: 3 })];
+        if (cCell && cCell.t === "n") cCell.z = numFormat;
+        if (dCell && dCell.t === "n") dCell.z = numFormat;
+      }
+      const totalIngresosRow = 4 + movs.length;
+      const totalRow = 7 + movs.length;
+      const comisionRow = 8 + movs.length;
+      [totalIngresosRow, totalRow, comisionRow].forEach((rowIdx) => {
+        const c = ws[XLSX.utils.encode_cell({ r: rowIdx, c: 2 })];
+        if (c && c.t === "n") c.z = numFormat;
+      });
+      const firstLegajoRow = 10 + movs.length;
+      const lastLegajoRow = 9 + movs.length + legajosConMonto.length;
+      const totalFormulaRow = 10 + movs.length + legajosConMonto.length;
+      for (let r = firstLegajoRow; r <= lastLegajoRow; r++) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
+        if (cell && cell.t === "n") cell.z = numFormat;
+      }
+      const totalFormulaRef = XLSX.utils.encode_cell({ r: totalFormulaRow, c: 1 });
+      ws[totalFormulaRef] = {
+        t: "n",
+        f: `SUM(B${firstLegajoRow + 1}:B${lastLegajoRow + 1})`,
+        z: numFormat,
+      };
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Cobro Certificaciones");
       const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });

@@ -14,7 +14,7 @@ function parseId(id: string): number | null {
   return isNaN(n) ? null : n;
 }
 
-/** PATCH - Asignar cuenta al movimiento */
+/** PATCH - Asignar cuenta y/o código operativo al movimiento */
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -30,7 +30,7 @@ export async function PATCH(
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  let body: { cuentaId?: number | null };
+  let body: { cuentaId?: number | null; codOperativo?: string | null };
   try {
     body = await req.json();
   } catch {
@@ -42,14 +42,37 @@ export async function PATCH(
     return NextResponse.json({ error: "Movimiento no encontrado" }, { status: 404 });
   }
 
-  const cuentaId = body.cuentaId === undefined ? movimiento.cuentaId : body.cuentaId === null ? null : Number(body.cuentaId);
-  if (cuentaId !== null && isNaN(cuentaId)) {
-    return NextResponse.json({ error: "cuentaId inválido" }, { status: 400 });
+  const data: {
+    cuentaId?: number | null;
+    codOperativo?: string | null;
+    codOperativoEditado?: boolean;
+  } = {};
+  if (body.cuentaId !== undefined) {
+    const cuentaId = body.cuentaId === null ? null : Number(body.cuentaId);
+    if (cuentaId !== null && isNaN(cuentaId)) {
+      return NextResponse.json({ error: "cuentaId inválido" }, { status: 400 });
+    }
+    data.cuentaId = cuentaId;
+  }
+  if (body.codOperativo !== undefined) {
+    const codOperativo = body.codOperativo === null || body.codOperativo === "" ? null : String(body.codOperativo).trim();
+    data.codOperativo = codOperativo;
+    data.codOperativoEditado = true;
   }
 
-  await prisma.movimientoExtracto.update({
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "No hay datos para actualizar" }, { status: 400 });
+  }
+
+  const actualizado = await prisma.movimientoExtracto.update({
     where: { id },
-    data: { cuentaId },
+    data,
+    select: {
+      id: true,
+      codOperativo: true,
+      codOperativoEditado: true,
+      cuentaId: true,
+    },
   });
 
   const user = session?.user as { id?: string; name?: string; email?: string };
@@ -58,13 +81,13 @@ export async function PATCH(
       userId: user?.id ?? "",
       userNombre: user?.name ?? "",
       userEmail: user?.email ?? "",
-      accion: "Asignó cuenta bancaria a movimiento",
+      accion: data.codOperativo !== undefined ? "Editó código operativo de movimiento" : "Asignó cuenta bancaria a movimiento",
       modulo: "Tesorería",
-      detalle: `Movimiento ${id}, cuentaId: ${cuentaId ?? "null"}`,
+      detalle: `Movimiento ${id}${data.cuentaId !== undefined ? `, cuentaId: ${data.cuentaId ?? "null"}` : ""}${data.codOperativo !== undefined ? `, codOperativo: ${data.codOperativo ?? "null"}` : ""}`,
     });
   } catch {}
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, movimiento: actualizado });
 }
 
 /** DELETE - Eliminar movimiento */

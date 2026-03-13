@@ -13,6 +13,53 @@ function parseId(id: string): number | null {
   return isNaN(n) ? null : n;
 }
 
+/** PATCH - Añadir código operativo a la cuenta (concatena sin duplicar) */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  if (!canAccess(roles)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const id = parseId((await params).id);
+  if (id === null) {
+    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  }
+
+  let body: { addCodOperativo?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
+  }
+
+  const addCodOperativoTrim = (body.addCodOperativo ?? "").trim();
+  if (!addCodOperativoTrim) {
+    return NextResponse.json({ error: "addCodOperativo es obligatorio" }, { status: 400 });
+  }
+
+  const cuenta = await prisma.cuentaBancaria.findUnique({ where: { id } });
+  if (!cuenta) {
+    return NextResponse.json({ error: "Cuenta no encontrada" }, { status: 404 });
+  }
+
+  const actual = cuenta.codOperativo ?? "";
+  const partes = actual.split(/\s+/).filter(Boolean);
+  if (partes.includes(addCodOperativoTrim)) {
+    return NextResponse.json(cuenta);
+  }
+
+  const nuevo = actual ? `${actual} ${addCodOperativoTrim}` : addCodOperativoTrim;
+  const actualizada = await prisma.cuentaBancaria.update({
+    where: { id },
+    data: { codOperativo: nuevo },
+  });
+  return NextResponse.json(actualizada);
+}
+
 /** PUT - Actualizar cuenta */
 export async function PUT(
   req: NextRequest,

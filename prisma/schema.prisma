@@ -524,20 +524,21 @@ model CuentaBancaria {
 }
 
 model MovimientoExtracto {
-  id           Int              @id @default(autoincrement())
-  fecha        DateTime
-  sucOrigen    String?
-  descSucursal String?
-  codOperativo String?
-  referencia   String?
-  concepto     String
-  importePesos Decimal          @db.Decimal(18, 2)
-  saldoPesos   Decimal          @db.Decimal(18, 2)
-  cuentaId     Int?
-  cuenta       CuentaBancaria?   @relation(fields: [cuentaId], references: [id])
-  importado    Boolean          @default(false)
-  creadoEn     DateTime         @default(now())
-  actualizadoEn DateTime         @updatedAt
+  id                    Int              @id @default(autoincrement())
+  fecha                 DateTime
+  sucOrigen             String?
+  descSucursal          String?
+  codOperativo          String?
+  codOperativoEditado   Boolean          @default(false)
+  referencia            String?
+  concepto              String
+  importePesos          Decimal          @db.Decimal(18, 2)
+  saldoPesos            Decimal          @db.Decimal(18, 2)
+  cuentaId              Int?
+  cuenta                CuentaBancaria?   @relation(fields: [cuentaId], references: [id])
+  importado             Boolean          @default(false)
+  creadoEn              DateTime         @default(now())
+  actualizadoEn         DateTime         @updatedAt
 
   @@map("movimientos_extracto")
 }

@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  let body: { codigo?: string; codOperativo?: string | null; nombre?: string };
+  let body: { codigo?: string; codOperativo?: string | null; nombre?: string; estado?: string };
   try {
     body = await req.json();
   } catch {
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
   const codigo = (body.codigo ?? "").trim();
   const nombre = (body.nombre ?? "").trim();
   const codOperativo = (body.codOperativo ?? "").trim() || null;
+  const activo = body.estado !== "Inactiva";
   if (!codigo || !nombre) {
     return NextResponse.json({ error: "Código y nombre son obligatorios" }, { status: 400 });
   }
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const cuenta = await prisma.cuentaBancaria.create({
-      data: { codigo, codOperativo, nombre },
+      data: { codigo, codOperativo, nombre, activo },
     });
     return NextResponse.json(cuenta, { status: 201 });
   } catch (err: unknown) {

@@ -457,6 +457,8 @@ export function ModalImportarExtracto({
                               }
                               placeholderCodigo="Código"
                               placeholderNombre="Nombre"
+                              codOperativoRef={m.codOperativo ?? m.referencia}
+                              showMessage={showMessage}
                             />
                           ))}
                       </TableCell>

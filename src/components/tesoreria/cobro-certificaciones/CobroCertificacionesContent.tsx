@@ -19,6 +19,7 @@ import {
   Percent,
 } from "lucide-react";
 import { formatearImporteAR, parsearArchivoExtracto } from "@/lib/parsearExtracto";
+import { parsearExcelGenerico, type MovimientoImportado } from "@/lib/tesoreria/parsearImportFlex";
 import { ModalEditarMovimiento, type MovimientoCobroCertificacion } from "./ModalEditarMovimiento";
 import { ModalComisiones } from "./ModalComisiones";
 import * as XLSX from "xlsx";
@@ -75,6 +76,8 @@ export function CobroCertificacionesContent() {
   const [importando, setImportando] = useState(false);
   const inputImportarRef = useRef<HTMLInputElement>(null);
   const [modalComisionesOpen, setModalComisionesOpen] = useState(false);
+  const [movimientosPreview, setMovimientosPreview] = useState<MovimientoImportado[]>([]);
+  const [modalPreviewImportar, setModalPreviewImportar] = useState(false);
 
   const fetchMovimientos = useCallback(async () => {
     setLoading(true);
@@ -253,20 +256,37 @@ export function CobroCertificacionesContent() {
       const nombreMesAnio = `CobroCertificaciones_${nombreMes}_${anio}`;
 
       if (formato === "xlsx") {
+        type MovExport = {
+          fecha: string;
+          concepto: string;
+          importe: number;
+          saldo: number;
+        };
         const filas: (string | number)[][] = [
           [data.titulo],
           [],
           ["Fecha", "Concepto", "Importe", "Saldo"],
-          ...movs.map((m: { fecha: string; concepto: string; importeFormato: string; saldoFormato: string }) => [
-            m.fecha,
-            m.concepto,
-            m.importeFormato,
-            m.saldoFormato,
-          ]),
+          ...(movs as MovExport[]).map((m) => [m.fecha, m.concepto, m.importe, m.saldo]),
           [],
-          ["Total ingresos", data.totalIngresosFormato ?? ""],
+          ["Total ingresos", "", ""],
         ];
         const ws = XLSX.utils.aoa_to_sheet(filas);
+        const numFormat = "#,##0.00";
+        const firstDataRow = 4;
+        const lastDataRow = 3 + movs.length;
+        const totalRow = 5 + movs.length;
+        for (let r = firstDataRow; r <= lastDataRow; r++) {
+          const cCell = ws[XLSX.utils.encode_cell({ r: r - 1, c: 2 })];
+          const dCell = ws[XLSX.utils.encode_cell({ r: r - 1, c: 3 })];
+          if (cCell && cCell.t === "n") cCell.z = numFormat;
+          if (dCell && dCell.t === "n") dCell.z = numFormat;
+        }
+        const totalImporteRef = XLSX.utils.encode_cell({ r: totalRow - 1, c: 2 });
+        ws[totalImporteRef] = {
+          t: "n",
+          f: `SUM(C${firstDataRow}:C${lastDataRow})`,
+          z: numFormat,
+        };
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Cobro Certificaciones");
         const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -325,55 +345,87 @@ export function CobroCertificacionesContent() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    const nombre = file.name.toLowerCase();
-    if (!nombre.endsWith(".csv") && !nombre.endsWith(".xls") && !nombre.endsWith(".txt")) {
-      showMessage("error", "Solo se permiten archivos .csv o .xls (texto delimitado).");
-      return;
-    }
     setImportando(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const text = (reader.result as string) || "";
-        const parsed = parsearArchivoExtracto(text);
-        if (parsed.length === 0) {
-          showMessage("error", "No se encontraron movimientos en el archivo.");
-          setImportando(false);
+
+    try {
+      const extension = file.name.split(".").pop()?.toLowerCase();
+      let movimientosParsados: MovimientoImportado[] = [];
+
+      if (extension === "xls" || extension === "xlsx") {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: "array", cellDates: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const filas: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+          header: 1,
+          defval: null,
+        });
+        movimientosParsados = parsearExcelGenerico(filas);
+
+        if (movimientosParsados.length === 0) {
+          showMessage(
+            "error",
+            "No se encontraron movimientos válidos. Verificá que el archivo tenga columnas Fecha, Concepto e Importe (o Entrada/Salida)."
+          );
           return;
         }
-        if (!confirm(`¿Importar ${parsed.length} movimiento(s) como cobros en ${nombreMes} ${anio}?`)) {
-          setImportando(false);
-          return;
-        }
-        let ok = 0;
-        for (const m of parsed) {
-          const res = await fetch("/api/tesoreria/cobro-certificaciones", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fecha: m.fecha,
-              concepto: m.concepto,
-              importePesos: Math.abs(Number(m.importePesos)),
-              mes,
-              anio,
-            }),
-          });
-          if (res.ok) ok++;
-        }
-        showMessage("ok", `${ok} cobro(s) importados.`);
-        fetchMovimientos();
-      } catch (err) {
-        showMessage("error", err instanceof Error ? err.message : "Error al importar.");
-      } finally {
-        setImportando(false);
+      } else if (extension === "csv" || extension === "txt") {
+        const texto = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve((ev.target?.result as string) ?? "");
+          reader.onerror = reject;
+          reader.readAsText(file, "ISO-8859-1");
+        });
+        const parseados = parsearArchivoExtracto(texto);
+        movimientosParsados = parseados.map((m) => ({
+          fecha: new Date(m.fecha),
+          concepto: m.concepto ?? "",
+          importePesos: Math.abs(Number(m.importePesos) || 0),
+          tipo: "INGRESO" as const,
+        }));
+      } else {
+        showMessage("error", "Solo se permiten archivos .csv, .xls, .xlsx o .txt.");
+        return;
       }
-    };
-    reader.onerror = () => {
-      showMessage("error", "Error al leer el archivo.");
+
+      if (movimientosParsados.length === 0) {
+        showMessage("error", "No se encontraron movimientos válidos en el archivo.");
+        return;
+      }
+
+      setMovimientosPreview(movimientosParsados);
+      setModalPreviewImportar(true);
+    } catch (err) {
+      console.error("Error al importar:", err);
+      showMessage("error", "Error al importar el archivo. Verificá el formato.");
+    } finally {
       setImportando(false);
-    };
-    reader.readAsText(file, "ISO-8859-1");
+    }
   };
+
+  const confirmarImportacion = useCallback(async () => {
+    setModalPreviewImportar(false);
+    let importados = 0;
+    for (const m of movimientosPreview) {
+      try {
+        const res = await fetch("/api/tesoreria/cobro-certificaciones", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fecha: m.fecha.toISOString(),
+            concepto: m.concepto,
+            importePesos: Math.abs(m.importePesos),
+            mes,
+            anio,
+          }),
+        });
+        if (res.ok) importados++;
+      } catch {
+        // ignorar error por fila
+      }
+    }
+    showMessage("ok", `Se importaron ${importados} movimiento(s) correctamente.`);
+    fetchMovimientos();
+  }, [movimientosPreview, mes, anio, fetchMovimientos]);
 
   return (
     <div className="space-y-6 mt-6">
@@ -535,7 +587,7 @@ export function CobroCertificacionesContent() {
             <input
               ref={inputImportarRef}
               type="file"
-              accept=".csv,.xls,.txt"
+              accept=".csv,.xls,.xlsx,.txt"
               className="hidden"
               onChange={handleImportar}
             />
@@ -680,6 +732,78 @@ export function CobroCertificacionesContent() {
         movimientos={movimientos}
         showMessage={showMessage}
       />
+
+      {modalPreviewImportar && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col shadow-xl">
+            <h3 className="font-semibold text-lg mb-1">Vista previa importación</h3>
+            <p className="text-sm text-gray-500 mb-3">
+              {movimientosPreview.length} movimiento(s) detectados. Revisá antes de confirmar.
+            </p>
+            <div className="overflow-y-auto flex-1">
+              <table className="w-full text-sm border-collapse">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="border-b text-left text-gray-600">
+                    <th className="pb-2 pr-4">Fecha</th>
+                    <th className="pb-2 pr-4">Concepto</th>
+                    <th className="pb-2 text-right pr-4">Importe</th>
+                    <th className="pb-2 text-right">Tipo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movimientosPreview.map((m, i) => (
+                    <tr key={i} className="border-b hover:bg-gray-50">
+                      <td className="py-2 pr-4">
+                        {m.fecha.toLocaleDateString("es-AR", {
+                          timeZone: "America/Argentina/Buenos_Aires",
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="py-2 pr-4 max-w-xs truncate">{m.concepto}</td>
+                      <td
+                        className={`py-2 pr-4 text-right font-medium ${
+                          m.importePesos >= 0 ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        {formatearImporteAR(m.importePesos)}
+                      </td>
+                      <td className="py-2 text-right">
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            m.tipo === "INGRESO"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {m.tipo}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end gap-2 mt-4 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setModalPreviewImportar(false)}
+                className="px-4 py-2 border rounded text-sm hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarImportacion}
+                className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+              >
+                Confirmar importación ({movimientosPreview.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

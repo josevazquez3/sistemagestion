@@ -8,6 +8,7 @@ import { Search, FolderUp, Trash2 } from "lucide-react";
 import { TablaMovimientos, type MovimientoExtracto } from "./TablaMovimientos";
 import { ModalImportarExtracto } from "./ModalImportarExtracto";
 import { ModalEditarCuentaMovimiento } from "./ModalEditarCuentaMovimiento";
+import { ModalEditarCodOperativo } from "./ModalEditarCodOperativo";
 
 const PER_PAGE = 20;
 const API_BASE = "/api/tesoreria/extracto-banco";
@@ -26,6 +27,8 @@ export function ExtractoBancoContent() {
   const [modalImportarOpen, setModalImportarOpen] = useState(false);
   const [modalEditarCuentaOpen, setModalEditarCuentaOpen] = useState(false);
   const [movimientoEditar, setMovimientoEditar] = useState<MovimientoExtracto | null>(null);
+  const [modalEditarCodOpOpen, setModalEditarCodOpOpen] = useState(false);
+  const [movimientoEditarCodOp, setMovimientoEditarCodOp] = useState<MovimientoExtracto | null>(null);
   const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set());
   const [confirmEliminar, setConfirmEliminar] = useState(false);
 
@@ -85,6 +88,11 @@ export function ExtractoBancoContent() {
   const handleEditarCuenta = (m: MovimientoExtracto) => {
     setMovimientoEditar(m);
     setModalEditarCuentaOpen(true);
+  };
+
+  const handleEditarCodOp = (m: MovimientoExtracto) => {
+    setMovimientoEditarCodOp(m);
+    setModalEditarCodOpOpen(true);
   };
 
   const handleEliminar = (m: MovimientoExtracto) => {
@@ -237,6 +245,7 @@ export function ExtractoBancoContent() {
             data={data}
             loading={loading}
             onEditarCuenta={handleEditarCuenta}
+            onEditarCodOp={handleEditarCodOp}
             onEliminar={handleEliminar}
             seleccionados={seleccionados}
             onToggleSeleccion={toggleSeleccion}
@@ -271,6 +280,13 @@ export function ExtractoBancoContent() {
         open={modalEditarCuentaOpen}
         onOpenChange={setModalEditarCuentaOpen}
         movimiento={movimientoEditar}
+        onSuccess={fetchMovimientos}
+        showMessage={showMessage}
+      />
+      <ModalEditarCodOperativo
+        open={modalEditarCodOpOpen}
+        onOpenChange={setModalEditarCodOpOpen}
+        movimiento={movimientoEditarCodOp}
         onSuccess={fetchMovimientos}
         showMessage={showMessage}
       />

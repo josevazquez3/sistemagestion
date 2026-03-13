@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Loader2, Hash } from "lucide-react";
 import { formatearImporteAR } from "@/lib/parsearExtracto";
 
 const TZ = "America/Argentina/Buenos_Aires";
@@ -34,6 +34,7 @@ export type MovimientoExtracto = {
   sucOrigen: string | null;
   descSucursal: string | null;
   codOperativo: string | null;
+  codOperativoEditado?: boolean;
   referencia: string | null;
   concepto: string;
   importePesos: number;
@@ -49,6 +50,7 @@ type TablaMovimientosProps = {
   data: MovimientoExtracto[];
   loading: boolean;
   onEditarCuenta: (m: MovimientoExtracto) => void;
+  onEditarCodOp: (m: MovimientoExtracto) => void;
   onEliminar: (m: MovimientoExtracto) => void;
   seleccionados: Set<number>;
   onToggleSeleccion: (id: number) => void;
@@ -59,6 +61,7 @@ export function TablaMovimientos({
   data,
   loading,
   onEditarCuenta,
+  onEditarCodOp,
   onEliminar,
   seleccionados,
   onToggleSeleccion,
@@ -130,7 +133,9 @@ export function TablaMovimientos({
                 <TableCell className="max-w-[120px] truncate" title={m.descSucursal ?? ""}>
                   {m.descSucursal ?? "—"}
                 </TableCell>
-                <TableCell>{m.codOperativo ?? "—"}</TableCell>
+                <TableCell className={m.codOperativoEditado ? "bg-yellow-100" : undefined}>
+                  {m.codOperativo ?? "—"}
+                </TableCell>
                 <TableCell>{m.referencia ?? "—"}</TableCell>
                 <TableCell className="max-w-[180px] truncate" title={m.concepto}>
                   {m.concepto}
@@ -164,6 +169,15 @@ export function TablaMovimientos({
                       title="Editar cuenta"
                     >
                       <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-orange-500 hover:bg-orange-50"
+                      onClick={() => onEditarCodOp(m)}
+                      title="Editar Código Operativo"
+                    >
+                      <Hash className="h-4 w-4" />
                     </Button>
                     <Button
                       size="sm"
