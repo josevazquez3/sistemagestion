@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { formatearImporteAR } from "@/lib/parsearExtracto";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, FolderUp, Trash2 } from "lucide-react";
+import { Search, FolderUp, Trash2, Pencil } from "lucide-react";
 import { TablaMovimientos, type MovimientoExtracto } from "./TablaMovimientos";
 import { ModalImportarExtracto } from "./ModalImportarExtracto";
 import { ModalEditarCuentaMovimiento } from "./ModalEditarCuentaMovimiento";
@@ -31,6 +32,10 @@ export function ExtractoBancoContent() {
   const [movimientoEditarCodOp, setMovimientoEditarCodOp] = useState<MovimientoExtracto | null>(null);
   const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set());
   const [confirmEliminar, setConfirmEliminar] = useState(false);
+  const [saldoInicial, setSaldoInicial] = useState(0);
+  const [editandoSaldo, setEditandoSaldo] = useState(false);
+  const [saldoInicialInput, setSaldoInicialInput] = useState("");
+  const [guardandoSaldo, setGuardandoSaldo] = useState(false);
 
   const fetchMovimientos = useCallback(async () => {
     setLoading(true);
@@ -70,6 +75,18 @@ export function ExtractoBancoContent() {
     fetch("/api/tesoreria/cuentas-bancarias/todas")
       .then((r) => r.json())
       .then((d) => (Array.isArray(d) ? setCuentas(d) : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/tesoreria/extracto-banco/config")
+      .then((r) => r.json())
+      .then((d) => {
+        const valor = Number(d?.saldoInicial ?? 0);
+        if (!Number.isNaN(valor) && valor >= 0) {
+          setSaldoInicial(valor);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -160,6 +177,49 @@ export function ExtractoBancoContent() {
     }
   }, [seleccionados, fetchMovimientos, showMessage]);
 
+  const comenzarEditarSaldo = () => {
+    setSaldoInicialInput(
+      saldoInicial.toLocaleString("es-AR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
+    setEditandoSaldo(true);
+  };
+
+  const guardarSaldoInicial = async () => {
+    const normalizado = saldoInicialInput.replace(/\./g, "").replace(",", ".");
+    const valor = Number.parseFloat(normalizado);
+    if (Number.isNaN(valor) || valor < 0) {
+      showMessage("error", "Ingresá un saldo inicial válido (número mayor o igual a 0).");
+      return;
+    }
+    setGuardandoSaldo(true);
+    try {
+      const res = await fetch("/api/tesoreria/extracto-banco/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saldoInicial: valor }),
+      });
+      const dataRes = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showMessage("error", dataRes.error || "Error al guardar saldo inicial.");
+        return;
+      }
+      const nuevo = Number(dataRes?.saldoInicial ?? valor);
+      setSaldoInicial(Number.isNaN(nuevo) ? valor : nuevo);
+      setEditandoSaldo(false);
+      showMessage("ok", "Saldo inicial actualizado.");
+    } catch {
+      showMessage("error", "Error de conexión al guardar el saldo inicial.");
+    } finally {
+      setGuardandoSaldo(false);
+    }
+  };
+
+  const sumaMovimientos = data.reduce((acc, m) => acc + (m.importePesos ?? 0), 0);
+  const saldoTotal = saldoInicial + sumaMovimientos;
+
   return (
     <div className="space-y-6 mt-6">
       {mensaje && (
@@ -176,7 +236,57 @@ export function ExtractoBancoContent() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
-          <CardTitle>Movimientos</CardTitle>
+          <div className="space-y-1">
+            <CardTitle>Movimientos</CardTitle>
+            <div className="text-sm text-gray-700 flex items-center gap-2">
+              <span>Saldo Inicial:</span>
+              {!editandoSaldo ? (
+                <>
+                  <span className="font-semibold text-green-700">
+                    $ {formatearImporteAR(saldoInicial)}
+                  </span>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-gray-600 hover:text-blue-700"
+                    onClick={comenzarEditarSaldo}
+                    title="Editar saldo inicial"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Input
+                    value={saldoInicialInput}
+                    onChange={(e) => setSaldoInicialInput(e.target.value)}
+                    className="w-36 h-8 text-sm"
+                    placeholder="Ej: 12.345,67"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8"
+                    onClick={guardarSaldoInicial}
+                    disabled={guardandoSaldo}
+                  >
+                    {guardandoSaldo ? "Guardando…" : "Guardar"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    onClick={() => setEditandoSaldo(false)}
+                    disabled={guardandoSaldo}
+                  >
+                    Cancelar
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2 items-center">
             <div className="relative min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -220,6 +330,17 @@ export function ExtractoBancoContent() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-700">
+              Saldo Inicial:{" "}
+              <span className="font-semibold text-green-700">
+                $ {formatearImporteAR(saldoInicial)}
+              </span>
+            </p>
+            <p className="text-base font-semibold text-green-800">
+              Saldo Total: $ {formatearImporteAR(saldoTotal)}
+            </p>
+          </div>
           {seleccionados.size > 0 && (
             <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded px-4 py-2 mb-2">
               <span className="text-sm text-red-700 font-medium">

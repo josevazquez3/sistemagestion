@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -76,6 +76,13 @@ export type MovimientoCobroCertificacion = {
 type LegajoOption = { id: string; numeroLegajo: number; nombre: string };
 type LegajoSeleccionado = { legajoId: string; nombre: string; monto: number };
 
+type MovimientoRango = {
+  fecha: string;
+  concepto: string;
+  importe: number;
+  saldo: number;
+};
+
 type ModalComisionesProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -90,7 +97,7 @@ export function ModalComisiones({
   onClose,
   mes,
   anio,
-  movimientos,
+  movimientos: _movimientos, // TODO: verificar si sigue siendo necesario; actualmente no se usa
   showMessage,
 }: ModalComisionesProps) {
   const [desde, setDesde] = useState("");
@@ -105,6 +112,7 @@ export function ModalComisiones({
   const [loadingLegajos, setLoadingLegajos] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const legajoDropdownRef = useRef<HTMLDivElement>(null);
+  const [movimientosRango, setMovimientosRango] = useState<MovimientoRango[]>([]);
 
   const totalComision =
     saldoPeriodo != null && porcentaje !== ""
@@ -112,17 +120,6 @@ export function ModalComisiones({
       : 0;
   const montoPorLegajo =
     legajos.length > 0 ? Math.round((totalComision / legajos.length) * 100) / 100 : 0;
-
-  const movimientosEnRango = useCallback(() => {
-    const d = parseFechaToDate(desde);
-    const h = parseFechaToDate(hasta);
-    if (!d || !h) return [];
-    const hastaEnd = new Date(h.getTime() + 24 * 60 * 60 * 1000 - 1);
-    return movimientos.filter((m) => {
-      const f = new Date(m.fecha);
-      return f >= d && f <= hastaEnd;
-    });
-  }, [movimientos, desde, hasta]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -142,10 +139,17 @@ export function ModalComisiones({
     fetch(`/api/tesoreria/cobro-certificaciones/saldo-periodo?${params}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.saldoTotal != null) setSaldoPeriodo(data.saldoTotal);
-        else setSaldoPeriodo(null);
+        if (data.saldoTotal != null) {
+          setSaldoPeriodo(data.saldoTotal);
+        } else {
+          setSaldoPeriodo(null);
+        }
+        setMovimientosRango(Array.isArray(data.movimientos) ? data.movimientos : []);
       })
-      .catch(() => setSaldoPeriodo(null))
+      .catch(() => {
+        setSaldoPeriodo(null);
+        setMovimientosRango([]);
+      })
       .finally(() => setLoadingSaldo(false));
   }, [isOpen, desde, hasta, mes, anio]);
 
@@ -231,9 +235,15 @@ export function ModalComisiones({
         return;
       }
 
-      const movs = movimientosEnRango();
+      const movs = movimientosRango;
       const nombreMes = MESES[mes - 1];
-      const nombreArchivo = `CobroCertificaciones_${nombreMes}_${anio}.xlsx`;
+      const desdeSafe = desde.replace(/\D/g, "");
+      const hastaSafe = hasta.replace(/\D/g, "");
+      const nombreArchivoBase =
+        desdeSafe && hastaSafe
+          ? `CobroCertificaciones_${desdeSafe}_${hastaSafe}.xlsx`
+          : `CobroCertificaciones_${nombreMes}_${anio}.xlsx`;
+      const nombreArchivo = nombreArchivoBase;
       const numFormat = "#,##0.00";
 
       const filas: (string | number)[][] = [];

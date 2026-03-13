@@ -579,6 +579,15 @@ model ConfigFondoFijo {
   @@map("config_fondo_fijo")
 }
 
+model ExtractoBancoConfig {
+  id           Int      @id @default(autoincrement())
+  saldoInicial Decimal  @db.Decimal(15, 2) @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("extracto_banco_config")
+}
+
 model CobroCertificacion {
   id              String   @id @default(cuid())
   fecha           DateTime
