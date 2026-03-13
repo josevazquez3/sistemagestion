@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     if (!isNaN(cuentaId)) where.cuentaId = cuentaId;
   }
 
-  const [data, total] = await Promise.all([
+  const [data, total, aggregate] = await Promise.all([
     prisma.movimientoExtracto.findMany({
       where,
       include: { cuenta: true },
@@ -83,6 +83,10 @@ export async function GET(req: NextRequest) {
       take: perPage,
     }),
     prisma.movimientoExtracto.count({ where }),
+    prisma.movimientoExtracto.aggregate({
+      where,
+      _sum: { importePesos: true },
+    }),
   ]);
 
   const serialized = data.map((m) => ({
@@ -91,7 +95,9 @@ export async function GET(req: NextRequest) {
     saldoPesos: Number(m.saldoPesos),
   }));
 
-  return NextResponse.json({ data: serialized, total, page, perPage });
+  const sumaTotal = aggregate._sum?.importePesos != null ? Number(aggregate._sum.importePesos) : 0;
+
+  return NextResponse.json({ data: serialized, total, page, perPage, sumaTotal });
 }
 
 /** DELETE - Eliminar movimientos por IDs (borrado en BDD) */

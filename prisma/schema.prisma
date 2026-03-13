@@ -580,10 +580,11 @@ model ConfigFondoFijo {
 }
 
 model ExtractoBancoConfig {
-  id           Int      @id @default(autoincrement())
-  saldoInicial Decimal  @db.Decimal(15, 2) @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                Int       @id @default(autoincrement())
+  saldoInicial      Decimal   @db.Decimal(15, 2) @default(0)
+  fechaSaldoInicial DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@map("extracto_banco_config")
 }

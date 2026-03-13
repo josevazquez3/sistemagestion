@@ -46,9 +46,16 @@ export type MovimientoExtracto = {
   actualizadoEn: string;
 };
 
+export type SaldoInicialRow = {
+  fechaDisplay: string;
+  concepto: string;
+  saldo: number;
+};
+
 type TablaMovimientosProps = {
   data: MovimientoExtracto[];
   loading: boolean;
+  saldoInicialRow?: SaldoInicialRow | null;
   onEditarCuenta: (m: MovimientoExtracto) => void;
   onEditarCodOp: (m: MovimientoExtracto) => void;
   onEliminar: (m: MovimientoExtracto) => void;
@@ -60,6 +67,7 @@ type TablaMovimientosProps = {
 export function TablaMovimientos({
   data,
   loading,
+  saldoInicialRow = null,
   onEditarCuenta,
   onEditarCodOp,
   onEliminar,
@@ -71,6 +79,7 @@ export function TablaMovimientos({
   const seleccionadosEnPagina = data.filter((m) => seleccionados.has(m.id)).length;
   const allSelected = data.length > 0 && seleccionadosEnPagina === data.length;
   const isIndeterminate = seleccionadosEnPagina > 0 && seleccionadosEnPagina < data.length;
+  const tieneFilas = saldoInicialRow != null || data.length > 0;
 
   useEffect(() => {
     if (headerCheckboxRef.current) {
@@ -111,14 +120,34 @@ export function TablaMovimientos({
                 <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
               </TableCell>
             </TableRow>
-          ) : data.length === 0 ? (
+          ) : !tieneFilas ? (
             <TableRow>
               <TableCell colSpan={11} className="text-center py-8 text-gray-500">
                 No hay movimientos.
               </TableCell>
             </TableRow>
           ) : (
-            data.map((m) => (
+            <>
+              {saldoInicialRow != null && (
+                <TableRow className="bg-green-50/70 border-b border-green-100">
+                  <TableCell className="w-8" />
+                  <TableCell className="whitespace-nowrap">{saldoInicialRow.fechaDisplay}</TableCell>
+                  <TableCell className="text-gray-500">—</TableCell>
+                  <TableCell className="text-gray-500">—</TableCell>
+                  <TableCell className="text-gray-500">—</TableCell>
+                  <TableCell>—</TableCell>
+                  <TableCell className="max-w-[180px] font-medium text-gray-800">
+                    {saldoInicialRow.concepto}
+                  </TableCell>
+                  <TableCell className="text-right text-gray-500">—</TableCell>
+                  <TableCell className="text-right whitespace-nowrap font-bold text-green-700">
+                    $ {formatearImporteAR(saldoInicialRow.saldo)}
+                  </TableCell>
+                  <TableCell className="text-gray-500">—</TableCell>
+                  <TableCell className="text-right w-24" />
+                </TableRow>
+              )}
+              {data.map((m) => (
               <TableRow key={m.id}>
                 <TableCell>
                   <input
@@ -191,7 +220,8 @@ export function TablaMovimientos({
                   </div>
                 </TableCell>
               </TableRow>
-            ))
+            ))}
+            </>
           )}
         </TableBody>
       </Table>

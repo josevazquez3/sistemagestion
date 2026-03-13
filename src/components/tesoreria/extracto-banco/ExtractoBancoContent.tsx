@@ -33,8 +33,11 @@ export function ExtractoBancoContent() {
   const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set());
   const [confirmEliminar, setConfirmEliminar] = useState(false);
   const [saldoInicial, setSaldoInicial] = useState(0);
+  const [fechaSaldoInicial, setFechaSaldoInicial] = useState<string>("");
+  const [sumaMovimientosTotal, setSumaMovimientosTotal] = useState(0);
   const [editandoSaldo, setEditandoSaldo] = useState(false);
   const [saldoInicialInput, setSaldoInicialInput] = useState("");
+  const [fechaSaldoInicialInput, setFechaSaldoInicialInput] = useState("");
   const [guardandoSaldo, setGuardandoSaldo] = useState(false);
 
   const fetchMovimientos = useCallback(async () => {
@@ -52,6 +55,8 @@ export function ExtractoBancoContent() {
       if (res.ok) {
         setData(json.data ?? []);
         setTotal(json.total ?? 0);
+        const sum = Number(json.sumaTotal);
+        setSumaMovimientosTotal(Number.isNaN(sum) ? 0 : sum);
         setSeleccionados(new Set());
       }
     } finally {
@@ -86,6 +91,8 @@ export function ExtractoBancoContent() {
         if (!Number.isNaN(valor) && valor >= 0) {
           setSaldoInicial(valor);
         }
+        const fecha = d?.fechaSaldoInicial;
+        setFechaSaldoInicial(typeof fecha === "string" ? fecha : "");
       })
       .catch(() => {});
   }, []);
@@ -184,7 +191,22 @@ export function ExtractoBancoContent() {
         maximumFractionDigits: 2,
       })
     );
+    setFechaSaldoInicialInput(fechaSaldoInicial);
     setEditandoSaldo(true);
+  };
+
+  /** Parsea DD/MM/YY o DD/MM/YYYY a Date (inicio del día en AR) para comparar */
+  const parseFechaFiltro = (str: string): Date | null => {
+    const t = (str ?? "").trim();
+    const parts = t.split("/").map((p) => parseInt(p, 10));
+    if (parts.length < 3) return null;
+    let [d, m, y] = parts;
+    if (!d || !m || !y) return null;
+    if (y < 100) y += 2000;
+    const monthIndex = m - 1;
+    if (monthIndex < 0 || monthIndex > 11 || d < 1 || d > 31) return null;
+    const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}T00:00:00.000-03:00`;
+    return new Date(iso);
   };
 
   const guardarSaldoInicial = async () => {
@@ -194,12 +216,17 @@ export function ExtractoBancoContent() {
       showMessage("error", "Ingresá un saldo inicial válido (número mayor o igual a 0).");
       return;
     }
+    const fechaVal = (fechaSaldoInicialInput ?? "").trim();
+    const payload: { saldoInicial: number; fechaSaldoInicial: string | null } = {
+      saldoInicial: valor,
+      fechaSaldoInicial: fechaVal === "" ? null : fechaVal,
+    };
     setGuardandoSaldo(true);
     try {
       const res = await fetch("/api/tesoreria/extracto-banco/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ saldoInicial: valor }),
+        body: JSON.stringify(payload),
       });
       const dataRes = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -208,6 +235,7 @@ export function ExtractoBancoContent() {
       }
       const nuevo = Number(dataRes?.saldoInicial ?? valor);
       setSaldoInicial(Number.isNaN(nuevo) ? valor : nuevo);
+      setFechaSaldoInicial(typeof dataRes?.fechaSaldoInicial === "string" ? dataRes.fechaSaldoInicial : "");
       setEditandoSaldo(false);
       showMessage("ok", "Saldo inicial actualizado.");
     } catch {
@@ -217,8 +245,22 @@ export function ExtractoBancoContent() {
     }
   };
 
-  const sumaMovimientos = data.reduce((acc, m) => acc + (m.importePesos ?? 0), 0);
-  const saldoTotal = saldoInicial + sumaMovimientos;
+  const saldoTotal = saldoInicial + sumaMovimientosTotal;
+
+  const mostrarFilaSaldoInicial =
+    saldoInicial > 0 &&
+    fechaSaldoInicial !== "" &&
+    page === 1 &&
+    (() => {
+      if (!desde.trim()) return true;
+      const dDesde = parseFechaFiltro(desde);
+      const dFechaSaldo = parseFechaFiltro(fechaSaldoInicial);
+      if (!dDesde || !dFechaSaldo) return true;
+      return dFechaSaldo.getTime() >= dDesde.getTime();
+    })();
+  const saldoInicialRow = mostrarFilaSaldoInicial
+    ? { fechaDisplay: fechaSaldoInicial, concepto: "Saldo Inicial", saldo: saldoInicial }
+    : null;
 
   return (
     <div className="space-y-6 mt-6">
@@ -238,13 +280,19 @@ export function ExtractoBancoContent() {
         <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
           <div className="space-y-1">
             <CardTitle>Movimientos</CardTitle>
-            <div className="text-sm text-gray-700 flex items-center gap-2">
+            <div className="text-sm text-gray-700 flex flex-wrap items-center gap-2">
               <span>Saldo Inicial:</span>
               {!editandoSaldo ? (
                 <>
                   <span className="font-semibold text-green-700">
                     $ {formatearImporteAR(saldoInicial)}
                   </span>
+                  {fechaSaldoInicial && (
+                    <>
+                      <span className="text-gray-500">al</span>
+                      <span className="text-gray-800">{fechaSaldoInicial}</span>
+                    </>
+                  )}
                   <Button
                     type="button"
                     size="icon"
@@ -263,6 +311,13 @@ export function ExtractoBancoContent() {
                     onChange={(e) => setSaldoInicialInput(e.target.value)}
                     className="w-36 h-8 text-sm"
                     placeholder="Ej: 12.345,67"
+                  />
+                  <span className="text-gray-500">al</span>
+                  <Input
+                    value={fechaSaldoInicialInput}
+                    onChange={(e) => setFechaSaldoInicialInput(e.target.value)}
+                    className="w-28 h-8 text-sm"
+                    placeholder="DD/MM/YYYY"
                   />
                   <Button
                     type="button"
@@ -336,6 +391,9 @@ export function ExtractoBancoContent() {
               <span className="font-semibold text-green-700">
                 $ {formatearImporteAR(saldoInicial)}
               </span>
+              {fechaSaldoInicial && (
+                <span className="text-gray-600 ml-1">al {fechaSaldoInicial}</span>
+              )}
             </p>
             <p className="text-base font-semibold text-green-800">
               Saldo Total: $ {formatearImporteAR(saldoTotal)}
@@ -365,6 +423,7 @@ export function ExtractoBancoContent() {
           <TablaMovimientos
             data={data}
             loading={loading}
+            saldoInicialRow={saldoInicialRow}
             onEditarCuenta={handleEditarCuenta}
             onEditarCodOp={handleEditarCodOp}
             onEliminar={handleEliminar}
