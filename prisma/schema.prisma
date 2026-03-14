@@ -631,3 +631,36 @@ model ComisionCertificacion {
 
   @@map("comision_certificacion")
 }
+
+model IngresoDistrito {
+  id               Int       @id @default(autoincrement())
+  mes              Int
+  anio             Int
+  codigos          String[]  @default([])
+  fecha            DateTime
+  recibo           String?
+  distrito         String?
+  concepto         String
+  ctaColeg         Decimal?  @db.Decimal(15, 2)
+  nMatriculados    Decimal?  @db.Decimal(15, 2)
+  importe          Decimal   @db.Decimal(15, 2)
+  saldo            Decimal   @db.Decimal(15, 2)
+  extractoBancoId  Int?
+  createdAt        DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([mes, anio])
+  @@map("ingresos_distritos")
+}
+
+model ConfigIngresoDistrito {
+  id                 String   @id @default(cuid())
+  mes                Int
+  anio               Int
+  codigosOperativos  String[]
+  createdAt          DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([mes, anio])
+  @@map("config_ingreso_distrito")
+}

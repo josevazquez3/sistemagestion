@@ -19,6 +19,7 @@ import {
   CalendarDays,
   Wallet,
   Award,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Session } from "next-auth";
@@ -74,6 +75,7 @@ const tesoreriaSubItems = [
   { href: "/tesoreria/extracto-banco", label: "Extracto Banco", icon: Wallet },
   { href: "/tesoreria/fondo-fijo", label: "Fondo Fijo", icon: Wallet },
   { href: "/tesoreria/cobro-certificaciones", label: "Cobro Certificaciones", icon: Award },
+  { href: "/tesoreria/ingresos-distritos", label: "Ingresos Distritos", icon: Building2 },
 ];
 
 export function Sidebar({ user }: { user: Session["user"] }) {
