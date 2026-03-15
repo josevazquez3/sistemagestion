@@ -118,9 +118,9 @@ export function LegajoForm({
             piso: data.piso ?? "",
             localidad: data.localidad ?? "",
             codigoPostal: data.codigoPostal ?? "",
-            fechaAlta: data.fechaAlta ? new Date(data.fechaAlta).toISOString().split("T")[0] : "",
-            fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento).toISOString().split("T")[0] : "",
-            fechaBaja: data.fechaBaja ? new Date(data.fechaBaja).toISOString().split("T")[0] : "",
+            fechaAlta: data.fechaAlta ? new Date(data.fechaAlta).toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }) : "",
+            fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento).toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }) : "",
+            fechaBaja: data.fechaBaja ? new Date(data.fechaBaja).toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }) : "",
             celular: celularSinPrefijo(data.celular),
             contactos: (data.contactos ?? []).map((c: { nombres: string; apellidos: string; parentesco: string; calle?: string; numero?: string; casa?: string; departamento?: string; piso?: string; telefonos: { numero: string }[] }) => ({
               nombres: c.nombres,

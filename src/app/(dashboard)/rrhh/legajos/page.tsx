@@ -145,7 +145,12 @@ export default function LegajosPage() {
     }
   };
 
-  const formatFecha = (s: string) => (s ? new Date(s).toLocaleDateString("es-AR") : "-");
+  const formatFecha = (s: string) =>
+    s
+      ? new Date(s).toLocaleDateString("es-AR", {
+          timeZone: "America/Argentina/Buenos_Aires",
+        })
+      : "-";
 
   return (
     <div className="max-w-6xl space-y-6">

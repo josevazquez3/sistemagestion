@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-/** GET - Listar roles y permisos (solo ADMIN) */
+/** GET - Listar roles y permisos (ADMIN o SUPER_ADMIN) */
 export async function GET() {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
-  if (!roles.includes("ADMIN")) {
+  if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

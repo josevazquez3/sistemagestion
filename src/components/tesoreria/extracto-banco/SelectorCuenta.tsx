@@ -172,12 +172,17 @@ export function SelectorCuenta({
   }, [nombre]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const abrirModalCrear = useCallback(() => {
+    const codigoUsuario = String(codigo ?? "").trim();
+    if (codigoUsuario) {
+      setNextCodigo(codigoUsuario);
+    } else {
+      fetch("/api/tesoreria/cuentas-bancarias/next-codigo")
+        .then((r) => r.json())
+        .then((d) => setNextCodigo(String(d.codigo ?? "01")))
+        .catch(() => setNextCodigo("01"));
+    }
     setModalCrearOpen(true);
-    fetch("/api/tesoreria/cuentas-bancarias/next-codigo")
-      .then((r) => r.json())
-      .then((d) => setNextCodigo(d.codigo ?? "01"))
-      .catch(() => setNextCodigo("01"));
-  }, []);
+  }, [codigo]);
 
   const handleCrearCuenta = useCallback(async () => {
     const nombreTrim = nombre.trim();
@@ -191,7 +196,7 @@ export function SelectorCuenta({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          codigo: nextCodigo || "01",
+          codigo: String(nextCodigo ?? "").trim() || "01",
           nombre: nombreTrim,
           codOperativo: (codOperativoRef ?? "").trim() || null,
           estado: "Activa",

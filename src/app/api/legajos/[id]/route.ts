@@ -39,11 +39,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const body = await req.json();
 
-    /** Convierte valor de input date (YYYY-MM-DD o "") a Date o null. Evita Invalid Date. */
+    /** Convierte valor de input date (YYYY-MM-DD o "") a Date a mediodía UTC para evitar desfase de un día en Argentina. */
     const toDateOrNull = (val: unknown): Date | null => {
       if (val == null || val === "") return null;
       const s = String(val).trim();
       if (!s) return null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + "T12:00:00.000Z");
       const d = new Date(s);
       return Number.isNaN(d.getTime()) ? null : d;
     };
