@@ -391,7 +391,7 @@ export function FondoFijoContent() {
 
       if (esExcel) {
         const mod = await import("xlsx");
-        const XLSX = (mod as { default?: typeof mod }).default ?? mod;
+        const XLSX = ((mod as unknown) as { default?: typeof mod }).default ?? mod;
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: "array", cellDates: false });
         const ws = wb.Sheets[wb.SheetNames[0]];
