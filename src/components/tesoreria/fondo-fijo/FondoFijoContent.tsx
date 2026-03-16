@@ -293,12 +293,36 @@ export function FondoFijoContent() {
       const nombreMesAnio = `FondoFijo_${nombreMes}_${anio}`;
 
       if (formato === "xlsx") {
-        const mod = await import("xlsx");
-        const XLSX = (mod as { default?: unknown }).default ?? mod;
-        if (!XLSX || typeof (XLSX as { utils?: unknown }).utils !== "object") {
-          throw new Error("Módulo xlsx no disponible. Recargá la página e intentá de nuevo.");
+        let XLSX: {
+          utils: { aoa_to_sheet: (a: unknown[]) => unknown; book_new: () => unknown; book_append_sheet: (wb: unknown, ws: unknown, name: string) => void };
+          write: (wb: unknown, opts: { bookType: string; type: string }) => unknown;
+        };
+        try {
+          const mod = await import("xlsx");
+          const lib = (mod as { default?: unknown }).default ?? mod;
+          if (lib && typeof (lib as { utils?: unknown }).utils === "object" && typeof (lib as { write?: unknown }).write === "function") {
+            XLSX = lib as typeof XLSX;
+          } else {
+            throw new Error("Forma del módulo inesperada");
+          }
+        } catch {
+          const win = typeof window !== "undefined" ? (window as unknown as { XLSX?: typeof XLSX }) : null;
+          if (win?.XLSX?.utils && typeof win.XLSX.write === "function") {
+            XLSX = win.XLSX;
+          } else {
+            await new Promise<void>((resolve, reject) => {
+              const script = document.createElement("script");
+              script.src = "https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js";
+              script.crossOrigin = "anonymous";
+              script.onload = () => resolve();
+              script.onerror = () => reject(new Error("No se pudo cargar la librería para exportar Excel."));
+              document.head.appendChild(script);
+            });
+            const winX = (window as unknown as { XLSX?: typeof XLSX }).XLSX;
+            if (!winX?.utils || typeof winX.write !== "function") throw new Error("Librería Excel no disponible.");
+            XLSX = winX;
+          }
         }
-        const xlsxUtils = (XLSX as { utils: { aoa_to_sheet: (a: unknown[]) => unknown; book_new: () => unknown; book_append_sheet: (wb: unknown, ws: unknown, name: string) => void }; write: (wb: unknown, opts: { bookType: string; type: string }) => unknown }).utils;
         type MovExport = { fecha: string; concepto: string; importe: number; saldo: number };
         const hasSaldoAnt = saldoAnt !== 0;
         const filas: (string | number)[][] = [
@@ -312,11 +336,10 @@ export function FondoFijoContent() {
           ["Total gastos", "", Math.abs(totalGastos), ""],
           ["Saldo final", "", "", saldoFinal],
         ];
-        const ws = xlsxUtils.aoa_to_sheet(filas) as Record<string, { t?: string; z?: string }>;
-
-        const wb = xlsxUtils.book_new();
-        xlsxUtils.book_append_sheet(wb, ws, "Fondo Fijo");
-        const wbout = (XLSX as { write: (wb: unknown, opts: { bookType: string; type: string }) => unknown }).write(wb, { bookType: "xlsx", type: "array" }) as BlobPart;
+        const ws = XLSX.utils.aoa_to_sheet(filas) as Record<string, { t?: string; z?: string }>;
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Fondo Fijo");
+        const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as BlobPart;
         const blob = new Blob([wbout], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
