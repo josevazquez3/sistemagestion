@@ -316,7 +316,7 @@ export function FondoFijoContent() {
 
         const wb = xlsxUtils.book_new();
         xlsxUtils.book_append_sheet(wb, ws, "Fondo Fijo");
-        const wbout = (XLSX as { write: (wb: unknown, opts: { bookType: string; type: string }) => unknown }).write(wb, { bookType: "xlsx", type: "array" });
+        const wbout = (XLSX as { write: (wb: unknown, opts: { bookType: string; type: string }) => unknown }).write(wb, { bookType: "xlsx", type: "array" }) as BlobPart;
         const blob = new Blob([wbout], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
