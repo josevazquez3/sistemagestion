@@ -22,7 +22,6 @@ import { parsearExcelGenerico, type MovimientoImportado } from "@/lib/tesoreria/
 import { ModalGasto } from "./ModalGasto";
 import { ModalEditarMovimiento, type MovimientoFondoFijo } from "./ModalEditarMovimiento";
 import { MultiCodigoInput } from "../MultiCodigoInput";
-import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -267,89 +266,57 @@ export function FondoFijoContent() {
   };
 
   const exportar = async (formato: "xlsx" | "pdf") => {
-    console.log("Exportando formato:", formato, "mes:", mes, "anio:", anio);
     try {
-      const res = await fetch(
-        `/api/tesoreria/fondo-fijo/exportar?mes=${mes}&anio=${anio}`
-      );
-      console.log("Response status:", res.status);
-      const data = await res.json();
-      console.log("Data recibida (keys):", data ? Object.keys(data) : "null");
-
-      if (!res.ok) {
-        showMessage("error", data?.error || "Error al exportar");
-        return;
-      }
-
-      const movs = data.movimientos ?? [];
+      const saldoAnt = Number(config.saldoAnterior ?? 0);
+      const movs = movimientos.map((m) => {
+        const imp = Number(m.importePesos ?? 0);
+        const sal = Number(m.saldoPesos ?? 0);
+        return {
+          fecha: formatFecha(m.fecha),
+          concepto: m.concepto,
+          importe: imp,
+          saldo: sal,
+          importeFormato: formatearImporteAR(imp),
+          saldoFormato: formatearImporteAR(sal),
+        };
+      });
+      const totalIngresos = movimientos
+        .filter((m) => Number(m.importePesos ?? 0) > 0)
+        .reduce((s, m) => s + Number(m.importePesos ?? 0), 0);
+      const totalGastos = movimientos
+        .filter((m) => Number(m.importePesos ?? 0) < 0)
+        .reduce((s, m) => s + Number(m.importePesos ?? 0), 0);
+      const saldoFinal =
+        movs.length > 0 ? movs[movs.length - 1].saldo : saldoAnt;
+      const titulo = `Fondo Fijo - ${nombreMes} ${anio}`;
+      const saldoAntFormato = formatearImporteAR(saldoAnt);
       const nombreMesAnio = `FondoFijo_${nombreMes}_${anio}`;
 
-      const saldoAnt = Number(data.saldoAnterior ?? 0);
-      const saldoAntFormato = data.saldoAnteriorFormato ?? formatearImporteAR(saldoAnt);
-
       if (formato === "xlsx") {
-        type MovExport = {
-          fecha: string;
-          concepto: string;
-          importe: number;
-          saldo: number;
-        };
+        const mod = await import("xlsx");
+        const XLSX = (mod as { default?: unknown }).default ?? mod;
+        if (!XLSX || typeof (XLSX as { utils?: unknown }).utils !== "object") {
+          throw new Error("Módulo xlsx no disponible. Recargá la página e intentá de nuevo.");
+        }
+        const xlsxUtils = (XLSX as { utils: { aoa_to_sheet: (a: unknown[]) => unknown; book_new: () => unknown; book_append_sheet: (wb: unknown, ws: unknown, name: string) => void }; write: (wb: unknown, opts: { bookType: string; type: string }) => unknown }).utils;
+        type MovExport = { fecha: string; concepto: string; importe: number; saldo: number };
         const hasSaldoAnt = saldoAnt !== 0;
-        const firstDataRowExcel = hasSaldoAnt ? 5 : 4;
-        const lastDataRowExcel = firstDataRowExcel + movs.length - 1;
-        const totalRowExcel = lastDataRowExcel + 2;
-        const numFormat = "#,##0.00";
-
         const filas: (string | number)[][] = [
-          [data.titulo],
+          [titulo],
           [],
           ["Fecha", "Concepto", "Importe", "Saldo"],
           ...(hasSaldoAnt ? [["", "Saldo Anterior", saldoAnt, saldoAnt] as (string | number)[]] : []),
           ...(movs as MovExport[]).map((m) => [m.fecha, m.concepto, m.importe, m.saldo]),
           [],
-          ["Total ingresos", "", ""],
-          ["Total gastos", "", ""],
-          ["Saldo final", "", ""],
+          ["Total ingresos", "", totalIngresos, ""],
+          ["Total gastos", "", Math.abs(totalGastos), ""],
+          ["Saldo final", "", "", saldoFinal],
         ];
-        const ws = XLSX.utils.aoa_to_sheet(filas);
+        const ws = xlsxUtils.aoa_to_sheet(filas) as Record<string, { t?: string; z?: string }>;
 
-        for (let excelRow = firstDataRowExcel; excelRow <= lastDataRowExcel; excelRow++) {
-          const rowIdx = excelRow - 1;
-          const cCell = ws[XLSX.utils.encode_cell({ r: rowIdx, c: 2 })];
-          const dCell = ws[XLSX.utils.encode_cell({ r: rowIdx, c: 3 })];
-          if (cCell && cCell.t === "n") cCell.z = numFormat;
-          if (dCell && dCell.t === "n") dCell.z = numFormat;
-        }
-        if (hasSaldoAnt) {
-          const r = 3;
-          const cCell = ws[XLSX.utils.encode_cell({ r, c: 2 })];
-          const dCell = ws[XLSX.utils.encode_cell({ r, c: 3 })];
-          if (cCell && cCell.t === "n") cCell.z = numFormat;
-          if (dCell && dCell.t === "n") dCell.z = numFormat;
-        }
-
-        const cTotalIng = XLSX.utils.encode_cell({ r: totalRowExcel - 1, c: 2 });
-        const cTotalGas = XLSX.utils.encode_cell({ r: totalRowExcel, c: 2 });
-        const dSaldoFin = XLSX.utils.encode_cell({ r: totalRowExcel + 1, c: 3 });
-        ws[cTotalIng] = {
-          t: "n",
-          f: `SUMIF(C${firstDataRowExcel}:C${lastDataRowExcel},">0")`,
-          z: numFormat,
-        };
-        ws[cTotalGas] = {
-          t: "n",
-          f: `ABS(SUMIF(C${firstDataRowExcel}:C${lastDataRowExcel},"<0"))`,
-          z: numFormat,
-        };
-        ws[dSaldoFin] = {
-          t: "n",
-          f: `D${lastDataRowExcel}`,
-          z: numFormat,
-        };
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Fondo Fijo");
-        const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const wb = xlsxUtils.book_new();
+        xlsxUtils.book_append_sheet(wb, ws, "Fondo Fijo");
+        const wbout = (XLSX as { write: (wb: unknown, opts: { bookType: string; type: string }) => unknown }).write(wb, { bookType: "xlsx", type: "array" });
         const blob = new Blob([wbout], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
@@ -365,19 +332,12 @@ export function FondoFijoContent() {
       } else {
         const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
         doc.setFontSize(14);
-        doc.text(data.titulo ?? `Fondo Fijo - ${nombreMes} ${anio}`, 14, 20);
+        doc.text(titulo, 14, 20);
         doc.setFontSize(10);
-        doc.text(`Saldo anterior: ${data.saldoAnteriorFormato ?? "0,00"}`, 14, 28);
+        doc.text(`Saldo anterior: ${saldoAntFormato}`, 14, 28);
         const tableData = [
-          ...(saldoAnt !== 0
-            ? [["", "Saldo Anterior", saldoAntFormato, saldoAntFormato]]
-            : []),
-          ...movs.map((m: { fecha: string; concepto: string; importeFormato: string; saldoFormato: string }) => [
-            m.fecha,
-            m.concepto,
-            m.importeFormato,
-            m.saldoFormato,
-          ]),
+          ...(saldoAnt !== 0 ? [["", "Saldo Anterior", saldoAntFormato, saldoAntFormato]] : []),
+          ...movs.map((m) => [m.fecha, m.concepto, m.importeFormato, m.saldoFormato]),
         ];
         autoTable(doc, {
           startY: 34,
@@ -386,9 +346,9 @@ export function FondoFijoContent() {
           theme: "grid",
         });
         const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? 34;
-        doc.text(`Total ingresos: ${data.totalIngresosFormato ?? "0,00"}`, 14, finalY + 8);
-        doc.text(`Total gastos: ${data.totalGastosFormato ?? "0,00"}`, 14, finalY + 14);
-        doc.text(`Saldo final: ${data.saldoFinalFormato ?? "0,00"}`, 14, finalY + 20);
+        doc.text(`Total ingresos: ${formatearImporteAR(totalIngresos)}`, 14, finalY + 8);
+        doc.text(`Total gastos: ${formatearImporteAR(Math.abs(totalGastos))}`, 14, finalY + 14);
+        doc.text(`Saldo final: ${formatearImporteAR(saldoFinal)}`, 14, finalY + 20);
         const pdfBlob = doc.output("blob");
         const pdfUrl = URL.createObjectURL(pdfBlob);
         const link = document.createElement("a");
@@ -401,7 +361,11 @@ export function FondoFijoContent() {
         showMessage("ok", "PDF exportado.");
       }
     } catch (err) {
-      console.error("Error completo al exportar:", err);
+      console.error("Error al exportar Fondo Fijo:", err);
+      if (err instanceof Error) {
+        console.error("Mensaje:", err.message);
+        console.error("Stack:", err.stack);
+      }
       showMessage("error", "Error al exportar. Intentá de nuevo.");
     } finally {
       setMenuExportarOpen(false);
@@ -426,6 +390,8 @@ export function FondoFijoContent() {
       let movimientosParsados: MovimientoImportado[] = [];
 
       if (esExcel) {
+        const mod = await import("xlsx");
+        const XLSX = (mod as { default?: typeof mod }).default ?? mod;
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: "array", cellDates: false });
         const ws = wb.Sheets[wb.SheetNames[0]];
@@ -489,8 +455,7 @@ export function FondoFijoContent() {
 
       showMessage("ok", `Se importaron ${importados} movimiento(s) correctamente.`);
       fetchMovimientos();
-    } catch (err) {
-      console.error("Error al importar:", err);
+    } catch {
       showMessage("error", "Error al importar el archivo. Verificá el formato.");
     } finally {
       setImportando(false);
