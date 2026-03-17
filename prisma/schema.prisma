@@ -348,15 +348,19 @@ model TipoNota {
 }
 
 model ModeloNota {
-  id            Int       @id @default(autoincrement())
-  tipoNotaId    Int
-  nombre        String    // nombre descriptivo del modelo
-  nombreArchivo String    // nombre original del archivo .docx
-  urlArchivo    String    // ruta en public/uploads/modelos-notas/
-  contenido     Bytes?    // contenido binario del .docx para edición
-  creadoEn      DateTime  @default(now())
-  actualizadoEn DateTime  @updatedAt
-  tipoNota      TipoNota  @relation(fields: [tipoNotaId], references: [id])
+  id             Int         @id @default(autoincrement())
+  tipoNotaId     Int
+  nombre         String      // nombre descriptivo del modelo
+  nombreArchivo  String      // nombre original del archivo .docx
+  urlArchivo     String      // ruta en public/uploads/modelos-notas/
+  contenido      Bytes?      // contenido binario del .docx para edición
+  modeloOrigenId Int?
+  modeloOrigen   ModeloNota?  @relation("DuplicadosNota", fields: [modeloOrigenId], references: [id])
+  duplicados     ModeloNota[] @relation("DuplicadosNota")
+  activo         Boolean     @default(true)
+  creadoEn       DateTime    @default(now())
+  actualizadoEn  DateTime    @updatedAt
+  tipoNota       TipoNota    @relation(fields: [tipoNotaId], references: [id])
 
   @@map("modelos_nota")
 }

@@ -11,6 +11,10 @@ import { BuscadorModelos } from "@/components/secretaria/modelos-notas/BuscadorM
 import { ModalSubirModelo } from "@/components/secretaria/modelos-notas/ModalSubirModelo";
 import { ModalEditarModelo } from "@/components/secretaria/modelos-notas/ModalEditarModelo";
 import { ModalEditarContenido } from "@/components/secretaria/modelos-notas/ModalEditarContenido";
+import { ModalDuplicarModeloNota } from "@/components/secretaria/modelos-notas/ModalDuplicarModeloNota";
+import { EditorDocxPanelNota } from "@/components/secretaria/modelos-notas/EditorDocxPanelNota";
+import { EditorDocxBarraNota } from "@/components/secretaria/modelos-notas/EditorDocxBarraNota";
+import { useEditoresDocxNotasStore } from "@/lib/stores/editoresDocxNotasStore";
 import type { TipoNota, ModeloNota } from "@/components/secretaria/modelos-notas/types";
 
 export function ModelosNotasContent() {
@@ -31,6 +35,7 @@ export function ModelosNotasContent() {
   const [modalContenidoOpen, setModalContenidoOpen] = useState(false);
   const [contenidoModeloId, setContenidoModeloId] = useState<number | null>(null);
   const [contenidoModeloNombre, setContenidoModeloNombre] = useState("");
+  const [modeloDuplicar, setModeloDuplicar] = useState<ModeloNota | null>(null);
 
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; text: string } | null>(null);
 
@@ -84,6 +89,7 @@ export function ModelosNotasContent() {
   }, []);
 
   const tiposActivos = tipos.filter((t) => t.activo);
+  const { editores, abrirEditor, restaurarEditor } = useEditoresDocxNotasStore();
 
   const handleDownload = (m: ModeloNota) => {
     window.open(`/api/secretaria/modelos-nota/${m.id}/download`, "_blank");
@@ -150,6 +156,39 @@ export function ModelosNotasContent() {
         }
       })
       .catch(() => showMessage("error", "Error de conexión"));
+  };
+
+  const handleDuplicarModelo = (m: ModeloNota) => {
+    setModeloDuplicar(m);
+  };
+
+  const handleEditContenido = async (m: ModeloNota) => {
+    const yaAbierto = editores.find((e) => e.modeloId === m.id);
+    if (yaAbierto) {
+      restaurarEditor(m.id);
+      return;
+    }
+    if (editores.length >= 3) {
+      showMessage("error", "Máximo 3 editores abiertos. Cerrá uno antes de abrir otro.");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/secretaria/modelos-nota/${m.id}/contenido`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data?.error as string) || "No se pudo cargar el contenido");
+      }
+      abrirEditor({
+        modeloId: m.id,
+        nombre: data.nombre as string,
+        tipoNota: data.tipoNota as string,
+        tipoNotaId: data.tipoNotaId as number,
+        contenidoHtml: data.html as string,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al abrir el editor";
+      showMessage("error", msg);
+    }
   };
 
   const toggleSelectAll = () => {
@@ -235,11 +274,8 @@ export function ModelosNotasContent() {
               setModeloEditar(m);
               setModalEditarOpen(true);
             }}
-            onEditContenido={(m) => {
-              setContenidoModeloId(m.id);
-              setContenidoModeloNombre(m.nombre);
-              setModalContenidoOpen(true);
-            }}
+            onEditContenido={handleEditContenido}
+            onDuplicar={handleDuplicarModelo}
             onDownload={handleDownload}
             onDelete={handleDeleteModelo}
             onExportZip={handleExportZip}
@@ -273,14 +309,29 @@ export function ModelosNotasContent() {
         showMessage={showMessage}
       />
 
-      <ModalEditarContenido
-        open={modalContenidoOpen}
-        onOpenChange={setModalContenidoOpen}
-        modeloId={contenidoModeloId}
-        modeloNombre={contenidoModeloNombre}
-        onSuccess={fetchModelos}
-        showMessage={showMessage}
-      />
+      {modeloDuplicar && (
+        <ModalDuplicarModeloNota
+          modelo={modeloDuplicar}
+          tiposNota={tiposActivos}
+          onClose={() => setModeloDuplicar(null)}
+          onGuardado={fetchModelos}
+          showMessage={showMessage}
+        />
+      )}
+
+      {editores
+        .filter((e) => !e.minimizado)
+        .map((e) => (
+          <EditorDocxPanelNota
+            key={e.modeloId}
+            modeloId={e.modeloId}
+            tiposNota={tiposActivos}
+            onModeloGuardado={fetchModelos}
+            showMessage={showMessage}
+          />
+        ))}
+
+      <EditorDocxBarraNota />
     </div>
   );
 }

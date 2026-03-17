@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { subirArchivo, esBlobUrl, sanitizarNombreArchivo } from "@/lib/blob";
-import { readFile } from "fs/promises";
-import path from "path";
-import mammoth from "mammoth";
-import { Document, Packer, Paragraph, TextRun } from "docx";
+import { subirArchivo } from "@/lib/blob";
+import { extraerHtmlDeDocx } from "@/lib/docx/extractorContenido";
+import { generarDocxDesdeHtml } from "@/lib/docx/generadorDocx";
 
 const ROLES = ["ADMIN", "SECRETARIA"] as const;
 
@@ -18,7 +16,7 @@ function parseId(id: string): number | null {
   return isNaN(n) ? null : n;
 }
 
-/** GET - Extraer texto del DOCX (mammoth) para edición */
+/** GET - Extraer HTML editable del DOCX */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -34,7 +32,10 @@ export async function GET(
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  const modelo = await prisma.modeloNota.findUnique({ where: { id } });
+  const modelo = await prisma.modeloNota.findUnique({
+    where: { id },
+    include: { tipoNota: { select: { id: true, nombre: true } } },
+  });
   if (!modelo) {
     return NextResponse.json({ error: "Modelo no encontrado" }, { status: 404 });
   }
@@ -42,34 +43,25 @@ export async function GET(
   let buffer: Buffer;
   if (modelo.contenido && modelo.contenido.length > 0) {
     buffer = Buffer.from(modelo.contenido);
-  } else if (esBlobUrl(modelo.urlArchivo)) {
-    const res = await fetch(modelo.urlArchivo);
-    if (!res.ok) return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
-    buffer = Buffer.from(await res.arrayBuffer());
   } else {
-    const filePath = path.join(process.cwd(), "public", modelo.urlArchivo);
-    try {
-      buffer = await readFile(filePath);
-    } catch {
-      return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
+    const res = await fetch(modelo.urlArchivo);
+    if (!res.ok) {
+      return NextResponse.json({ error: "No se pudo acceder al archivo" }, { status: 500 });
     }
+    buffer = Buffer.from(await res.arrayBuffer());
   }
 
-  try {
-    const result = await mammoth.extractRawText({ buffer });
-    const text = result.value || "";
-    return NextResponse.json({ text });
-  } catch (e) {
-    console.error("Error extrayendo texto con mammoth:", e);
-    return NextResponse.json(
-      { error: "No se pudo extraer el texto del documento" },
-      { status: 500 }
-    );
-  }
+  const html = await extraerHtmlDeDocx(buffer);
+  return NextResponse.json({
+    html,
+    nombre: modelo.nombre,
+    tipoNota: modelo.tipoNota.nombre,
+    tipoNotaId: modelo.tipoNotaId,
+  });
 }
 
-/** POST - Guardar contenido editado: regenera .docx con Document/Paragraph/TextRun/Packer */
-export async function POST(
+/** PUT - Guardar HTML editado y regenerar .docx (actualizar o guardar como nuevo) */
+export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -89,54 +81,84 @@ export async function POST(
     return NextResponse.json({ error: "Modelo no encontrado" }, { status: 404 });
   }
 
+  let body: { html?: string; nombre?: string; tipoNotaId?: number; guardarComo?: boolean };
   try {
-    const body = await req.json();
-    const text = typeof body.texto === "string" ? body.texto : "";
-
-    const lines = text.split(/\r?\n/);
-    const children =
-      lines.length > 0
-        ? lines.map(
-            (line: string) =>
-              new Paragraph({
-                children: [new TextRun(line || " ")],
-                spacing: { after: 200 },
-              })
-          )
-        : [new Paragraph({ children: [new TextRun(" ")], spacing: { after: 200 } })];
-
-    const doc = new Document({ sections: [{ children }] });
-    const buffer = Buffer.from(await Packer.toBuffer(doc));
-
-    const base = sanitizarNombreArchivo(
-      modelo.nombreArchivo.replace(/\.[^/.]+$/, "") || "modelo"
-    );
-    const ext = modelo.nombreArchivo.includes(".")
-      ? modelo.nombreArchivo.split(".").pop() ?? "docx"
-      : "docx";
-    const safeName = `${base}_${Date.now()}.${ext}`;
-    const urlArchivo = await subirArchivo(
-      "modelos-notas",
-      safeName,
-      buffer,
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    );
-
-    await prisma.modeloNota.update({
-      where: { id },
-      data: {
-        urlArchivo,
-        contenido: buffer,
-        nombreArchivo: modelo.nombreArchivo,
-      },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (e) {
-    console.error("Error guardando contenido:", e);
-    return NextResponse.json(
-      { error: "Error al guardar el contenido" },
-      { status: 500 }
-    );
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
   }
+  if (!body.html) {
+    return NextResponse.json({ error: "El contenido es requerido" }, { status: 400 });
+  }
+
+  const nombreFinal = (body.nombre || modelo.nombre).trim();
+  const tipoFinal = body.tipoNotaId ?? modelo.tipoNotaId;
+
+  const buffer = await generarDocxDesdeHtml(body.html, nombreFinal);
+  const arrayBuffer = buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength
+  ) as ArrayBuffer;
+  const bytes = new Uint8Array(arrayBuffer);
+
+  const safeNombre = nombreFinal
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_")
+    .toLowerCase();
+  const nombreArchivo = `${safeNombre}_${Date.now()}.docx`;
+
+  const urlArchivo = await subirArchivo(
+    "modelos-notas",
+    nombreArchivo,
+    buffer,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  );
+
+  if (body.guardarComo) {
+    const include = {
+      tipoNota: { select: { id: true, nombre: true, activo: true } },
+    } as const;
+    const dataBase = {
+      nombre: nombreFinal,
+      tipoNotaId: tipoFinal,
+      nombreArchivo,
+      urlArchivo,
+      contenido: bytes,
+    };
+    let nuevo;
+    try {
+      nuevo = await prisma.modeloNota.create({
+        data: { ...dataBase, modeloOrigenId: id, activo: true },
+        include,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (
+        e instanceof Error &&
+        e.name === "PrismaClientValidationError" &&
+        (msg.includes("modeloOrigenId") || msg.includes("activo"))
+      ) {
+        nuevo = await prisma.modeloNota.create({ data: dataBase, include });
+      } else {
+        throw e;
+      }
+    }
+    return NextResponse.json({ modelo: nuevo, accion: "creado" }, { status: 201 });
+  }
+
+  const actualizado = await prisma.modeloNota.update({
+    where: { id },
+    data: {
+      nombre: nombreFinal,
+      tipoNotaId: tipoFinal,
+      nombreArchivo,
+      urlArchivo,
+      contenido: bytes,
+    },
+    include: { tipoNota: { select: { id: true, nombre: true, activo: true } } },
+  });
+  return NextResponse.json({ modelo: actualizado, accion: "actualizado" });
 }
