@@ -494,15 +494,19 @@ model TipoOficio {
 }
 
 model ModeloOficio {
-  id            Int         @id @default(autoincrement())
-  tipoOficioId  Int
-  nombre        String
-  nombreArchivo String
-  urlArchivo    String
-  contenido     Bytes?
-  creadoEn      DateTime   @default(now())
-  actualizadoEn DateTime   @updatedAt
-  tipoOficio    TipoOficio  @relation(fields: [tipoOficioId], references: [id])
+  id             Int            @id @default(autoincrement())
+  tipoOficioId   Int
+  nombre         String
+  nombreArchivo  String
+  urlArchivo     String
+  contenido      Bytes?
+  modeloOrigenId Int?
+  modeloOrigen   ModeloOficio?  @relation("Duplicados", fields: [modeloOrigenId], references: [id])
+  duplicados     ModeloOficio[] @relation("Duplicados")
+  activo         Boolean        @default(true)
+  creadoEn       DateTime       @default(now())
+  actualizadoEn  DateTime       @updatedAt
+  tipoOficio     TipoOficio     @relation(fields: [tipoOficioId], references: [id])
 
   @@map("modelos_oficio")
 }

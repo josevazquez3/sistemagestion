@@ -83,11 +83,22 @@ export async function POST(req: NextRequest) {
 
     const safeName = `modelooficio_${Date.now()}_${randomBytes(4).toString("hex")}.docx`;
     const buffer = Buffer.from(await file.arrayBuffer());
+    const arrayBuffer = buffer.buffer.slice(
+      buffer.byteOffset,
+      buffer.byteOffset + buffer.byteLength
+    ) as ArrayBuffer;
+    const bytes = new Uint8Array(arrayBuffer);
     const contentType = file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     const urlArchivo = await subirArchivo("modelos-oficios", safeName, buffer, contentType);
 
     const modelo = await prisma.modeloOficio.create({
-      data: { tipoOficioId, nombre, nombreArchivo: file.name, urlArchivo, contenido: buffer },
+      data: {
+        tipoOficioId,
+        nombre,
+        nombreArchivo: file.name,
+        urlArchivo,
+        contenido: bytes,
+      },
       include: { tipoOficio: { select: { id: true, nombre: true, activo: true } } },
     });
 

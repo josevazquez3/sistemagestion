@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2, Download, FileText, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Download, FileText, Loader2, Copy } from "lucide-react";
 import type { ModeloOficio } from "./types";
 
 function formatFechaArgentina(iso: string): string {
@@ -34,6 +34,7 @@ type ModelosOficioTablaProps = {
   onSelectOne: (id: number) => void;
   onEdit: (m: ModeloOficio) => void;
   onEditContenido: (m: ModeloOficio) => void;
+  onDuplicar: (m: ModeloOficio) => void;
   onDownload: (m: ModeloOficio) => void;
   onDelete: (m: ModeloOficio) => void;
   onExportZip: () => void;
@@ -48,6 +49,7 @@ export function ModelosOficioTabla({
   onSelectOne,
   onEdit,
   onEditContenido,
+  onDuplicar,
   onDownload,
   onDelete,
   onExportZip,
@@ -154,6 +156,14 @@ export function ModelosOficioTabla({
                         title="Editar contenido DOCX"
                       >
                         <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDuplicar(m)}
+                        title="Duplicar modelo"
+                      >
+                        <Copy className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"

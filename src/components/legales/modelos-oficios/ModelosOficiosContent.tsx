@@ -11,6 +11,10 @@ import { BuscadorModelosOficio } from "@/components/legales/modelos-oficios/Busc
 import { ModalSubirModeloOficio } from "@/components/legales/modelos-oficios/ModalSubirModeloOficio";
 import { ModalEditarModeloOficio } from "@/components/legales/modelos-oficios/ModalEditarModeloOficio";
 import { ModalEditarContenidoOficio } from "@/components/legales/modelos-oficios/ModalEditarContenidoOficio";
+import { ModalDuplicarModelo } from "@/components/legales/modelos-oficios/ModalDuplicarModelo";
+import { EditorDocxPanel } from "@/components/legales/modelos-oficios/EditorDocxPanel";
+import { EditorDocxBarra } from "@/components/legales/modelos-oficios/EditorDocxBarra";
+import { useEditoresDocxStore } from "@/lib/stores/editoresDocxStore";
 import type { TipoOficio, ModeloOficio } from "@/components/legales/modelos-oficios/types";
 
 export function ModelosOficiosContent() {
@@ -31,8 +35,11 @@ export function ModelosOficiosContent() {
   const [modalContenidoOpen, setModalContenidoOpen] = useState(false);
   const [contenidoModeloId, setContenidoModeloId] = useState<number | null>(null);
   const [contenidoModeloNombre, setContenidoModeloNombre] = useState("");
+  const [modeloDuplicar, setModeloDuplicar] = useState<ModeloOficio | null>(null);
 
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; text: string } | null>(null);
+
+  const { editores, abrirEditor, restaurarEditor } = useEditoresDocxStore();
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 300);
@@ -84,6 +91,7 @@ export function ModelosOficiosContent() {
   }, []);
 
   const tiposActivos = tipos.filter((t) => t.activo);
+  const tiposActivosParaDuplicar = tiposActivos;
 
   const handleDownload = (m: ModeloOficio) => {
     window.open(`/api/legales/modelos-oficio/${m.id}/download`, "_blank");
@@ -150,6 +158,38 @@ export function ModelosOficiosContent() {
         }
       })
       .catch(() => showMessage("error", "Error de conexión"));
+  };
+  const handleDuplicarModelo = (m: ModeloOficio) => {
+    setModeloDuplicar(m);
+  };
+
+  const handleEditContenido = async (m: ModeloOficio) => {
+    const yaAbierto = editores.find((e) => e.modeloId === m.id);
+    if (yaAbierto) {
+      restaurarEditor(m.id);
+      return;
+    }
+    if (editores.length >= 3) {
+      showMessage("error", "Máximo 3 editores abiertos. Cerrá uno antes de abrir otro.");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/legales/modelos-oficio/${m.id}/contenido`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data?.error as string) || "No se pudo cargar el contenido");
+      }
+      abrirEditor({
+        modeloId: m.id,
+        nombre: data.nombre as string,
+        tipoOficio: data.tipoOficio as string,
+        tipoOficioId: data.tipoOficioId as number,
+        contenidoHtml: data.html as string,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al abrir el editor";
+      showMessage("error", msg);
+    }
   };
 
   const toggleSelectAll = () => {
@@ -235,11 +275,8 @@ export function ModelosOficiosContent() {
               setModeloEditar(m);
               setModalEditarOpen(true);
             }}
-            onEditContenido={(m) => {
-              setContenidoModeloId(m.id);
-              setContenidoModeloNombre(m.nombre);
-              setModalContenidoOpen(true);
-            }}
+            onEditContenido={handleEditContenido}
+            onDuplicar={handleDuplicarModelo}
             onDownload={handleDownload}
             onDelete={handleDeleteModelo}
             onExportZip={handleExportZip}
@@ -273,14 +310,29 @@ export function ModelosOficiosContent() {
         showMessage={showMessage}
       />
 
-      <ModalEditarContenidoOficio
-        open={modalContenidoOpen}
-        onOpenChange={setModalContenidoOpen}
-        modeloId={contenidoModeloId}
-        modeloNombre={contenidoModeloNombre}
-        onSuccess={fetchModelos}
-        showMessage={showMessage}
-      />
+      {modeloDuplicar && (
+        <ModalDuplicarModelo
+          modelo={modeloDuplicar}
+          tiposOficio={tiposActivosParaDuplicar}
+          onClose={() => setModeloDuplicar(null)}
+          onGuardado={fetchModelos}
+          showMessage={showMessage}
+        />
+      )}
+
+      {editores
+        .filter((e) => !e.minimizado)
+        .map((e) => (
+          <EditorDocxPanel
+            key={e.modeloId}
+            modeloId={e.modeloId}
+            tiposOficio={tiposActivos}
+            onModeloGuardado={fetchModelos}
+            showMessage={showMessage}
+          />
+        ))}
+
+      <EditorDocxBarra />
     </div>
   );
 }

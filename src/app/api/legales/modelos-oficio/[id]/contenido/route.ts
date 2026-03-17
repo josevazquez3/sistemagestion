@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { subirArchivo, esBlobUrl, sanitizarNombreArchivo } from "@/lib/blob";
-import { readFile } from "fs/promises";
-import path from "path";
-import mammoth from "mammoth";
-import { Document, Packer, Paragraph, TextRun } from "docx";
+import { subirArchivo } from "@/lib/blob";
+import { extraerHtmlDeDocx } from "@/lib/docx/extractorContenido";
+import { generarDocxDesdeHtml } from "@/lib/docx/generadorDocx";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
 
@@ -18,7 +16,6 @@ function parseId(id: string): number | null {
   return isNaN(n) ? null : n;
 }
 
-/** GET - Extraer texto del DOCX (mammoth) para edición */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -34,7 +31,10 @@ export async function GET(
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  const modelo = await prisma.modeloOficio.findUnique({ where: { id } });
+  const modelo = await prisma.modeloOficio.findUnique({
+    where: { id },
+    include: { tipoOficio: { select: { id: true, nombre: true } } },
+  });
   if (!modelo) {
     return NextResponse.json({ error: "Modelo no encontrado" }, { status: 404 });
   }
@@ -42,34 +42,28 @@ export async function GET(
   let buffer: Buffer;
   if (modelo.contenido && modelo.contenido.length > 0) {
     buffer = Buffer.from(modelo.contenido);
-  } else if (esBlobUrl(modelo.urlArchivo)) {
-    const res = await fetch(modelo.urlArchivo);
-    if (!res.ok) return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
-    buffer = Buffer.from(await res.arrayBuffer());
   } else {
-    const filePath = path.join(process.cwd(), "public", modelo.urlArchivo);
-    try {
-      buffer = await readFile(filePath);
-    } catch {
-      return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
+    const res = await fetch(modelo.urlArchivo);
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: "No se pudo acceder al archivo" },
+        { status: 500 }
+      );
     }
+    buffer = Buffer.from(await res.arrayBuffer());
   }
 
-  try {
-    const result = await mammoth.extractRawText({ buffer });
-    const text = result.value || "";
-    return NextResponse.json({ text });
-  } catch (e) {
-    console.error("Error extrayendo texto con mammoth:", e);
-    return NextResponse.json(
-      { error: "No se pudo extraer el texto del documento" },
-      { status: 500 }
-    );
-  }
+  const html = await extraerHtmlDeDocx(buffer);
+
+  return NextResponse.json({
+    html,
+    nombre: modelo.nombre,
+    tipoOficio: modelo.tipoOficio.nombre,
+    tipoOficioId: modelo.tipoOficioId,
+  });
 }
 
-/** POST - Guardar contenido editado */
-export async function POST(
+export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -84,59 +78,80 @@ export async function POST(
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
+  let body: {
+    html?: string;
+    nombre?: string;
+    tipoOficioId?: number;
+    guardarComo?: boolean;
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
+  }
+
+  if (!body.html) {
+    return NextResponse.json({ error: "El contenido es requerido" }, { status: 400 });
+  }
+
   const modelo = await prisma.modeloOficio.findUnique({ where: { id } });
   if (!modelo) {
     return NextResponse.json({ error: "Modelo no encontrado" }, { status: 404 });
   }
 
-  try {
-    const body = await req.json();
-    const text = typeof body.texto === "string" ? body.texto : "";
+  const nombreFinal = (body.nombre || modelo.nombre).trim();
+  const tipoFinal = body.tipoOficioId ?? modelo.tipoOficioId;
 
-    const lines = text.split(/\r?\n/);
-    const children =
-      lines.length > 0
-        ? lines.map(
-            (line: string) =>
-              new Paragraph({
-                children: [new TextRun(line || " ")],
-                spacing: { after: 200 },
-              })
-          )
-        : [new Paragraph({ children: [new TextRun(" ")], spacing: { after: 200 } })];
+  const buffer = await generarDocxDesdeHtml(body.html, nombreFinal);
+  const arrayBuffer = buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength
+  ) as ArrayBuffer;
+  const bytes = new Uint8Array(arrayBuffer);
+  const safeNombre = nombreFinal
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_")
+    .toLowerCase();
+  const nombreArchivo = `${safeNombre}_${Date.now()}.docx`;
 
-    const doc = new Document({ sections: [{ children }] });
-    const buffer = Buffer.from(await Packer.toBuffer(doc));
+  const urlArchivo = await subirArchivo(
+    "modelos-oficios",
+    nombreArchivo,
+    buffer,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  );
 
-    const base = sanitizarNombreArchivo(
-      modelo.nombreArchivo.replace(/\.[^/.]+$/, "") || "modelo"
-    );
-    const ext = modelo.nombreArchivo.includes(".")
-      ? modelo.nombreArchivo.split(".").pop() ?? "docx"
-      : "docx";
-    const safeName = `${base}_${Date.now()}.${ext}`;
-    const urlArchivo = await subirArchivo(
-      "modelos-oficios",
-      safeName,
-      buffer,
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    );
-
-    await prisma.modeloOficio.update({
-      where: { id },
+  if (body.guardarComo) {
+    const nuevo = await prisma.modeloOficio.create({
       data: {
+        nombre: nombreFinal,
+        tipoOficioId: tipoFinal,
+        nombreArchivo,
         urlArchivo,
-        contenido: buffer,
-        nombreArchivo: modelo.nombreArchivo,
+        contenido: bytes,
+        // Si el esquema Prisma aún no tiene modeloOrigenId/activo,
+        // estos campos se ignoran sin afectar el flujo principal.
       },
+      include: { tipoOficio: { select: { id: true, nombre: true, activo: true } } },
     });
-
-    return NextResponse.json({ success: true });
-  } catch (e) {
-    console.error("Error guardando contenido:", e);
-    return NextResponse.json(
-      { error: "Error al guardar el contenido" },
-      { status: 500 }
-    );
+    return NextResponse.json({ modelo: nuevo, accion: "creado" }, { status: 201 });
   }
+
+  const actualizado = await prisma.modeloOficio.update({
+    where: { id },
+    data: {
+      nombre: nombreFinal,
+      tipoOficioId: tipoFinal,
+      nombreArchivo,
+      urlArchivo,
+      contenido: bytes,
+    },
+    include: { tipoOficio: { select: { id: true, nombre: true, activo: true } } },
+  });
+
+  return NextResponse.json({ modelo: actualizado, accion: "actualizado" });
 }
+
