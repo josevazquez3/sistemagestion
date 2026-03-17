@@ -519,7 +519,7 @@ model ModeloOficio {
 
 model CuentaBancaria {
   id              Int                 @id @default(autoincrement())
-  codigo          String
+  codigo          String              @unique
   codOperativo    String?
   nombre          String
   activo          Boolean              @default(true)
@@ -527,7 +527,6 @@ model CuentaBancaria {
   actualizadoEn   DateTime            @updatedAt
   movimientos     MovimientoExtracto[]
 
-  @@unique([codigo, codOperativo])
   @@map("cuentas_bancarias")
 }
 
@@ -595,6 +594,53 @@ model ExtractoBancoConfig {
   updatedAt         DateTime  @updatedAt
 
   @@map("extracto_banco_config")
+}
+
+model ConciliacionBanco {
+  id              Int                      @id @default(autoincrement())
+  mes             Int
+  anio            Int
+  saldoAnterior   Decimal                  @default(0) @db.Decimal(15, 2)
+  totalIngresos   Decimal                  @default(0) @db.Decimal(15, 2)
+  totalSalidas    Decimal                  @default(0) @db.Decimal(15, 2)
+  totalGastos     Decimal                  @default(0) @db.Decimal(15, 2)
+  subtotal        Decimal                  @default(0) @db.Decimal(15, 2)
+  totalConciliado Decimal                  @default(0) @db.Decimal(15, 2)
+  cerrado         Boolean                  @default(false)
+  creadoEn        DateTime                 @default(now())
+  actualizadoEn   DateTime                 @updatedAt
+  asignaciones    ConciliacionAsignacion[]
+  exclusiones     ConciliacionExclusion[]
+
+  @@unique([mes, anio])
+  @@map("conciliacion_banco")
+}
+
+model ConciliacionExclusion {
+  id             Int               @id @default(autoincrement())
+  conciliacionId Int
+  conciliacion   ConciliacionBanco @relation(fields: [conciliacionId], references: [id], onDelete: Cascade)
+  movimientoId   Int
+  creadoEn       DateTime          @default(now())
+
+  @@unique([conciliacionId, movimientoId])
+  @@map("conciliacion_exclusion")
+}
+
+model ConciliacionAsignacion {
+  id             Int               @id @default(autoincrement())
+  conciliacionId Int
+  conciliacion   ConciliacionBanco @relation(fields: [conciliacionId], references: [id], onDelete: Cascade)
+  cuentaCodigo   String
+  codOperativo   String?
+  cuentaNombre   String
+  tipo           String
+  orden          Int               @default(0)
+  creadoEn       DateTime          @default(now())
+  actualizadoEn  DateTime          @updatedAt
+
+  @@unique([conciliacionId, cuentaCodigo])
+  @@map("conciliacion_asignacion")
 }
 
 model CobroCertificacion {

@@ -211,7 +211,10 @@ export function SelectorCuenta({
         setNoEncontrado(false);
         setCuentaEncontrada(true);
         setModalCrearOpen(false);
-        showMessage?.("ok", "Cuenta creada correctamente.");
+        showMessage?.(
+          "ok",
+          res.status === 200 ? "Código operativo agregado a la cuenta." : "Cuenta creada correctamente."
+        );
       } else {
         showMessage?.("error", data.error || "Error al crear la cuenta.");
       }

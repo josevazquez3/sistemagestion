@@ -20,6 +20,7 @@ import {
   Wallet,
   Award,
   Building2,
+  CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Session } from "next-auth";
@@ -36,6 +37,7 @@ const navItems = [
   { href: "/tesoreria", label: "Tesorería", icon: Landmark, expandable: true, tesoreriaModule: true },
   { href: "/tesoreria/cuentas-bancarias", label: "Cuentas Bancarias", icon: Landmark, parent: "tesoreria", tesoreriaModule: true },
   { href: "/tesoreria/extracto-banco", label: "Extracto Banco", icon: Wallet, parent: "tesoreria", tesoreriaModule: true },
+  { href: "/tesoreria/conciliacion-banco", label: "Conciliación Banco", icon: CheckSquare, parent: "tesoreria", tesoreriaModule: true },
   { href: "/legislacion", label: "Legislación", icon: BookOpen },
   { href: "/legales", label: "Legales", icon: Scale, expandable: true, legalesModule: true },
   { href: "/legales/modelos-oficios", label: "Modelos de Oficios", icon: FileText, parent: "legales", legalesModule: true },
@@ -73,6 +75,7 @@ const legalesSubItems = [
 const tesoreriaSubItems = [
   { href: "/tesoreria/cuentas-bancarias", label: "Cuentas Bancarias", icon: Landmark },
   { href: "/tesoreria/extracto-banco", label: "Extracto Banco", icon: Wallet },
+  { href: "/tesoreria/conciliacion-banco", label: "Conciliación Banco", icon: CheckSquare },
   { href: "/tesoreria/fondo-fijo", label: "Fondo Fijo", icon: Wallet },
   { href: "/tesoreria/cobro-certificaciones", label: "Cobro Certificaciones", icon: Award },
   { href: "/tesoreria/ingresos-distritos", label: "Ingresos Distritos", icon: Building2 },

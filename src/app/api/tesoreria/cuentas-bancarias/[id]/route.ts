@@ -95,14 +95,14 @@ export async function PUT(
     return NextResponse.json({ error: "Código y nombre son obligatorios" }, { status: 400 });
   }
 
-  const existente = await prisma.cuentaBancaria.findFirst({
-    where: { codigo, codOperativo, NOT: { id } },
-  });
-  if (existente) {
-    return NextResponse.json(
-      { error: "Ya existe otra cuenta con ese código y código operativo" },
-      { status: 409 }
-    );
+  if (codigo !== cuenta.codigo) {
+    const otro = await prisma.cuentaBancaria.findUnique({ where: { codigo } });
+    if (otro && otro.id !== id) {
+      return NextResponse.json(
+        { error: "Ya existe otra cuenta con ese código" },
+        { status: 409 }
+      );
+    }
   }
 
   const actualizada = await prisma.cuentaBancaria.update({

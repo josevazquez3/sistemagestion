@@ -9,12 +9,7 @@ function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
 
-function parseId(id: string): number | null {
-  const n = parseInt(id, 10);
-  return isNaN(n) ? null : n;
-}
-
-/** GET - Listar con búsqueda y paginación */
+/** GET ?codigo=XX → { existe, cuenta }. Si no, listado paginado. */
 export async function GET(req: NextRequest) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
@@ -23,6 +18,17 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
+  const codigoCheck = searchParams.get("codigo")?.trim();
+  if (codigoCheck) {
+    const cuenta = await prisma.cuentaBancaria.findUnique({
+      where: { codigo: codigoCheck },
+    });
+    return NextResponse.json({
+      existe: !!cuenta,
+      cuenta: cuenta ?? null,
+    });
+  }
+
   const q = searchParams.get("q")?.trim() ?? "";
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const perPage = Math.min(50, Math.max(1, parseInt(searchParams.get("perPage") ?? "20", 10)));
@@ -48,7 +54,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ data, total, page, perPage });
 }
 
-/** POST - Crear cuenta */
+/** POST — Crear cuenta o fusionar codOperativo si el código ya existe */
 export async function POST(req: NextRequest) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
@@ -56,7 +62,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  let body: { codigo?: string; codOperativo?: string | null; nombre?: string; estado?: string };
+  let body: {
+    codigo?: string;
+    codOperativo?: string | null;
+    nombre?: string;
+    estado?: string;
+    activo?: boolean;
+  };
   try {
     body = await req.json();
   } catch {
@@ -65,32 +77,85 @@ export async function POST(req: NextRequest) {
 
   const codigo = (body.codigo ?? "").trim();
   const nombre = (body.nombre ?? "").trim();
-  const codOperativo = (body.codOperativo ?? "").trim() || null;
-  const activo = body.estado !== "Inactiva";
+  const codOpsNuevos = (body.codOperativo ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const activo = body.activo ?? body.estado !== "Inactiva";
+
   if (!codigo || !nombre) {
     return NextResponse.json({ error: "Código y nombre son obligatorios" }, { status: 400 });
   }
 
-  const existente = await prisma.cuentaBancaria.findFirst({
-    where: { codigo, codOperativo },
+  const existente = await prisma.cuentaBancaria.findUnique({
+    where: { codigo },
   });
+
   if (existente) {
+    const codOpsExistentes = new Set(
+      (existente.codOperativo ?? "").trim().split(/\s+/).filter(Boolean)
+    );
+    let huboNuevos = false;
+    for (const c of codOpsNuevos) {
+      if (!codOpsExistentes.has(c)) {
+        codOpsExistentes.add(c);
+        huboNuevos = true;
+      }
+    }
+
+    if (huboNuevos) {
+      const actualizado = await prisma.cuentaBancaria.update({
+        where: { codigo },
+        data: {
+          codOperativo: Array.from(codOpsExistentes).join(" ") || null,
+          ...(nombre !== existente.nombre ? { nombre } : {}),
+          activo,
+        },
+      });
+      return NextResponse.json(
+        {
+          ...actualizado,
+          mensaje: "Cuenta actualizada con nuevo(s) código(s) operativo(s)",
+        },
+        { status: 200 }
+      );
+    }
+
+    if (nombre !== existente.nombre) {
+      const actualizado = await prisma.cuentaBancaria.update({
+        where: { codigo },
+        data: { nombre, activo },
+      });
+      return NextResponse.json(
+        { ...actualizado, mensaje: "Nombre de cuenta actualizado" },
+        { status: 200 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Ya existe una cuenta con ese código y código operativo" },
+      {
+        error: `El código "${codigo}" ya existe`,
+        cuenta: existente,
+      },
       { status: 409 }
     );
   }
 
   try {
     const cuenta = await prisma.cuentaBancaria.create({
-      data: { codigo, codOperativo, nombre, activo },
+      data: {
+        codigo,
+        codOperativo: codOpsNuevos.length ? codOpsNuevos.join(" ") : null,
+        nombre,
+        activo,
+      },
     });
     return NextResponse.json(cuenta, { status: 201 });
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code;
     if (code === "P2002") {
       return NextResponse.json(
-        { error: "Ya existe una cuenta con ese código y código operativo" },
+        { error: "Ya existe una cuenta con ese código" },
         { status: 409 }
       );
     }

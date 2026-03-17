@@ -168,12 +168,14 @@ export function ImportarCuentas({
     const data = await res.json();
     if (!res.ok) return;
     const existentes = (data as { codigo: string; codOperativo?: string | null }[]) ?? [];
-    const esDuplicado = (f: FilaCuenta) =>
-      existentes.some(
-        (c) =>
-          c.codigo === f.codigo.trim() &&
-          (c.codOperativo ?? "") === (f.codOperativo ?? "").trim()
-      );
+    const esDuplicado = (f: FilaCuenta) => {
+      const ex = existentes.find((c) => c.codigo === f.codigo.trim());
+      if (!ex) return false;
+      const nuevos = (f.codOperativo ?? "").trim().split(/\s+/).filter(Boolean);
+      if (nuevos.length === 0) return true;
+      const ya = new Set((ex.codOperativo ?? "").trim().split(/\s+/).filter(Boolean));
+      return nuevos.every((op) => ya.has(op));
+    };
     setFilas((prev) => prev.map((f) => ({ ...f, duplicado: esDuplicado(f) })));
     const indicesNoDup = filasActuales
       .map((f, i) => (esDuplicado(f) ? -1 : i))

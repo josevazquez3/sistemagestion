@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { registrarCuentaSiNoExiste } from "@/lib/tesoreria/registrarCuentaSiNoExiste";
 import type { Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
@@ -207,18 +208,36 @@ export async function POST(req: NextRequest) {
   const saldoInicial =
     ultimoMovimiento != null ? Number(ultimoMovimiento.saldoPesos) : 0;
 
-  const data = body.map((m) => ({
-    fecha: parseFechaExtracto(m.fecha),
-    sucOrigen: m.sucOrigen ?? null,
-    descSucursal: m.descSucursal ?? null,
-    codOperativo: m.codOperativo ?? null,
-    referencia: m.referencia ?? null,
-    concepto: m.concepto ?? "",
-    importePesos: new Decimal(m.importePesos ?? 0),
-    saldoPesos: new Decimal(0),
-    cuentaId: m.cuentaId ?? null,
-    importado: true,
-  }));
+  const codOpsUnicos = [
+    ...new Set(body.map((m) => (m.codOperativo ?? "").trim()).filter(Boolean)),
+  ];
+  const opToCuentaId = new Map<string, number>();
+  for (const op of codOpsUnicos) {
+    const r = await registrarCuentaSiNoExiste(op);
+    if (r) opToCuentaId.set(op, r.id);
+  }
+
+  const data = body.map((m) => {
+    const op = (m.codOperativo ?? "").trim();
+    const cuentaIdMov =
+      m.cuentaId != null && m.cuentaId !== undefined
+        ? m.cuentaId
+        : op
+          ? opToCuentaId.get(op) ?? null
+          : null;
+    return {
+      fecha: parseFechaExtracto(m.fecha),
+      sucOrigen: m.sucOrigen ?? null,
+      descSucursal: m.descSucursal ?? null,
+      codOperativo: m.codOperativo ?? null,
+      referencia: m.referencia ?? null,
+      concepto: m.concepto ?? "",
+      importePesos: new Decimal(m.importePesos ?? 0),
+      saldoPesos: new Decimal(0),
+      cuentaId: cuentaIdMov,
+      importado: true,
+    };
+  });
 
   data.sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 

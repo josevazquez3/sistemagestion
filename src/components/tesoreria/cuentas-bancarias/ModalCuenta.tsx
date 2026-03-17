@@ -62,6 +62,53 @@ export function ModalCuenta({
     }
     setSaving(true);
     try {
+      if (!esEdicion) {
+        const checkRes = await fetch(
+          `/api/tesoreria/cuentas-bancarias?codigo=${encodeURIComponent(c)}`
+        );
+        const checkData = (await checkRes.json()) as {
+          existe?: boolean;
+          cuenta?: { nombre: string } | null;
+        };
+        if (checkData.existe && checkData.cuenta) {
+          const co = (codOperativo ?? "").trim();
+          const confirmar = window.confirm(
+            `El código "${c}" ya existe (${checkData.cuenta.nombre}).\n` +
+              (co
+                ? `¿Agregar el código operativo "${co}" a esa cuenta?`
+                : `¿Actualizar solo el nombre con los datos ingresados?`)
+          );
+          if (!confirmar) {
+            setSaving(false);
+            return;
+          }
+          const res = await fetch("/api/tesoreria/cuentas-bancarias", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              codigo: c,
+              codOperativo: co || null,
+              nombre: n || checkData.cuenta.nombre,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            showMessage(
+              "ok",
+              res.status === 200
+                ? "Código operativo agregado a la cuenta."
+                : "Cuenta creada."
+            );
+            onOpenChange(false);
+            onSuccess();
+          } else {
+            showMessage("error", data.error || "Error al actualizar");
+          }
+          setSaving(false);
+          return;
+        }
+      }
+
       const url = esEdicion
         ? `/api/tesoreria/cuentas-bancarias/${cuenta.id}`
         : "/api/tesoreria/cuentas-bancarias";
@@ -77,7 +124,10 @@ export function ModalCuenta({
       });
       const data = await res.json();
       if (res.ok) {
-        showMessage("ok", esEdicion ? "Cuenta actualizada." : "Cuenta creada.");
+        showMessage(
+          "ok",
+          esEdicion ? "Cuenta actualizada." : res.status === 200 ? "Cuenta actualizada." : "Cuenta creada."
+        );
         onOpenChange(false);
         onSuccess();
       } else {

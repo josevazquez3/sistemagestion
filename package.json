@@ -11,7 +11,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "deduplicar:cuentas": "tsx scripts/deduplicarCuentas.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
