@@ -17,6 +17,7 @@ import {
   Trash2,
   FileText,
   Percent,
+  Loader2,
 } from "lucide-react";
 import { formatearImporteAR, parsearArchivoExtracto } from "@/lib/parsearExtracto";
 import { parsearExcelGenerico, type MovimientoImportado } from "@/lib/tesoreria/parsearImportFlex";
@@ -78,6 +79,9 @@ export function CobroCertificacionesContent() {
   const [modalComisionesOpen, setModalComisionesOpen] = useState(false);
   const [movimientosPreview, setMovimientosPreview] = useState<MovimientoImportado[]>([]);
   const [modalPreviewImportar, setModalPreviewImportar] = useState(false);
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [eliminando, setEliminando] = useState(false);
+  const checkboxTodosRef = useRef<HTMLInputElement>(null);
 
   const fetchMovimientos = useCallback(async () => {
     setLoading(true);
@@ -120,6 +124,19 @@ export function CobroCertificacionesContent() {
   }, [fetchConfig]);
 
   useEffect(() => {
+    setSeleccionados(new Set());
+  }, [mes, anio, buscar]);
+
+  useEffect(() => {
+    const ref = checkboxTodosRef.current;
+    if (!ref) return;
+    const n = movimientos.length;
+    const s = seleccionados.size;
+    ref.checked = n > 0 && s === n;
+    ref.indeterminate = n > 0 && s > 0 && s < n;
+  }, [movimientos.length, seleccionados.size]);
+
+  useEffect(() => {
     if (pickerOpen) setAñoPicker(anio);
   }, [pickerOpen, anio]);
 
@@ -145,6 +162,51 @@ export function CobroCertificacionesContent() {
   }, []);
 
   const nombreMes = MESES[mes - 1];
+
+  const toggleSeleccion = (id: string) => {
+    setSeleccionados((prev) => {
+      const nuevo = new Set(prev);
+      nuevo.has(id) ? nuevo.delete(id) : nuevo.add(id);
+      return nuevo;
+    });
+  };
+
+  const toggleTodos = () => {
+    if (seleccionados.size === movimientos.length) {
+      setSeleccionados(new Set());
+    } else {
+      setSeleccionados(new Set(movimientos.map((m) => m.id)));
+    }
+  };
+
+  const eliminarSeleccionados = async () => {
+    if (seleccionados.size === 0) return;
+    const confirmado = window.confirm(
+      `¿Eliminar ${seleccionados.size} movimiento(s) seleccionado(s)? Esta acción no se puede deshacer.`
+    );
+    if (!confirmado) return;
+    setEliminando(true);
+    const count = seleccionados.size;
+    try {
+      const res = await fetch("/api/tesoreria/cobro-certificaciones/eliminar-masivo", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(seleccionados) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showMessage("error", (data.error as string) || "Error al eliminar.");
+        return;
+      }
+      setSeleccionados(new Set());
+      await fetchMovimientos();
+      showMessage("ok", `${data.eliminados ?? count} movimiento(s) eliminado(s) correctamente.`);
+    } catch {
+      showMessage("error", "Error al eliminar los movimientos seleccionados.");
+    } finally {
+      setEliminando(false);
+    }
+  };
 
   const seleccionarMes = (m: number) => {
     setMes(m);
@@ -404,7 +466,9 @@ export function CobroCertificacionesContent() {
 
   const confirmarImportacion = useCallback(async () => {
     setModalPreviewImportar(false);
+    const total = movimientosPreview.length;
     let importados = 0;
+    let primerError: string | null = null;
     for (const m of movimientosPreview) {
       try {
         const res = await fetch("/api/tesoreria/cobro-certificaciones", {
@@ -418,12 +482,30 @@ export function CobroCertificacionesContent() {
             anio,
           }),
         });
-        if (res.ok) importados++;
+        if (res.ok) {
+          importados++;
+        } else {
+          const data = await res.json().catch(() => ({}));
+          if (!primerError && data?.error) primerError = data.error as string;
+        }
       } catch {
-        // ignorar error por fila
+        if (!primerError) primerError = "Error de conexión";
       }
     }
-    showMessage("ok", `Se importaron ${importados} movimiento(s) correctamente.`);
+    setSeleccionados(new Set());
+    if (importados === total) {
+      showMessage("ok", `Se importaron ${importados} movimiento(s) correctamente.`);
+    } else if (importados > 0) {
+      showMessage(
+        "error",
+        `Se importaron ${importados} de ${total}. ${total - importados} no se pudieron importar.${primerError ? ` Motivo: ${primerError}` : ""}`
+      );
+    } else {
+      showMessage(
+        "error",
+        `Ninguno se pudo importar.${primerError ? ` Motivo: ${primerError}` : " Revisá que cada fila tenga fecha, concepto e importe válidos."}`
+      );
+    }
     fetchMovimientos();
   }, [movimientosPreview, mes, anio, fetchMovimientos]);
 
@@ -574,43 +656,44 @@ export function CobroCertificacionesContent() {
               Saldo Total: $ {formatearImporteAR(saldoTotal)}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
-              <Input
-                placeholder="Buscar..."
-                value={buscar}
-                onChange={(e) => setBuscar(e.target.value)}
-                className="pl-8 w-48"
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
+                <Input
+                  placeholder="Buscar..."
+                  value={buscar}
+                  onChange={(e) => setBuscar(e.target.value)}
+                  className="pl-8 w-48"
+                />
+              </div>
+              <input
+                ref={inputImportarRef}
+                type="file"
+                accept=".csv,.xls,.xlsx,.txt"
+                className="hidden"
+                onChange={handleImportar}
               />
-            </div>
-            <input
-              ref={inputImportarRef}
-              type="file"
-              accept=".csv,.xls,.xlsx,.txt"
-              className="hidden"
-              onChange={handleImportar}
-            />
-            <button
-              type="button"
-              onClick={() => inputImportarRef.current?.click()}
-              disabled={importando}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-70 text-white text-sm px-4 py-2 rounded-lg"
-            >
-              <Upload className="w-4 h-4" />
-              {importando ? "Importando…" : "Importar"}
-            </button>
-            <div className="relative">
               <button
                 type="button"
-                onClick={() => setMenuExportarOpen((o) => !o)}
-                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-2 rounded-lg"
+                onClick={() => inputImportarRef.current?.click()}
+                disabled={importando}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-70 text-white text-sm px-4 py-2 rounded-lg"
               >
-                <Download className="w-4 h-4" />
-                Exportar
-                <ChevronDown className="w-3 h-3" />
+                <Upload className="w-4 h-4" />
+                {importando ? "Importando…" : "Importar"}
               </button>
-              {menuExportarOpen && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMenuExportarOpen((o) => !o)}
+                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-2 rounded-lg"
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {menuExportarOpen && (
                 <>
                   <div
                     className="fixed inset-0 z-10"
@@ -637,7 +720,23 @@ export function CobroCertificacionesContent() {
                   </div>
                 </>
               )}
+              </div>
             </div>
+            {seleccionados.size > 0 && (
+              <button
+                type="button"
+                onClick={eliminarSeleccionados}
+                disabled={eliminando}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+              >
+                {eliminando ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Eliminar seleccionados ({seleccionados.size})
+              </button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -645,6 +744,15 @@ export function CobroCertificacionesContent() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-gray-600">
+                  <th className="w-10 pb-2 pt-2 pl-2 pr-0">
+                    <input
+                      ref={checkboxTodosRef}
+                      type="checkbox"
+                      aria-label="Seleccionar todos"
+                      onChange={toggleTodos}
+                      className="w-4 h-4 accent-red-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="pb-2 pt-2 pl-2">Fecha</th>
                   <th className="pb-2 pt-2">Concepto</th>
                   <th className="pb-2 pt-2 text-right">Importe</th>
@@ -655,19 +763,30 @@ export function CobroCertificacionesContent() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-400">
+                    <td colSpan={6} className="py-8 text-center text-gray-400">
                       Cargando…
                     </td>
                   </tr>
                 ) : movimientos.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-500">
+                    <td colSpan={6} className="py-8 text-center text-gray-500">
                       No hay movimientos para este período.
                     </td>
                   </tr>
                 ) : (
                   movimientos.map((mov) => (
-                    <tr key={mov.id} className="border-b hover:bg-gray-50">
+                    <tr
+                      key={mov.id}
+                      className={`border-b hover:bg-gray-50 ${seleccionados.has(mov.id) ? "bg-red-50" : ""}`}
+                    >
+                      <td className="w-10 py-3 pl-2 pr-0">
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.has(mov.id)}
+                          onChange={() => toggleSeleccion(mov.id)}
+                          className="w-4 h-4 accent-red-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="py-3 pl-2 whitespace-nowrap">
                         {formatFecha(mov.fecha)}
                       </td>
@@ -737,8 +856,11 @@ export function CobroCertificacionesContent() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col shadow-xl">
             <h3 className="font-semibold text-lg mb-1">Vista previa importación</h3>
-            <p className="text-sm text-gray-500 mb-3">
+            <p className="text-sm text-gray-500 mb-1">
               {movimientosPreview.length} movimiento(s) detectados. Revisá antes de confirmar.
+            </p>
+            <p className="text-xs text-gray-400 mb-3">
+              Se omiten filas sin fecha/concepto/importe válidos, con importe 0 o con concepto &quot;Saldo anterior&quot;. Si el archivo tiene más filas, revisá que tengan esas columnas bien completas.
             </p>
             <div className="overflow-y-auto flex-1">
               <table className="w-full text-sm border-collapse">

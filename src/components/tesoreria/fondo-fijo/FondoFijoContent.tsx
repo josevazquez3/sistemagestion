@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Trash2,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { formatearImporteAR, parsearArchivoExtracto } from "@/lib/parsearExtracto";
 import { parsearExcelGenerico, type MovimientoImportado } from "@/lib/tesoreria/parsearImportFlex";
@@ -79,6 +80,9 @@ export function FondoFijoContent() {
   const [importando, setImportando] = useState(false);
   const inputImportarRef = useRef<HTMLInputElement>(null);
   const [saldoTotal, setSaldoTotal] = useState<number>(0);
+  const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set());
+  const [eliminando, setEliminando] = useState(false);
+  const checkboxTodosRef = useRef<HTMLInputElement>(null);
 
   const fetchMovimientos = useCallback(async () => {
     setLoading(true);
@@ -133,6 +137,19 @@ export function FondoFijoContent() {
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
+
+  useEffect(() => {
+    setSeleccionados(new Set());
+  }, [mes, anio, buscar]);
+
+  useEffect(() => {
+    const ref = checkboxTodosRef.current;
+    if (!ref) return;
+    const n = movimientos.length;
+    const s = seleccionados.size;
+    ref.checked = n > 0 && s === n;
+    ref.indeterminate = n > 0 && s > 0 && s < n;
+  }, [movimientos.length, seleccionados.size]);
 
   useEffect(() => {
     if (pickerOpen) setAñoPicker(anio);
@@ -248,6 +265,51 @@ export function FondoFijoContent() {
       showMessage("error", "Error de conexión");
     } finally {
       setCargandoActualizar(false);
+    }
+  };
+
+  const toggleSeleccion = (id: number) => {
+    setSeleccionados((prev) => {
+      const nuevo = new Set(prev);
+      nuevo.has(id) ? nuevo.delete(id) : nuevo.add(id);
+      return nuevo;
+    });
+  };
+
+  const toggleTodos = () => {
+    if (seleccionados.size === movimientos.length) {
+      setSeleccionados(new Set());
+    } else {
+      setSeleccionados(new Set(movimientos.map((m) => m.id)));
+    }
+  };
+
+  const eliminarSeleccionados = async () => {
+    if (seleccionados.size === 0) return;
+    const confirmado = window.confirm(
+      `¿Eliminar ${seleccionados.size} movimiento(s) seleccionado(s)?\nEsta acción no se puede deshacer.`
+    );
+    if (!confirmado) return;
+    setEliminando(true);
+    const count = seleccionados.size;
+    try {
+      const res = await fetch("/api/tesoreria/fondo-fijo/eliminar-masivo", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(seleccionados) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showMessage("error", (data.error as string) || "Error al eliminar.");
+        return;
+      }
+      setSeleccionados(new Set());
+      await fetchMovimientos();
+      showMessage("ok", `${data.eliminados ?? count} movimiento(s) eliminado(s) correctamente.`);
+    } catch {
+      showMessage("error", "Error al eliminar los movimientos seleccionados.");
+    } finally {
+      setEliminando(false);
     }
   };
 
@@ -476,6 +538,7 @@ export function FondoFijoContent() {
         }
       }
 
+      setSeleccionados(new Set());
       showMessage("ok", `Se importaron ${importados} movimiento(s) correctamente.`);
       fetchMovimientos();
     } catch {
@@ -654,70 +717,87 @@ export function FondoFijoContent() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
-              <Input
-                placeholder="Buscar..."
-                value={buscar}
-                onChange={(e) => setBuscar(e.target.value)}
-                className="pl-8 w-48"
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
+                <Input
+                  placeholder="Buscar..."
+                  value={buscar}
+                  onChange={(e) => setBuscar(e.target.value)}
+                  className="pl-8 w-48"
+                />
+              </div>
+              <input
+                ref={inputImportarRef}
+                type="file"
+                accept=".csv,.xls,.xlsx,.txt"
+                className="hidden"
+                onChange={handleImportar}
               />
-            </div>
-            <input
-              ref={inputImportarRef}
-              type="file"
-              accept=".csv,.xls,.xlsx,.txt"
-              className="hidden"
-              onChange={handleImportar}
-            />
-            <button
-              type="button"
-              onClick={() => inputImportarRef.current?.click()}
-              disabled={importando}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-70 text-white text-sm px-4 py-2 rounded-lg"
-            >
-              <Upload className="w-4 h-4" />
-              {importando ? "Importando…" : "Importar"}
-            </button>
-            <div className="relative">
               <button
                 type="button"
-                onClick={() => setMenuExportarOpen((o) => !o)}
-                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-2 rounded-lg"
+                onClick={() => inputImportarRef.current?.click()}
+                disabled={importando}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-70 text-white text-sm px-4 py-2 rounded-lg"
               >
-                <Download className="w-4 h-4" />
-                Exportar
-                <ChevronDown className="w-3 h-3" />
+                <Upload className="w-4 h-4" />
+                {importando ? "Importando…" : "Importar"}
               </button>
-              {menuExportarOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    aria-hidden
-                    onClick={() => setMenuExportarOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-20 min-w-[160px] py-1">
-                    <button
-                      type="button"
-                      onClick={() => exportar("xlsx")}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 w-full text-left"
-                    >
-                      <Download className="w-4 h-4 text-green-600" />
-                      Excel (.xlsx)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => exportar("pdf")}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 w-full text-left border-t"
-                    >
-                      <FileText className="w-4 h-4 text-red-600" />
-                      PDF
-                    </button>
-                  </div>
-                </>
-              )}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMenuExportarOpen((o) => !o)}
+                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-2 rounded-lg"
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {menuExportarOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      aria-hidden
+                      onClick={() => setMenuExportarOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-20 min-w-[160px] py-1">
+                      <button
+                        type="button"
+                        onClick={() => exportar("xlsx")}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 w-full text-left"
+                      >
+                        <Download className="w-4 h-4 text-green-600" />
+                        Excel (.xlsx)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => exportar("pdf")}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 w-full text-left border-t"
+                      >
+                        <FileText className="w-4 h-4 text-red-600" />
+                        PDF
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
+            {seleccionados.size > 0 && (
+              <button
+                type="button"
+                onClick={eliminarSeleccionados}
+                disabled={eliminando}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+              >
+                {eliminando ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Eliminar seleccionados ({seleccionados.size})
+              </button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -725,6 +805,15 @@ export function FondoFijoContent() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-gray-600">
+                  <th className="w-10 pb-2 pt-2 pl-2 pr-0">
+                    <input
+                      ref={checkboxTodosRef}
+                      type="checkbox"
+                      aria-label="Seleccionar todos"
+                      onChange={toggleTodos}
+                      className="w-4 h-4 accent-red-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="pb-2 pt-2 pl-2">Fecha</th>
                   <th className="pb-2 pt-2">Concepto</th>
                   <th className="pb-2 pt-2 text-right">Importe</th>
@@ -735,6 +824,7 @@ export function FondoFijoContent() {
               <tbody>
                 {config?.saldoAnterior != null && Number(config.saldoAnterior) !== 0 && (
                   <tr className="border-b bg-gray-50">
+                    <td className="w-10 px-2 py-3" />
                     <td className="py-3 pl-2 text-gray-400 italic">—</td>
                     <td className="py-3 font-medium text-gray-700">Saldo Anterior</td>
                     <td className="py-3 text-right font-medium text-green-600">
@@ -748,19 +838,30 @@ export function FondoFijoContent() {
                 )}
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-400">
+                    <td colSpan={6} className="py-8 text-center text-gray-400">
                       Cargando…
                     </td>
                   </tr>
                 ) : movimientos.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-500">
+                    <td colSpan={6} className="py-8 text-center text-gray-500">
                       No hay movimientos para este período.
                     </td>
                   </tr>
                 ) : (
                   movimientos.map((mov) => (
-                    <tr key={mov.id} className="border-b hover:bg-gray-50">
+                    <tr
+                      key={mov.id}
+                      className={`border-b hover:bg-gray-50 ${seleccionados.has(mov.id) ? "bg-red-50" : ""}`}
+                    >
+                      <td className="w-10 py-3 pl-2 pr-0">
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.has(mov.id)}
+                          onChange={() => toggleSeleccion(mov.id)}
+                          className="w-4 h-4 accent-red-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="py-3 pl-2 whitespace-nowrap">
                         {formatFecha(mov.fecha)}
                       </td>

@@ -90,7 +90,7 @@ export function parsearExcelGenerico(filas: unknown[][]): MovimientoImportado[] 
   const resultado: MovimientoImportado[] = [];
 
   let headerIdx = -1;
-  for (let i = 0; i < Math.min(filas.length, 10); i++) {
+  for (let i = 0; i < Math.min(filas.length, 50); i++) {
     const fila = filas[i] as unknown[] | undefined;
     if (!fila) continue;
     const vals = fila.map((c) => String(c ?? "").toLowerCase().trim());
