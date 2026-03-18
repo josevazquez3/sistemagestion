@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const tipoNotaIdStr = formData.get("tipoNotaId") as string | null;
     const nombre = (formData.get("nombre") as string)?.trim();
-    const file = formData.get("file") as File | null;
+    const fileRaw = formData.get("file");
 
     if (!tipoNotaIdStr || !nombre) {
       return NextResponse.json(
@@ -80,6 +80,13 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    if (!fileRaw || typeof fileRaw === "string") {
+      return NextResponse.json(
+        { error: "Debe adjuntar un archivo Word (.docx)" },
+        { status: 400 }
+      );
+    }
+    const file = fileRaw as File;
 
     const tipoNotaId = parseInt(tipoNotaIdStr, 10);
     if (isNaN(tipoNotaId)) {

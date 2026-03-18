@@ -60,11 +60,14 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const tipoOficioIdStr = formData.get("tipoOficioId") as string | null;
     const nombre = (formData.get("nombre") as string)?.trim();
-    const file = formData.get("file") as File | null;
-
+    const fileRaw = formData.get("file");
     if (!tipoOficioIdStr || !nombre) {
       return NextResponse.json({ error: "Tipo de oficio y nombre son obligatorios" }, { status: 400 });
     }
+    if (!fileRaw || typeof fileRaw === "string") {
+      return NextResponse.json({ error: "Debe adjuntar un archivo Word (.docx)" }, { status: 400 });
+    }
+    const file = fileRaw as File;
     const tipoOficioId = parseInt(tipoOficioIdStr, 10);
     if (isNaN(tipoOficioId)) {
       return NextResponse.json({ error: "Tipo de oficio inválido" }, { status: 400 });
