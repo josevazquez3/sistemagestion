@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "TESORERO", "SUPER_ADMIN"] as const;
 
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
-}
-
-function parseFechaDDMMYYYY(str: string): Date | null {
-  const trimmed = (str ?? "").trim();
-  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
-  if (!match) return null;
-  const [, d, m, y] = match;
-  const day = parseInt(d!, 10);
-  const month = parseInt(m!, 10) - 1;
-  const year = parseInt(y!, 10);
-  if (month < 0 || month > 11 || day < 1 || day > 31) return null;
-  return new Date(year, month, day, 0, 0, 0, 0);
 }
 
 /** POST - Guardar comisión de certificaciones */
@@ -50,12 +39,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "mes y anio son obligatorios" }, { status: 400 });
   }
 
-  const fechaDesde = body.fechaDesde
-    ? parseFechaDDMMYYYY(body.fechaDesde)
-    : null;
-  const fechaHasta = body.fechaHasta
-    ? parseFechaDDMMYYYY(body.fechaHasta)
-    : null;
+  const fechaDesde = body.fechaDesde ? parsearFechaSegura(body.fechaDesde) : null;
+  const fechaHasta = body.fechaHasta ? parsearFechaSegura(body.fechaHasta) : null;
   if (!fechaDesde || !fechaHasta) {
     return NextResponse.json({ error: "fechaDesde y fechaHasta obligatorios (DD/MM/YYYY)" }, { status: 400 });
   }

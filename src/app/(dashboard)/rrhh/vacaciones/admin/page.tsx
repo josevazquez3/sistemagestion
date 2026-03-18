@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { formatearFecha } from "@/lib/vacaciones.utils";
 import { isSuperAdmin, canManageLegajos } from "@/lib/auth.utils";
+import { emitNovedadesLiquidadoresRefresh } from "@/lib/rrhh-dashboard-events";
 import { Loader2, Settings, Users, Search, FileDown, Trash2, Link2, Unlink, Check } from "lucide-react";
 
 type Legajo = {
@@ -301,6 +302,7 @@ export default function VacacionesAdminPage() {
       if (res.success) {
         setBajaModal(null);
         if (empleadoId) cargarConfigYSolicitudes(empleadoId);
+        emitNovedadesLiquidadoresRefresh();
       } else {
         alert(res.error ?? "Error al dar de baja");
       }
@@ -332,6 +334,7 @@ export default function VacacionesAdminPage() {
       }
       setEliminarFisicoModal(null);
       if (empleadoId) cargarConfigYSolicitudes(empleadoId);
+      emitNovedadesLiquidadoresRefresh();
     } catch (e: unknown) {
       alert((e as Error).message);
     } finally {

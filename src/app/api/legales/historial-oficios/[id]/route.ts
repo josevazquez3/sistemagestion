@@ -6,6 +6,7 @@ import { subirArchivo, eliminarArchivo } from "@/lib/blob";
 import path from "path";
 import { randomBytes } from "crypto";
 import { unlink } from "fs/promises";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
 const PDF_MIME = "application/pdf";
@@ -17,15 +18,6 @@ function canAccess(roles: string[]) {
 function parseId(id: string): number | null {
   const n = parseInt(id, 10);
   return isNaN(n) ? null : n;
-}
-
-function parseFechaArgentina(str: string): Date | null {
-  if (!str) return null;
-  const [d, m, y] = str.split("/").map((x) => parseInt(x, 10));
-  if (!d || !m || !y) return null;
-  const date = new Date(y, m - 1, d);
-  if (isNaN(date.getTime())) return null;
-  return date;
 }
 
 export async function GET(
@@ -67,7 +59,7 @@ export async function PUT(
     const file = formData.get("file") as File | null;
     const data: { titulo?: string; fechaOficio?: Date; nombreArchivo?: string | null; urlArchivo?: string | null } = {};
     if (titulo !== undefined) data.titulo = titulo;
-    const fechaOficio = parseFechaArgentina(fechaOficioStr ?? "");
+    const fechaOficio = parsearFechaSegura(fechaOficioStr ?? "");
     if (fechaOficio) data.fechaOficio = fechaOficio;
     if (quitarArchivo && oficio.urlArchivo) {
       await eliminarArchivo(oficio.urlArchivo);

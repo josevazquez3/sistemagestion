@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FolderUp, Loader2, CheckCircle2, XCircle } from "lucide-react";
-import { formatDateInputWithSlashes } from "@/lib/legislacion.utils";
+import { InputFecha } from "@/components/ui/InputFecha";
 import type { CategoriaLegislacion, SeccionLegislacion } from "./types";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -395,9 +395,9 @@ export function ModalCargaMasiva({
                         </select>
                       </TableCell>
                       <TableCell>
-                        <input
+                        <InputFecha
                           value={r.fechaDocumento}
-                          onChange={(e) => setFechaDocumento(r.name, formatDateInputWithSlashes(e.target.value))}
+                          onChange={(v) => setFechaDocumento(r.name, v)}
                           placeholder="DD/MM/YYYY"
                           className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                         />

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { FileText, FileDown, Plus, Pencil, Trash2, Loader2, Search, CheckCircle, RotateCcw } from "lucide-react";
 import { ModalReunion } from "./ModalReunion";
-import { formatDateInputWithSlashes } from "@/lib/legislacion.utils";
+import { InputFecha } from "@/components/ui/InputFecha";
 import {
   exportarAgendaPDF,
   exportarAgendaDOCX,
@@ -23,6 +23,7 @@ import {
   type ReunionExport,
 } from "@/lib/exportarAgenda";
 import type { Reunion } from "./types";
+import { formatearFechaUTC } from "@/lib/utils/fecha";
 
 const TZ = "America/Argentina/Buenos_Aires";
 const PER_PAGE = 20;
@@ -30,12 +31,7 @@ const API_BASE = "/api/secretaria/agenda";
 
 function formatFecha(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("es-AR", {
-      timeZone: TZ,
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return formatearFechaUTC(new Date(iso));
   } catch {
     return iso.slice(0, 10);
   }
@@ -235,18 +231,16 @@ export function AgendaContent() {
                 className="pl-9"
               />
             </div>
-            <input
-              type="text"
+            <InputFecha
               placeholder="Desde (DD/MM/YYYY)"
               value={desde}
-              onChange={(e) => setDesde(formatDateInputWithSlashes(e.target.value))}
+              onChange={setDesde}
               className="w-36 h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
-            <input
-              type="text"
+            <InputFecha
               placeholder="Hasta (DD/MM/YYYY)"
               value={hasta}
-              onChange={(e) => setHasta(formatDateInputWithSlashes(e.target.value))}
+              onChange={setHasta}
               className="w-36 h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
             <select

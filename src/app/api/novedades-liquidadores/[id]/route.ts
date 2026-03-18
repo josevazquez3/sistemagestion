@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { fechaSeguraParaPrisma } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "RRHH"] as const;
 
@@ -48,8 +49,8 @@ export async function PUT(
     const data: Record<string, unknown> = {};
     if (body.tipo != null) data.tipo = String(body.tipo);
     if (body.codigo != null) data.codigo = Number(body.codigo);
-    if (body.fechaDesde != null) data.fechaDesde = new Date(body.fechaDesde);
-    if (body.fechaHasta != null) data.fechaHasta = new Date(body.fechaHasta);
+    if (body.fechaDesde != null) data.fechaDesde = fechaSeguraParaPrisma(body.fechaDesde);
+    if (body.fechaHasta != null) data.fechaHasta = fechaSeguraParaPrisma(body.fechaHasta);
     if (body.diasTotal != null) data.diasTotal = Number(body.diasTotal);
     if (body.observacion != null) data.observacion = body.observacion?.trim() || null;
     if (body.periodoNombre != null) data.periodoNombre = body.periodoNombre?.trim() || null;

@@ -43,7 +43,19 @@ export async function DELETE(
   }
 
   try {
-    await prisma.solicitudVacaciones.delete({ where: { id } });
+    /** Quitar novedades de vacaciones que cubran el mismo período (evita huérfanos si fechaDesde difiere por TZ). */
+    await prisma.$transaction([
+      prisma.novedadLiquidacion.deleteMany({
+        where: {
+          legajoId: solicitud.legajoId,
+          tipo: "VACACIONES",
+          fechaDesde: { lte: solicitud.fechaHasta },
+          fechaHasta: { gte: solicitud.fechaDesde },
+        },
+      }),
+      prisma.notificacion.deleteMany({ where: { solicitudId: id } }),
+      prisma.solicitudVacaciones.delete({ where: { id } }),
+    ]);
   } catch (e) {
     console.error("[DELETE /api/vacaciones/[id]/fisico]", e);
     return NextResponse.json(

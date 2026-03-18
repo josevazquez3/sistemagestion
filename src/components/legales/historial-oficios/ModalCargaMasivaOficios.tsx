@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { InputFecha } from "@/components/ui/InputFecha";
 import {
   FolderUp,
   Loader2,
@@ -418,10 +419,9 @@ export function ModalCargaMasivaOficios({
                           />
                         </TableCell>
                         <TableCell>
-                          <input
-                            type="text"
+                          <InputFecha
                             value={r.fechaOficio}
-                            onChange={(e) => setFechaOficio(r.name, e.target.value)}
+                            onChange={(v) => setFechaOficio(r.name, v)}
                             placeholder="DD/MM/YYYY"
                             className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                           />

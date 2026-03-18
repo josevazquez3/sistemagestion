@@ -14,6 +14,7 @@ import {
 import { Loader2 } from "lucide-react";
 import type { ModeloOficio } from "./types";
 import type { TipoOficio } from "./types";
+import { esWordModeloPermitido } from "@/lib/legales/modelosOficioWordShared";
 
 type ModalEditarModeloOficioProps = {
   open: boolean;
@@ -113,8 +114,20 @@ export function ModalEditarModeloOficio({
             </label>
             <Input
               type="file"
-              accept=".docx"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                if (!f) {
+                  setFile(null);
+                  return;
+                }
+                if (!esWordModeloPermitido(f.name)) {
+                  showMessage("error", "Solo se permiten archivos .doc o .docx.");
+                  e.target.value = "";
+                  return;
+                }
+                setFile(f);
+              }}
             />
           </div>
         </div>

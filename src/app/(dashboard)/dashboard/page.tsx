@@ -8,6 +8,8 @@ import { DashboardLicenciasWidget } from "@/components/licencias/DashboardLicenc
 import { NovedadesLiquidadoresCard } from "@/components/dashboard/NovedadesLiquidadoresCard";
 import { SecretariaDashboardCard } from "@/components/dashboard/SecretariaDashboardCard";
 
+export const dynamic = "force-dynamic";
+
 const ROLES_ADMIN = ["ADMIN", "RRHH"] as const;
 
 export default async function DashboardPage() {

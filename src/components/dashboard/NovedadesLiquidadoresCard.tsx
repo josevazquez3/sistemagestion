@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClipboardList } from "lucide-react";
+import { NOVEDADES_LIQUIDADORES_REFRESH } from "@/lib/rrhh-dashboard-events";
 
 type Pendiente = {
   legajoId: string;
@@ -16,8 +17,12 @@ export function NovedadesLiquidadoresCard() {
   const [data, setData] = useState<Pendiente[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/novedades-liquidadores/pendientes")
+  const cargarPendientes = useCallback(() => {
+    setLoading(true);
+    fetch("/api/novedades-liquidadores/pendientes", {
+      cache: "no-store",
+      headers: { Pragma: "no-cache" },
+    })
       .then((r) => r.json())
       .then((res) => {
         setData(res.data || []);
@@ -25,6 +30,20 @@ export function NovedadesLiquidadoresCard() {
       .catch(() => setData([]))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    cargarPendientes();
+    const onRefresh = () => cargarPendientes();
+    window.addEventListener(NOVEDADES_LIQUIDADORES_REFRESH, onRefresh);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") cargarPendientes();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener(NOVEDADES_LIQUIDADORES_REFRESH, onRefresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [cargarPendientes]);
 
   const total = data.length;
   const tienePendientes = total > 0;

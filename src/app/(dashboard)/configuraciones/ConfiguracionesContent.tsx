@@ -1,14 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Download, Upload, Trash2 } from "lucide-react";
 import { ModalBackup } from "@/components/configuraciones/ModalBackup";
 import { ModalRestore } from "@/components/configuraciones/ModalRestore";
 import { ModalVaciarBDD } from "@/components/configuraciones/ModalVaciarBDD";
 import { AuditoriaPanel } from "@/components/configuraciones/AuditoriaPanel";
+import { ConciliacionSaldoInicialConfig } from "@/components/configuraciones/ConciliacionSaldoInicialConfig";
 
 export function ConfiguracionesContent() {
+  const { data: session } = useSession();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
+
   const [modalBackup, setModalBackup] = useState(false);
   const [modalRestore, setModalRestore] = useState(false);
   const [modalVaciar, setModalVaciar] = useState(false);
@@ -59,6 +65,8 @@ export function ConfiguracionesContent() {
       <ModalBackup open={modalBackup} onOpenChange={setModalBackup} />
       <ModalRestore open={modalRestore} onOpenChange={setModalRestore} />
       <ModalVaciarBDD open={modalVaciar} onOpenChange={setModalVaciar} />
+
+      {isSuperAdmin && <ConciliacionSaldoInicialConfig />}
 
       <AuditoriaPanel />
     </div>

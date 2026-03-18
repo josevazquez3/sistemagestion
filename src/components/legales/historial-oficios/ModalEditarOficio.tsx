@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { InputFecha } from "@/components/ui/InputFecha";
 import type { OficioRespondido } from "./types";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -146,10 +147,9 @@ export function ModalEditarOficio({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fecha del oficio * (DD/MM/YYYY)
             </label>
-            <input
-              type="text"
+            <InputFecha
               value={fechaOficio}
-              onChange={(e) => setFechaOficio(e.target.value)}
+              onChange={setFechaOficio}
               placeholder="DD/MM/YYYY"
               className="w-full h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
             />

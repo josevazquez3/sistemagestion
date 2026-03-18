@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { fechaSeguraParaPrisma } from "@/lib/utils/fecha";
 import { prisma } from "@/lib/prisma";
 import { calcularDiasVacaciones } from "@/lib/vacaciones.utils";
 import { z } from "zod";
@@ -412,8 +413,8 @@ export async function crearSolicitudVacaciones(
     const solicitud = await prisma.solicitudVacaciones.create({
       data: {
         legajoId: parsed.data.legajoId,
-        fechaDesde: parsed.data.fechaDesde,
-        fechaHasta: parsed.data.fechaHasta,
+        fechaDesde: fechaSeguraParaPrisma(parsed.data.fechaDesde),
+        fechaHasta: fechaSeguraParaPrisma(parsed.data.fechaHasta),
         diasSolicitados,
         diasRestantes,
         estado: EstadoVacaciones.PENDIENTE,
@@ -517,8 +518,8 @@ export async function editarSolicitudVacaciones(
     await prisma.solicitudVacaciones.update({
       where: { id: solicitud.id },
       data: {
-        fechaDesde: parsed.data.fechaDesde,
-        fechaHasta: parsed.data.fechaHasta,
+        fechaDesde: fechaSeguraParaPrisma(parsed.data.fechaDesde),
+        fechaHasta: fechaSeguraParaPrisma(parsed.data.fechaHasta),
         diasSolicitados,
         diasRestantes: nuevosRestantes,
       },

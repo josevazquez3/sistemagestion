@@ -11,18 +11,15 @@ import {
 } from "@/components/ui/table";
 import { Eye, Pencil, Trash2, Download, Printer, Loader2, FileText } from "lucide-react";
 import type { DocumentoOrdenDia } from "./types";
+import { esDocFormatoAntiguo } from "@/lib/legales/modelosOficioWordShared";
+import { formatearFechaUTC } from "@/lib/utils/fecha";
 
 const TZ = "America/Argentina/Buenos_Aires";
 
 function formatFecha(iso: string | null): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString("es-AR", {
-      timeZone: TZ,
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return formatearFechaUTC(new Date(iso));
   } catch {
     return iso.slice(0, 10);
   }
@@ -91,7 +88,9 @@ export function DocumentosOrdenDiaTabla({
               </TableCell>
             </TableRow>
           ) : (
-            documentos.map((doc) => (
+            documentos.map((doc) => {
+              const esDoc = esDocFormatoAntiguo(doc.nombreArchivo);
+              return (
               <TableRow key={doc.id}>
                 <TableCell className="font-medium max-w-[220px] truncate" title={doc.titulo}>
                   {doc.titulo}
@@ -103,10 +102,15 @@ export function DocumentosOrdenDiaTabla({
                   <span className="inline-flex items-center gap-1">
                     {doc.tipoArchivo === "PDF" ? (
                       <span className="text-red-600" title="PDF">PDF</span>
+                    ) : doc.tipoArchivo === "DOC" || esDoc ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-[#E8F5E9] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[#2E7D32]">
+                        <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        DOC
+                      </span>
                     ) : (
                       <span className="text-blue-600 inline-flex items-center gap-1">
                         <FileText className="h-4 w-4 shrink-0" aria-hidden />
-                        {doc.tipoArchivo}
+                        DOCX
                       </span>
                     )}
                   </span>
@@ -117,15 +121,24 @@ export function DocumentosOrdenDiaTabla({
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 shrink-0"
-                      onClick={() => onVer(doc)}
-                      title="Ver"
+                    <span
+                      className="inline-flex"
+                      title={
+                        esDoc
+                          ? "Vista previa no disponible para archivos .doc"
+                          : "Ver documento"
+                      }
                     >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className={`h-8 w-8 p-0 shrink-0 ${esDoc ? "opacity-40 cursor-not-allowed" : ""}`}
+                        disabled={esDoc}
+                        onClick={() => !esDoc && onVer(doc)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </span>
                     {canEdit && (
                       <>
                         <Button
@@ -161,19 +174,29 @@ export function DocumentosOrdenDiaTabla({
                     >
                       <Download className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 shrink-0 text-gray-600 hover:bg-gray-100"
-                      onClick={() => onImprimir(doc)}
-                      title={`Imprimir ${doc.nombreArchivo}`}
+                    <span
+                      className="inline-flex"
+                      title={
+                        esDoc
+                          ? "Impresión no disponible para archivos .doc"
+                          : `Imprimir ${doc.nombreArchivo ?? ""}`
+                      }
                     >
-                      <Printer className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className={`h-8 w-8 p-0 shrink-0 text-gray-600 hover:bg-gray-100 ${esDoc ? "opacity-40 cursor-not-allowed" : ""}`}
+                        disabled={esDoc}
+                        onClick={() => !esDoc && onImprimir(doc)}
+                      >
+                        <Printer className="h-4 w-4" />
+                      </Button>
+                    </span>
                   </div>
                 </TableCell>
               </TableRow>
-            ))
+            );
+            })
           )}
         </TableBody>
       </Table>

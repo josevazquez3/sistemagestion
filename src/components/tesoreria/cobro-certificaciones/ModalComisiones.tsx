@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputFecha } from "@/components/ui/InputFecha";
 import { Label } from "@/components/ui/label";
 import { formatearImporteAR } from "@/lib/parsearExtracto";
 import * as XLSX from "xlsx";
@@ -41,26 +42,6 @@ function parseFechaToDate(str: string): Date | null {
   const year = parseInt(y, 10);
   if (month < 0 || month > 11 || day < 1 || day > 31) return null;
   return new Date(year, month, day, 0, 0, 0, 0);
-}
-
-function handleFechaChange(
-  value: string,
-  setter: (v: string) => void
-) {
-  const soloDigitos = value.replace(/\D/g, "").slice(0, 8);
-  let formateado = soloDigitos;
-  if (soloDigitos.length >= 3) {
-    formateado = soloDigitos.slice(0, 2) + "/" + soloDigitos.slice(2);
-  }
-  if (soloDigitos.length >= 5) {
-    formateado =
-      soloDigitos.slice(0, 2) +
-      "/" +
-      soloDigitos.slice(2, 4) +
-      "/" +
-      soloDigitos.slice(4, 8);
-  }
-  setter(formateado);
 }
 
 export type MovimientoCobroCertificacion = {
@@ -348,20 +329,20 @@ export function ModalComisiones({
             <div className="flex gap-2 items-center flex-wrap">
               <div>
                 <span className="text-xs text-gray-500 block">Desde</span>
-                <Input
+                <InputFecha
                   placeholder="DD/MM/YYYY"
                   value={desde}
-                  onChange={(e) => handleFechaChange(e.target.value, setDesde)}
-                  className="w-32"
+                  onChange={setDesde}
+                  className="w-32 flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 />
               </div>
               <div>
                 <span className="text-xs text-gray-500 block">Hasta</span>
-                <Input
+                <InputFecha
                   placeholder="DD/MM/YYYY"
                   value={hasta}
-                  onChange={(e) => handleFechaChange(e.target.value, setHasta)}
-                  className="w-32"
+                  onChange={setHasta}
+                  className="w-32 flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 />
               </div>
             </div>

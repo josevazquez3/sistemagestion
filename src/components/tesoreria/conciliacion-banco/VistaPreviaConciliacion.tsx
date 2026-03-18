@@ -149,6 +149,9 @@ export function VistaPreviaConciliacion({
                 Fecha
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+                Cód. op.
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
                 Concepto
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
@@ -166,7 +169,7 @@ export function VistaPreviaConciliacion({
           <tbody className="divide-y divide-gray-100">
             <tr className="bg-blue-50">
               <td />
-              <td colSpan={3} className="px-4 py-2.5 text-sm font-semibold text-blue-700">
+              <td colSpan={4} className="px-4 py-2.5 text-sm font-semibold text-blue-700">
                 Saldo Anterior
               </td>
               <td className="px-4 py-2.5 text-right font-semibold text-blue-700">
@@ -197,7 +200,12 @@ export function VistaPreviaConciliacion({
                   <td className="whitespace-nowrap px-4 py-2.5 text-xs text-gray-500">
                     {new Date(fila.fecha).toLocaleDateString("es-AR")}
                   </td>
-                  <td className="max-w-xs truncate px-4 py-2.5 text-gray-700">{fila.concepto}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-gray-600">
+                    {fila.codOperativo}
+                  </td>
+                  <td className="max-w-xs truncate px-4 py-2.5 text-gray-700">
+                    {fila.concepto === "—" || !fila.concepto ? "—" : fila.concepto}
+                  </td>
                   <td className="px-4 py-2.5">
                     <span
                       className={`rounded-full border px-2 py-0.5 text-xs ${
@@ -208,7 +216,9 @@ export function VistaPreviaConciliacion({
                             : "border-amber-200 bg-amber-50 text-amber-700"
                       }`}
                     >
-                      {fila.cuentaCodigo} – {fila.cuentaNombre}
+                      {fila.cuentaNombre
+                        ? `${fila.cuentaCodigo} – ${fila.cuentaNombre}`
+                        : fila.cuentaCodigo}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right font-medium text-emerald-600">

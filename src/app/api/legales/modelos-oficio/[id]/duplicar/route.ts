@@ -3,6 +3,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { subirArchivo } from "@/lib/blob";
+import {
+  extensionWordModelo,
+  MIME_WORD_DOC,
+  MIME_WORD_DOCX,
+} from "@/lib/legales/modelosOficioArchivo";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
 
@@ -65,7 +70,9 @@ export async function POST(
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_+/g, "_")
     .toLowerCase();
-  const nombreArchivo = `${safeBase}_copia_${Date.now()}.docx`;
+  const ext = extensionWordModelo(origen.nombreArchivo);
+  const nombreArchivo = `${safeBase}_copia_${Date.now()}${ext}`;
+  const mime = ext === ".doc" ? MIME_WORD_DOC : MIME_WORD_DOCX;
 
   const arrayBuffer = buffer.buffer.slice(
     buffer.byteOffset,
@@ -73,12 +80,7 @@ export async function POST(
   ) as ArrayBuffer;
   const bytes = new Uint8Array(arrayBuffer);
 
-  const urlArchivo = await subirArchivo(
-    "modelos-oficios",
-    nombreArchivo,
-    buffer,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  );
+  const urlArchivo = await subirArchivo("modelos-oficios", nombreArchivo, buffer, mime);
 
   const tipoOficioId =
     body.tipoOficioId !== undefined
@@ -91,7 +93,7 @@ export async function POST(
     data: {
       nombre,
       tipoOficioId,
-      nombreArchivo: origen.nombreArchivo,
+      nombreArchivo,
       urlArchivo,
       contenido: bytes,
       modeloOrigenId: origen.id,

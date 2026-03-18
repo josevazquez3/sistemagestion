@@ -1,11 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Decimal } from "@prisma/client/runtime/library";
+import type { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolverSaldoAnteriorPeriodo } from "@/lib/tesoreria/configuracionTesoreria";
+
+type MovimientoConciliacion = Prisma.MovimientoExtractoGetPayload<{
+  include: {
+    cuenta: { select: { codigo: true; codOperativo: true; nombre: true } };
+  };
+}>;
 
 const ROLES = ["ADMIN", "TESORERO", "SUPER_ADMIN"] as const;
 
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
+}
+
+/** Concepto para UI: nunca mostrar el nº de cuenta / cód. op. como si fuera descripción. */
+function conceptoMovimientoParaUI(
+  concepto: string,
+  codOpMov: string | null | undefined,
+  cuentaCodigoAsignada: string,
+  referencia: string | null | undefined
+): string {
+  const c = (concepto ?? "").trim();
+  const op = (codOpMov ?? "").trim();
+  const cc = (cuentaCodigoAsignada ?? "").trim();
+  const ref = (referencia ?? "").trim();
+  if (!c) return ref || "—";
+  if (c === cc || c === op) return ref || "—";
+  return c;
+}
+
+/** Cód. operativo real (distinto del código de cuenta) o "—". */
+function codOperativoParaMostrar(
+  movCodOp: string | null | undefined,
+  cuenta: { codigo: string; codOperativo: string | null } | null | undefined
+): string {
+  const cod = (cuenta?.codigo ?? "").trim();
+  const cOpCuenta = (cuenta?.codOperativo ?? "")
+    .replace(/[/|\r\n]+/g, " ")
+    .trim();
+  const tokens = cOpCuenta.split(/\s+/).filter(Boolean);
+  const distinto = tokens.find((t) => t !== cod);
+  if (distinto) return distinto;
+  const m = (movCodOp ?? "").trim();
+  if (m && m !== cod) return m;
+  return "—";
+}
+
+function nombreCuentaParaMostrar(
+  cuentaCodigo: string,
+  nombreAsignacion: string,
+  nombreCuentaDb: string | null | undefined
+): string {
+  const cc = cuentaCodigo.trim();
+  const na = (nombreAsignacion ?? "").trim();
+  const nd = (nombreCuentaDb ?? "").trim();
+  const candidato =
+    na && na !== cc && !/^\d{3,8}$/.test(na) ? na : nd && nd !== cc ? nd : na || nd;
+  if (!candidato || candidato === cc || /^Cuenta\s+\d+$/i.test(candidato))
+    return "—";
+  return candidato;
 }
 
 export async function GET(req: NextRequest) {
@@ -28,23 +85,24 @@ export async function GET(req: NextRequest) {
     include: { asignaciones: { orderBy: { orden: "asc" } } },
   });
 
+  const mesAnteriorRef = mes === 1 ? 12 : mes - 1;
+  const anioAnteriorRef = mes === 1 ? anio - 1 : anio;
+
+  const ctxSaldo = await resolverSaldoAnteriorPeriodo(mes, anio);
+
   if (!conciliacion) {
-    const mesAnterior = mes === 1 ? 12 : mes - 1;
-    const anioAnterior = mes === 1 ? anio - 1 : anio;
-
-    const anterior = await prisma.conciliacionBanco.findUnique({
-      where: { mes_anio: { mes: mesAnterior, anio: anioAnterior } },
-    });
-
     conciliacion = await prisma.conciliacionBanco.create({
       data: {
         mes,
         anio,
-        saldoAnterior: anterior?.totalConciliado ?? 0,
+        saldoAnterior: ctxSaldo.saldoAnterior,
       },
       include: { asignaciones: { orderBy: { orden: "asc" } } },
     });
   }
+
+  /** Saldo de apertura del mes: el guardado en BD (modal / creación), no se pisa con el automático en cada GET. */
+  const saldoAnteriorCalculado = Number(conciliacion.saldoAnterior);
 
   const fechaInicio = new Date(anio, mes - 1, 1);
   const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
@@ -128,7 +186,7 @@ export async function GET(req: NextRequest) {
     idsExcluidos = [];
   }
 
-  let movimientos: Awaited<ReturnType<typeof prisma.movimientoExtracto.findMany>> = [];
+  let movimientos: MovimientoConciliacion[] = [];
 
   if (todosLosCodigos.length > 0) {
     movimientos = await prisma.movimientoExtracto.findMany({
@@ -138,6 +196,9 @@ export async function GET(req: NextRequest) {
         ...(idsExcluidos.length > 0 ? { id: { notIn: idsExcluidos } } : {}),
       },
       orderBy: [{ fecha: "asc" }, { id: "asc" }],
+      include: {
+        cuenta: { select: { codigo: true, codOperativo: true, nombre: true } },
+      },
     });
   }
 
@@ -157,13 +218,14 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const saldoAnterior = Number(conciliacion.saldoAnterior);
+  const saldoAnterior = saldoAnteriorCalculado;
   const subtotal = totalIngresos + saldoAnterior;
   const totalConciliado = subtotal - totalSalidas - totalGastos;
 
   await prisma.conciliacionBanco.update({
     where: { id: conciliacion.id },
     data: {
+      saldoAnterior,
       totalIngresos,
       totalSalidas,
       totalGastos,
@@ -191,15 +253,26 @@ export async function GET(req: NextRequest) {
       subtotal,
       totalConciliado,
     },
+    esUsandoSaldoInicial: ctxSaldo.esUsandoSaldoInicial,
+    saldoInicialConfigurado: ctxSaldo.saldoInicialConfigurado,
+    faltaConfigurarSaldoInicial: ctxSaldo.faltaConfigurarSaldoInicial,
+    hayConciliacionMesPrevio: ctxSaldo.hayConciliacionMesPrevio,
     movimientos: movimientos.map((m) => {
       const op = (m.codOperativo ?? "").trim();
       const meta = tokenToAsignacion.get(op);
+      const cuentaCodigo = meta?.cuentaCodigo ?? op;
+      const cuentaNombre = nombreCuentaParaMostrar(
+        cuentaCodigo,
+        meta?.cuentaNombre ?? "",
+        m.cuenta?.nombre
+      );
       return {
         id: m.id,
         fecha: m.fecha.toISOString(),
-        concepto: m.concepto,
-        cuentaCodigo: meta?.cuentaCodigo ?? op,
-        cuentaNombre: meta?.cuentaNombre ?? "",
+        concepto: conceptoMovimientoParaUI(m.concepto, m.codOperativo, cuentaCodigo, m.referencia),
+        codOperativo: codOperativoParaMostrar(m.codOperativo, m.cuenta),
+        cuentaCodigo,
+        cuentaNombre,
         tipo: (meta?.tipo ?? "INGRESO") as string,
         monto: Number(m.importePesos),
       };
@@ -217,6 +290,7 @@ export async function POST(req: NextRequest) {
   let body: {
     mes: number;
     anio: number;
+    saldoAnterior?: number;
     asignaciones: Array<{
       cuentaCodigo: string;
       codOperativo?: string | null;
@@ -231,7 +305,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
   }
 
-  const { mes, anio, asignaciones } = body;
+  const { mes, anio, asignaciones, saldoAnterior: saldoBody } = body;
   if (
     typeof mes !== "number" ||
     typeof anio !== "number" ||
@@ -244,16 +318,12 @@ export async function POST(req: NextRequest) {
     where: { mes_anio: { mes, anio } },
   });
   if (!conciliacion) {
-    const mesAnt = mes === 1 ? 12 : mes - 1;
-    const anioAnt = mes === 1 ? anio - 1 : anio;
-    const anterior = await prisma.conciliacionBanco.findUnique({
-      where: { mes_anio: { mes: mesAnt, anio: anioAnt } },
-    });
+    const ctx = await resolverSaldoAnteriorPeriodo(mes, anio);
     conciliacion = await prisma.conciliacionBanco.create({
       data: {
         mes,
         anio,
-        saldoAnterior: anterior?.totalConciliado ?? 0,
+        saldoAnterior: ctx.saldoAnterior,
       },
     });
   }
@@ -279,6 +349,19 @@ export async function POST(req: NextRequest) {
           orden: Number(a.orden) || 0,
         };
       }),
+    });
+  }
+
+  if (
+    typeof saldoBody === "number" &&
+    Number.isFinite(saldoBody) &&
+    saldoBody >= 0
+  ) {
+    await prisma.conciliacionBanco.update({
+      where: { id: conciliacion.id },
+      data: {
+        saldoAnterior: new Decimal(Math.round(saldoBody * 100) / 100),
+      },
     });
   }
 

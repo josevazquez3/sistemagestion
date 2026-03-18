@@ -6,6 +6,7 @@ import { subirArchivo } from "@/lib/blob";
 import { randomBytes } from "crypto";
 import { SeccionLegislacion } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES_WRITE = ["ADMIN", "SECRETARIA", "SUPER_ADMIN"] as const;
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
@@ -26,15 +27,6 @@ function canWrite(roles: unknown): boolean {
   const list = Array.isArray(roles) ? roles : [];
   const names = list.map(normalizeRole).filter(Boolean) as string[];
   return ROLES_WRITE.some((r) => names.includes(r));
-}
-
-function parseFechaArgentina(str: string): Date | null {
-  if (!str) return null;
-  const [d, m, y] = str.split("/").map((x) => parseInt(x, 10));
-  if (!d || !m || !y) return null;
-  const date = new Date(y, m - 1, d);
-  if (isNaN(date.getTime())) return null;
-  return date;
 }
 
 function validarSeccion(s: string): s is SeccionLegislacion {
@@ -75,11 +67,11 @@ export async function GET(req: NextRequest) {
 
   const fechaDoc: { gte?: Date; lte?: Date } = {};
   if (desde) {
-    const d = parseFechaArgentina(desde);
+    const d = parsearFechaSegura(desde);
     if (d) fechaDoc.gte = d;
   }
   if (hasta) {
-    const h = parseFechaArgentina(hasta);
+    const h = parsearFechaSegura(hasta);
     if (h) {
       const endOfDay = new Date(h);
       endOfDay.setHours(23, 59, 59, 999);
@@ -189,7 +181,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Categoría inválida" }, { status: 400 });
     }
 
-    const fechaDocumento = parseFechaArgentina(fechaDocumentoStr ?? "") ?? null;
+    const fechaDocumento = parsearFechaSegura(fechaDocumentoStr ?? "") ?? null;
 
     const ext = isPdf ? "pdf" : "docx";
     const timestamp = Date.now();

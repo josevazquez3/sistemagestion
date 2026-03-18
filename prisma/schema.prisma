@@ -596,6 +596,17 @@ model ExtractoBancoConfig {
   @@map("extracto_banco_config")
 }
 
+/** Fila única (findFirst): saldo de arranque de conciliación bancaria */
+model ConfiguracionTesoreria {
+  id                              Int      @id @default(autoincrement())
+  saldoInicialConciliacion        Decimal  @default(0) @db.Decimal(15, 2)
+  saldoInicialConciliacionCargado Boolean  @default(false)
+  creadoEn                        DateTime @default(now())
+  actualizadoEn                   DateTime @updatedAt
+
+  @@map("configuracion_tesoreria")
+}
+
 model ConciliacionBanco {
   id              Int                      @id @default(autoincrement())
   mes             Int

@@ -15,7 +15,7 @@ export default async function ModelosNotasPage() {
     <div className="max-w-6xl mx-auto">
       <h1 className="text-2xl font-semibold text-gray-800">Modelos de Notas</h1>
       <p className="text-gray-500 mt-1">
-        Gestioná tipos de nota y modelos de documentos .docx para Secretaría.
+        Gestioná tipos de nota y modelos Word (.doc y .docx) para Secretaría.
       </p>
       <ModelosNotasContent />
     </div>

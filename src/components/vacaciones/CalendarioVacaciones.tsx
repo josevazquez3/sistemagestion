@@ -4,6 +4,7 @@ import { useCallback, useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { cn } from "@/lib/utils";
+import { InputFecha } from "@/components/ui/InputFecha";
 import { EstadoVacaciones } from "@prisma/client";
 import { normalizarFecha } from "@/lib/vacaciones.utils";
 
@@ -71,11 +72,11 @@ interface CalendarioVacacionesProps {
   locale?: string;
 }
 
-/** Normaliza una fecha a YYYY-MM-DD para comparación sin hora */
+/** YYYY-MM-DD del día calendario en UTC (coherente con fechas persistidas) */
 function toDateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
@@ -249,12 +250,10 @@ export function CalendarioVacaciones({
           <label className="block text-sm font-medium text-gray-600 mb-1">
             Desde
           </label>
-          <input
-            type="text"
+          <InputFecha
             placeholder="DD/MM/YYYY"
             value={inputDesde}
-            onChange={(e) => handleCambioDesde(e.target.value)}
-            maxLength={10}
+            onChange={(v) => handleCambioDesde(v)}
             disabled={disabled}
             className="h-9 w-[10.5rem] rounded-md border border-input bg-background px-3 text-sm"
           />
@@ -263,12 +262,10 @@ export function CalendarioVacaciones({
           <label className="block text-sm font-medium text-gray-600 mb-1">
             Hasta
           </label>
-          <input
-            type="text"
+          <InputFecha
             placeholder="DD/MM/YYYY"
             value={inputHasta}
-            onChange={(e) => handleCambioHasta(e.target.value)}
-            maxLength={10}
+            onChange={(v) => handleCambioHasta(v)}
             disabled={disabled}
             className="h-9 w-[10.5rem] rounded-md border border-input bg-background px-3 text-sm"
           />

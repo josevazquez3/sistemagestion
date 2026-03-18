@@ -19,12 +19,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { InputFecha } from "@/components/ui/InputFecha";
 import {
   FolderUp,
   Loader2,
   CheckCircle2,
   XCircle,
 } from "lucide-react";
+import { esWordModeloPermitido, quitarExtensionWord } from "@/lib/legales/modelosOficioWordShared";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_FILES = 50;
@@ -55,7 +57,7 @@ function formatSize(bytes: number): string {
 }
 
 function nombreSinExtension(name: string): string {
-  return name.replace(/\.docx$/i, "") || name;
+  return quitarExtensionWord(name);
 }
 
 type ModalCargaMasivaActasProps = {
@@ -127,9 +129,9 @@ export function ModalCargaMasivaActas({
       currentNames.add(nameLower);
       let status: "pendiente" | "invalido" = "pendiente";
       let error: string | undefined;
-      if (!nameLower.endsWith(".docx")) {
+      if (!esWordModeloPermitido(name)) {
         status = "invalido";
-        error = "Formato no permitido";
+        error = "Solo .doc o .docx";
       } else if (file.size > MAX_FILE_SIZE) {
         status = "invalido";
         error = "Supera 10 MB";
@@ -286,13 +288,13 @@ export function ModalCargaMasivaActas({
                 <input
                   id="carga-masiva-actas-input"
                   type="file"
-                  accept=".docx"
+                  accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   multiple
                   className="hidden"
                   onChange={(e) => addFiles(e.target.files)}
                 />
                 <p className="text-gray-600">
-                  Arrastrá los archivos .docx o hacé clic para seleccionar
+                  Archivos Word .doc o .docx — arrastrá o hacé clic para seleccionar
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
                   Máximo {MAX_FILES} archivos, 10 MB cada uno
@@ -416,10 +418,9 @@ export function ModalCargaMasivaActas({
                           />
                         </TableCell>
                         <TableCell>
-                          <input
-                            type="text"
+                          <InputFecha
                             value={r.fechaActa}
-                            onChange={(e) => setFechaActa(r.name, e.target.value)}
+                            onChange={(v) => setFechaActa(r.name, v)}
                             placeholder="DD/MM/YYYY"
                             className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                           />

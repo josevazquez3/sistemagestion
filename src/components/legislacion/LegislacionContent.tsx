@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputFecha } from "@/components/ui/InputFecha";
 import { FilePlus, FolderUp, Search } from "lucide-react";
 import { CategoriasPanel } from "./CategoriasPanel";
 import { DocumentosTabla } from "./DocumentosTabla";
@@ -215,18 +216,16 @@ export function LegislacionContent({ seccion, canEdit }: LegislacionContentProps
               <option value="PDF">PDF</option>
               <option value="DOCX">DOCX</option>
             </select>
-            <input
-              type="text"
+            <InputFecha
               placeholder="Desde (DD/MM/YYYY)"
               value={desde}
-              onChange={(e) => setDesde(e.target.value)}
+              onChange={setDesde}
               className="w-36 h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
-            <input
-              type="text"
+            <InputFecha
               placeholder="Hasta (DD/MM/YYYY)"
               value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
+              onChange={setHasta}
               className="w-36 h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
           </div>

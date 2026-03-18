@@ -11,7 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { formatDateInputWithSlashes } from "@/lib/legislacion.utils";
+import { InputFecha } from "@/components/ui/InputFecha";
 import type { CategoriaLegislacion, DocumentoLegislacion, SeccionLegislacion } from "./types";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -167,10 +167,9 @@ export function ModalEditarDocumento({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha del documento (DD/MM/YYYY)</label>
-            <input
-              type="text"
+            <InputFecha
               value={fechaDocumento}
-              onChange={(e) => setFechaDocumento(formatDateInputWithSlashes(e.target.value))}
+              onChange={setFechaDocumento}
               placeholder="DD/MM/YYYY"
               className="w-full h-9 rounded-md border border-gray-300 px-3 text-sm"
             />

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { subirArchivo } from "@/lib/blob";
 import { extraerHtmlDeDocx } from "@/lib/docx/extractorContenido";
 import { generarDocxDesdeHtml } from "@/lib/docx/generadorDocx";
+import { esWordDocBinario } from "@/lib/legales/modelosOficioArchivo";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
 
@@ -53,10 +54,23 @@ export async function GET(
     buffer = Buffer.from(await res.arrayBuffer());
   }
 
+  if (esWordDocBinario(modelo.nombreArchivo)) {
+    return NextResponse.json({
+      html: "",
+      previewNoDisponible: true,
+      mensajePreview:
+        "Vista previa no disponible para archivos .doc (formato antiguo). Descargá el archivo para editarlo en Word.",
+      nombre: modelo.nombre,
+      tipoOficio: modelo.tipoOficio.nombre,
+      tipoOficioId: modelo.tipoOficioId,
+    });
+  }
+
   const html = await extraerHtmlDeDocx(buffer);
 
   return NextResponse.json({
     html,
+    previewNoDisponible: false,
     nombre: modelo.nombre,
     tipoOficio: modelo.tipoOficio.nombre,
     tipoOficioId: modelo.tipoOficioId,
@@ -97,6 +111,15 @@ export async function PUT(
   const modelo = await prisma.modeloOficio.findUnique({ where: { id } });
   if (!modelo) {
     return NextResponse.json({ error: "Modelo no encontrado" }, { status: 404 });
+  }
+  if (esWordDocBinario(modelo.nombreArchivo)) {
+    return NextResponse.json(
+      {
+        error:
+          "No se puede guardar contenido desde el editor web sobre un .doc. Subí una versión .docx o reemplazá el archivo por uno .docx.",
+      },
+      { status: 400 }
+    );
   }
 
   const nombreFinal = (body.nombre || modelo.nombre).trim();

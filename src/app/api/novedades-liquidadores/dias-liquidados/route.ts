@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  primerDiaMesNoonUTC,
+  ultimoDiaMesNoonUTC,
+  formatearFechaUTC,
+} from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "RRHH"] as const;
 
@@ -9,11 +14,7 @@ function canAccess(roles: string[]) {
 }
 
 function formatFecha(d: Date): string {
-  return d.toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatearFechaUTC(d);
 }
 
 /** GET - Empleados con vacaciones APROBADAS en el período, agrupados por legajo con total de días */
@@ -32,12 +33,14 @@ export async function GET(request: NextRequest) {
 
   if (periodo && /^\d{4}-\d{2}$/.test(periodo)) {
     const [año, mes] = periodo.split("-").map(Number);
-    inicioMes = new Date(año, mes - 1, 1);
-    finMes = new Date(año, mes, 0, 23, 59, 59);
+    inicioMes = primerDiaMesNoonUTC(año, mes);
+    finMes = ultimoDiaMesNoonUTC(año, mes);
   } else {
     const hoy = new Date();
-    inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
+    const y = hoy.getUTCFullYear();
+    const m = hoy.getUTCMonth() + 1;
+    inicioMes = primerDiaMesNoonUTC(y, m);
+    finMes = ultimoDiaMesNoonUTC(y, m);
   }
 
   const solicitudes = await prisma.solicitudVacaciones.findMany({

@@ -3,6 +3,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { subirArchivo } from "@/lib/blob";
+import {
+  extensionWordModelo,
+  MIME_WORD_DOC,
+  MIME_WORD_DOCX,
+} from "@/lib/legales/modelosOficioArchivo";
 
 const ROLES = ["ADMIN", "SECRETARIA"] as const;
 
@@ -92,7 +97,7 @@ export async function POST(
   const dataBase = {
     nombre,
     tipoNotaId,
-    nombreArchivo: origen.nombreArchivo,
+    nombreArchivo,
     urlArchivo,
     contenido: bytes,
   };

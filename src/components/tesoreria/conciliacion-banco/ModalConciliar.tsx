@@ -3,16 +3,47 @@
 import { useState, useEffect } from "react";
 import { X, Save, ChevronDown, ChevronUp } from "lucide-react";
 import type { CuentaOperativa, AsignacionCuenta, TipoCuenta } from "@/types/conciliacion";
+import { parsearImporteAR } from "@/lib/parsearExtracto";
 
 interface Props {
   mes: number;
   anio: number;
+  saldoAnterior: number;
+  mesAnteriorLabel: string;
+  /** TESORERO / ADMIN / SUPER_ADMIN pueden editar el saldo de apertura */
+  puedeEditarSaldo: boolean;
   cuentasDisponibles: CuentaOperativa[];
   asignacionesIniciales: AsignacionCuenta[];
   onClose: () => void;
   onGuardado: () => void;
   showMessage: (tipo: "ok" | "error", text: string) => void;
 }
+
+function formatoSaldoARInput(n: number) {
+  return new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+function normalizarTextoSaldoInput(raw: string): string {
+  const t = raw.replace(/\$/g, "").replace(/\s/g, "");
+  const ci = t.indexOf(",");
+  const izq = (ci >= 0 ? t.slice(0, ci) : t).replace(/\./g, "").replace(/\D/g, "");
+  const der =
+    ci >= 0 ? t.slice(ci + 1).replace(/\D/g, "").slice(0, 2) : "";
+  if (ci >= 0) {
+    return der.length > 0 ? `${izq},${der}` : `${izq},`;
+  }
+  return izq;
+}
+
+const fmtSaldo = (n: number) =>
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: 2,
+  }).format(n);
 
 type SeccionTipo = TipoCuenta;
 
@@ -69,6 +100,32 @@ const MESES_LABEL = [
   "Diciembre",
 ];
 
+/** Código que aparece en el extracto (p. ej. 0824) — primer token distinto del código de cuenta */
+function codigoExtractoVisible(cuenta: CuentaOperativa): string {
+  const codCuenta = (cuenta.codigo || cuenta.cuentaCodigo || "").trim();
+  const raw = (cuenta.codOperativo ?? "")
+    .replace(/[/|\r\n]+/g, " ")
+    .trim();
+  const tokens = raw.split(/\s+/).filter(Boolean);
+  const distinto = tokens.find((t) => t !== codCuenta);
+  if (distinto) return distinto;
+  if (tokens.length > 0) return tokens[0]!;
+  return codCuenta || "—";
+}
+
+/** Código de cuenta institucional (05, 021, 01) */
+function codigoCuentaVisible(cuenta: CuentaOperativa): string {
+  return (cuenta.codigo || cuenta.cuentaCodigo || "—").trim() || "—";
+}
+
+function nombreCuentaVisible(cuenta: CuentaOperativa): string {
+  const codCuenta = (cuenta.codigo || cuenta.cuentaCodigo || "").trim();
+  const n = (cuenta.nombre ?? "").trim();
+  if (!n) return "Sin nombre";
+  if (n === codCuenta) return "Sin nombre";
+  return n;
+}
+
 function CuentaRow({
   cuenta,
   tipo,
@@ -84,9 +141,9 @@ function CuentaRow({
   st: ReturnType<typeof sectionClasses>;
   onToggle: () => void;
 }) {
-  const codCol = (cuenta.codigo || cuenta.cuentaCodigo || "—").trim() || "—";
-  const codOp = (cuenta.codOperativo ?? "").trim();
-  const mostrarOp = codOp && codOp !== codCol;
+  const codExtr = codigoExtractoVisible(cuenta);
+  const codCuenta = codigoCuentaVisible(cuenta);
+  const nombreVis = nombreCuentaVisible(cuenta);
 
   return (
     <label
@@ -109,18 +166,21 @@ function CuentaRow({
             tipo === "INGRESO" ? "#059669" : tipo === "SALIDA" ? "#dc2626" : "#d97706",
         }}
       />
-      <span className="w-10 flex-shrink-0 text-right font-mono text-xs font-semibold text-gray-700">
-        {codCol}
+      <span
+        className="w-12 flex-shrink-0 text-right font-mono text-xs font-semibold text-gray-700"
+        title="Código en extracto"
+      >
+        {codExtr}
       </span>
       <span className="flex-shrink-0 select-none text-gray-200">│</span>
       <span
-        className="w-32 flex-shrink-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs text-gray-500"
-        title={mostrarOp ? codOp : undefined}
+        className="w-10 flex-shrink-0 text-right font-mono text-xs font-semibold text-gray-600"
+        title="Código de cuenta"
       >
-        {mostrarOp ? codOp : "—"}
+        {codCuenta}
       </span>
-      <span className="min-w-0 flex-1 truncate text-sm text-gray-700" title={cuenta.nombre}>
-        {cuenta.nombre}
+      <span className="min-w-0 flex-1 truncate text-sm text-gray-700" title={nombreVis}>
+        {nombreVis}
       </span>
     </label>
   );
@@ -129,12 +189,20 @@ function CuentaRow({
 export function ModalConciliar({
   mes,
   anio,
+  saldoAnterior,
+  mesAnteriorLabel,
+  puedeEditarSaldo,
   cuentasDisponibles,
   asignacionesIniciales,
   onClose,
   onGuardado,
   showMessage,
 }: Props) {
+  const [saldoStr, setSaldoStr] = useState(() => formatoSaldoARInput(saldoAnterior));
+  useEffect(() => {
+    setSaldoStr(formatoSaldoARInput(saldoAnterior));
+  }, [saldoAnterior, mes, anio]);
+
   const [seleccionadas, setSeleccionadas] = useState<Record<SeccionTipo, Set<string>>>(() => ({
     INGRESO: new Set(
       asignacionesIniciales.filter((a) => a.tipo === "INGRESO").map((a) => a.cuentaCodigo)
@@ -284,6 +352,37 @@ export function ModalConciliar({
               Asigná cada cuenta a su categoría. Las cuentas asignadas no aparecen en otras
               categorías.
             </p>
+            <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm">
+              <label className="block text-xs font-semibold text-blue-900">
+                Saldo anterior ({mesAnteriorLabel})
+              </label>
+              {puedeEditarSaldo ? (
+                <>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={saldoStr}
+                    onChange={(e) => setSaldoStr(normalizarTextoSaldoInput(e.target.value))}
+                    onBlur={() => {
+                      const n = Math.max(
+                        0,
+                        parsearImporteAR(saldoStr.replace(/\$/g, "").trim() || "0")
+                      );
+                      setSaldoStr(formatoSaldoARInput(n));
+                    }}
+                    placeholder="0,00"
+                    className="mt-1 w-full max-w-[220px] rounded-md border border-blue-200 bg-white px-2 py-1.5 font-mono text-sm tabular-nums text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Podés modificar este valor si difiere del saldo real del banco. Se guarda al
+                    pulsar <strong>Conciliar</strong>.
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 font-semibold tabular-nums text-blue-800">{fmtSaldo(saldoAnterior)}</p>
+              )}
+            </div>
           </div>
           <button
             type="button"
@@ -339,12 +438,12 @@ export function ModalConciliar({
                         {(disponibles.length > 0 || seleccionadas[tipo].size > 0) && (
                           <div className="mb-1 flex items-center gap-3 border-b border-gray-100 px-3 py-1.5">
                             <span className="w-4 flex-shrink-0" />
-                            <span className="w-10 flex-shrink-0 text-right text-xs font-semibold text-gray-400">
-                              Cód.
+                            <span className="w-12 flex-shrink-0 text-right text-xs font-semibold text-gray-400">
+                              Extr.
                             </span>
                             <span className="flex-shrink-0 text-gray-100">│</span>
-                            <span className="w-32 flex-shrink-0 text-xs font-semibold text-gray-400">
-                              Cód. Op.
+                            <span className="w-10 flex-shrink-0 text-right text-xs font-semibold text-gray-400">
+                              Cta.
                             </span>
                             <span className="flex-1 text-xs font-semibold text-gray-400">
                               Nombre de la cuenta

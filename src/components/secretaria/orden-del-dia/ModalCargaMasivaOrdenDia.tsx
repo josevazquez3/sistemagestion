@@ -20,8 +20,9 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FolderUp, Loader2, CheckCircle2, XCircle } from "lucide-react";
-import { formatDateInputWithSlashes } from "@/lib/legislacion.utils";
+import { InputFecha } from "@/components/ui/InputFecha";
 import type { CategoriaOrdenDia } from "./types";
+import { quitarExtensionWord } from "@/lib/legales/modelosOficioWordShared";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_FILES = 50;
@@ -51,8 +52,11 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function nombreSinExtension(name: string): string {
-  return name.replace(/\.(pdf|docx)$/i, "") || name;
+function tituloSugeridoDesdeArchivo(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf")) return name.replace(/\.pdf$/i, "") || name;
+  if (lower.endsWith(".doc") || lower.endsWith(".docx")) return quitarExtensionWord(name);
+  return name;
 }
 
 type ModalCargaMasivaOrdenDiaProps = {
@@ -121,12 +125,14 @@ export function ModalCargaMasivaOrdenDia({
       if (currentNames.has(nameLower) || next.some((n) => n.name.toLowerCase() === nameLower)) continue;
       currentNames.add(nameLower);
       const isPdf = nameLower.endsWith(".pdf");
+      const isDoc = nameLower.endsWith(".doc") && !nameLower.endsWith(".docx");
       const isDocx = nameLower.endsWith(".docx");
       let status: "pendiente" | "invalido" = "pendiente";
       let error: string | undefined;
       let tipo = "";
       if (isPdf) tipo = "PDF";
       else if (isDocx) tipo = "DOCX";
+      else if (isDoc) tipo = "DOC";
       else {
         status = "invalido";
         error = "Formato no permitido";
@@ -167,7 +173,7 @@ export function ModalCargaMasivaOrdenDia({
       .map((f) => ({
         name: f.name,
         file: f.file,
-        titulo: nombreSinExtension(f.name),
+        titulo: tituloSugeridoDesdeArchivo(f.name),
         categoriaId: "",
         fechaDocumento: "",
       }));
@@ -270,12 +276,12 @@ export function ModalCargaMasivaOrdenDia({
                 <input
                   id="carga-masiva-od-input"
                   type="file"
-                  accept=".pdf,.docx"
+                  accept=".pdf,.doc,.docx"
                   multiple
                   className="hidden"
                   onChange={(e) => addFiles(e.target.files)}
                 />
-                <p className="text-gray-600">Arrastrá PDF o DOCX o hacé clic. Máx. {MAX_FILES} archivos, 20 MB c/u.</p>
+                <p className="text-gray-600">Arrastrá PDF, DOC o DOCX o hacé clic. Máx. {MAX_FILES} archivos, 20 MB c/u.</p>
               </div>
               {fileList.length > 0 && (
                 <Table>
@@ -392,9 +398,9 @@ export function ModalCargaMasivaOrdenDia({
                         </select>
                       </TableCell>
                       <TableCell>
-                        <input
+                        <InputFecha
                           value={r.fechaDocumento}
-                          onChange={(e) => setFechaDocumento(r.name, formatDateInputWithSlashes(e.target.value))}
+                          onChange={(v) => setFechaDocumento(r.name, v)}
                           placeholder="DD/MM/YYYY"
                           className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                         />

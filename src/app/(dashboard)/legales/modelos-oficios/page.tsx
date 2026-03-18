@@ -15,7 +15,7 @@ export default async function ModelosOficiosPage() {
     <div className="max-w-6xl mx-auto">
       <h1 className="text-2xl font-semibold text-gray-800">Modelos de Oficios</h1>
       <p className="text-gray-500 mt-1">
-        Gestioná tipos de oficio y modelos de documentos .docx para Legales.
+        Gestioná tipos de oficio y modelos Word (.doc y .docx) para Legales.
       </p>
       <ModelosOficiosContent />
     </div>

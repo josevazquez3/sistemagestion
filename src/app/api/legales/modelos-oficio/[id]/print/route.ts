@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { esBlobUrl } from "@/lib/blob";
 import mammoth from "mammoth";
+import { esWordDocBinario } from "@/lib/legales/modelosOficioArchivo";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -52,9 +53,19 @@ export async function GET(
       buffer = await readFile(filePath);
     }
 
-    const resultado = await mammoth.convertToHtml({ buffer });
-    const htmlContenido = resultado.value;
     const titulo = modelo.nombre ?? modelo.nombreArchivo ?? "Modelo de oficio";
+
+    let htmlContenido: string;
+    if (esWordDocBinario(modelo.nombreArchivo)) {
+      htmlContenido = `<div style="padding:2rem;font-family:Arial,sans-serif;max-width:560px;">
+        <p><strong>${titulo}</strong></p>
+        <p style="margin-top:1rem;color:#444;">Vista previa e impresión no disponibles para archivos <strong>.doc</strong> (formato Word antiguo).</p>
+        <p style="margin-top:0.75rem;">Usá <strong>Descargar</strong> en la tabla de modelos para abrir el archivo en Microsoft Word.</p>
+      </div>`;
+    } else {
+      const resultado = await mammoth.convertToHtml({ buffer });
+      htmlContenido = resultado.value;
+    }
 
     const htmlCompleto = `<!DOCTYPE html>
 <html lang="es">

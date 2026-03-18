@@ -23,12 +23,16 @@ export function parsearImporteAR(str: string): number {
   return negativo ? -valor : valor;
 }
 
-/** DD/MM/YYYY → ISO string fijo en mediodía de Argentina */
+/** DD/MM/YYYY → ISO mediodía UTC (mismo criterio que el resto del sistema) */
 export function parsearFechaAR(str: string): string {
   const [d, m, y] = str.trim().split("/");
   if (!d || !m || !y) return "";
-  // Evita corrimientos de día por timezone al persistir/mostrar.
-  return `${y}-${m}-${d}T12:00:00.000-03:00`;
+  const day = parseInt(d, 10);
+  const month = parseInt(m, 10);
+  const year = parseInt(y, 10);
+  if (!day || !month || !year) return "";
+  const t = Date.UTC(year, month - 1, day, 12, 0, 0, 0);
+  return new Date(t).toISOString();
 }
 
 export type MovimientoRaw = {
@@ -80,13 +84,22 @@ export function parsearArchivoExtracto(contenido: string): MovimientoRaw[] {
       /^DEBE$/.test(tipoStr);
     if (esDebito && importePesos > 0) importePesos = -importePesos;
 
+    const codOp = cols[3]?.trim() || undefined;
+    const ref = cols[4]?.trim() || undefined;
+    const conceptoCol = cols[5]?.trim() ?? "";
+    let concepto =
+      conceptoCol ||
+      ref ||
+      cols[2]?.trim() ||
+      "";
+    if (codOp && concepto.trim() === codOp.trim()) concepto = "";
     movimientos.push({
       fecha: fechaIso,
       sucOrigen: cols[1]?.trim() || undefined,
       descSucursal: cols[2]?.trim() || undefined,
-      codOperativo: cols[3]?.trim() || undefined,
-      referencia: cols[4]?.trim() || undefined,
-      concepto: cols[5]?.trim() ?? "",
+      codOperativo: codOp,
+      referencia: ref,
+      concepto,
       importePesos,
       saldoPesos: parsearImporteAR(saldoStr),
     });

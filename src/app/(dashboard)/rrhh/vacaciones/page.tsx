@@ -22,6 +22,7 @@ import {
 import { Loader2, Calendar } from "lucide-react";
 import type { RangoFechas } from "@/components/vacaciones/CalendarioVacaciones";
 import { isSuperAdmin } from "@/lib/auth.utils";
+import { emitNovedadesLiquidadoresRefresh } from "@/lib/rrhh-dashboard-events";
 
 export default function VacacionesPage() {
   const { data: session } = useSession();
@@ -177,6 +178,7 @@ export default function VacacionesPage() {
       }
       setBajaModal(null);
       cargarDatos();
+      emitNovedadesLiquidadoresRefresh();
     } finally {
       setBajaLoading(false);
     }
@@ -197,6 +199,7 @@ export default function VacacionesPage() {
       }
       setEliminarFisicoModal(null);
       cargarDatos();
+      emitNovedadesLiquidadoresRefresh();
     } catch (e: unknown) {
       alert((e as Error).message);
     } finally {

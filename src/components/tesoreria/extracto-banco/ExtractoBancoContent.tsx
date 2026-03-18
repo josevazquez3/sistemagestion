@@ -5,6 +5,7 @@ import { formatearImporteAR } from "@/lib/parsearExtracto";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputFecha } from "@/components/ui/InputFecha";
 import { Search, FolderUp, Trash2, Pencil } from "lucide-react";
 import { TablaMovimientos, type MovimientoExtracto } from "./TablaMovimientos";
 import { ModalImportarExtracto } from "./ModalImportarExtracto";
@@ -313,10 +314,10 @@ export function ExtractoBancoContent() {
                     placeholder="Ej: 12.345,67"
                   />
                   <span className="text-gray-500">al</span>
-                  <Input
+                  <InputFecha
                     value={fechaSaldoInicialInput}
-                    onChange={(e) => setFechaSaldoInicialInput(e.target.value)}
-                    className="w-28 h-8 text-sm"
+                    onChange={setFechaSaldoInicialInput}
+                    className="w-28 h-8 text-sm flex rounded-md border border-input bg-transparent px-2 py-1 shadow-sm"
                     placeholder="DD/MM/YYYY"
                   />
                   <Button
@@ -352,18 +353,16 @@ export function ExtractoBancoContent() {
                 className="pl-9"
               />
             </div>
-            <input
-              type="text"
+            <InputFecha
               placeholder="Desde (DD/MM/YY)"
               value={desde}
-              onChange={(e) => setDesde(e.target.value)}
+              onChange={setDesde}
               className="w-32 h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
-            <input
-              type="text"
+            <InputFecha
               placeholder="Hasta (DD/MM/YY)"
               value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
+              onChange={setHasta}
               className="w-32 h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
             <select

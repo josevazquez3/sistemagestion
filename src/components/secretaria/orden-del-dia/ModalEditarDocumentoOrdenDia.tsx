@@ -11,10 +11,19 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { formatDateInputWithSlashes } from "@/lib/legislacion.utils";
+import { InputFecha } from "@/components/ui/InputFecha";
 import type { CategoriaOrdenDia, DocumentoOrdenDia } from "./types";
+import { esWordModeloPermitido } from "@/lib/legales/modelosOficioWordShared";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+function validarArchivoCliente(file: File): string | null {
+  const n = file.name.toLowerCase();
+  if (file.size > MAX_FILE_SIZE) return "El archivo no puede superar 20 MB.";
+  if (n.endsWith(".pdf")) return null;
+  if (esWordModeloPermitido(file.name)) return null;
+  return "Solo se permiten archivos PDF, DOC o DOCX.";
+}
 const TZ = "America/Argentina/Buenos_Aires";
 
 function formatFecha(iso: string | null): string {
@@ -84,13 +93,9 @@ export function ModalEditarDocumentoOrdenDia({
       return;
     }
     if (file && file.size > 0) {
-      const name = file.name.toLowerCase();
-      if (!name.endsWith(".pdf") && !name.endsWith(".docx")) {
-        showMessage("error", "Solo se permiten PDF o DOCX.");
-        return;
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        showMessage("error", "El archivo no puede superar 20 MB.");
+      const errArch = validarArchivoCliente(file);
+      if (errArch) {
+        showMessage("error", errArch);
         return;
       }
     }
@@ -167,10 +172,9 @@ export function ModalEditarDocumentoOrdenDia({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha del documento (DD/MM/YYYY)</label>
-            <input
-              type="text"
+            <InputFecha
               value={fechaDocumento}
-              onChange={(e) => setFechaDocumento(formatDateInputWithSlashes(e.target.value))}
+              onChange={setFechaDocumento}
               placeholder="DD/MM/YYYY"
               className="w-full h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
@@ -210,22 +214,40 @@ export function ModalEditarDocumentoOrdenDia({
                 e.preventDefault();
                 setDrag(false);
                 const f = e.dataTransfer.files[0];
-                if (f && (f.name.toLowerCase().endsWith(".pdf") || f.name.toLowerCase().endsWith(".docx")))
-                  setFile(f);
+                if (!f) return;
+                const err = validarArchivoCliente(f);
+                if (err) {
+                  showMessage("error", err);
+                  return;
+                }
+                setFile(f);
               }}
             >
               <input
                 type="file"
-                accept=".pdf,.docx"
+                accept=".pdf,.doc,.docx"
                 className="hidden"
                 id="modal-editar-doc-od-file"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (!f) {
+                    setFile(null);
+                    return;
+                  }
+                  const err = validarArchivoCliente(f);
+                  if (err) {
+                    showMessage("error", err);
+                    e.target.value = "";
+                    return;
+                  }
+                  setFile(f);
+                }}
               />
               <label htmlFor="modal-editar-doc-od-file" className="cursor-pointer">
                 {file ? (
                   <span className="text-sm text-[#388E3C] font-medium">{file.name}</span>
                 ) : (
-                  <span className="text-sm text-gray-500">Arrastrá un PDF o DOCX o hacé clic</span>
+                  <span className="text-sm text-gray-500">Arrastrá un PDF, DOC o DOCX o hacé clic</span>
                 )}
               </label>
             </div>

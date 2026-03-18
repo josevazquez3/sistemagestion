@@ -5,6 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { registrarCuentaSiNoExiste } from "@/lib/tesoreria/registrarCuentaSiNoExiste";
 import type { Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
+import { parsearFechaInputAPI, parsearFechaSeguraFlexible } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "TESORERO", "SUPER_ADMIN"] as const;
 
@@ -12,13 +13,6 @@ function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
 
-function parseFechaExtracto(fecha: string): Date {
-  const raw = (fecha ?? "").trim();
-  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw)
-    ? `${raw}T12:00:00.000-03:00`
-    : raw;
-  return new Date(normalized);
-}
 
 /** GET - Listar movimientos con filtros y paginación */
 export async function GET(req: NextRequest) {
@@ -48,24 +42,13 @@ export async function GET(req: NextRequest) {
 
   if (desde || hasta) {
     const fecha: { gte?: Date; lte?: Date } = {};
-    const parseFecha = (s: string): Date | null => {
-      const parts = s.trim().split("/").map(Number);
-      if (parts.length < 3) return null;
-      let [d, m, y] = parts;
-      if (!d || !m || !y) return null;
-      if (y < 100) y += 2000;
-      return new Date(y, m - 1, d);
-    };
     if (desde) {
-      const d = parseFecha(desde);
+      const d = parsearFechaSeguraFlexible(desde);
       if (d) fecha.gte = d;
     }
     if (hasta) {
-      const d = parseFecha(hasta);
-      if (d) {
-        d.setHours(23, 59, 59, 999);
-        fecha.lte = d;
-      }
+      const d = parsearFechaSeguraFlexible(hasta);
+      if (d) fecha.lte = d;
     }
     if (fecha.gte !== undefined || fecha.lte !== undefined) where.fecha = fecha;
   }
@@ -169,13 +152,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Se requiere un array de movimientos" }, { status: 400 });
   }
 
-  const fechaInvalida = body.find((m) => Number.isNaN(parseFechaExtracto(m.fecha).getTime()));
+  const fechaInvalida = body.find((m) => Number.isNaN(parsearFechaInputAPI(m.fecha).getTime()));
   if (fechaInvalida) {
     return NextResponse.json({ error: "Hay movimientos con fecha inválida" }, { status: 400 });
   }
 
   const cuentaId = body[0]?.cuentaId ?? null;
-  const fechasParsed = body.map((m) => parseFechaExtracto(m.fecha));
+  const fechasParsed = body.map((m) => parsearFechaInputAPI(m.fecha));
   const primerFechaArchivo = new Date(
     Math.min(...fechasParsed.map((d) => d.getTime()))
   );
@@ -225,13 +208,18 @@ export async function POST(req: NextRequest) {
         : op
           ? opToCuentaId.get(op) ?? null
           : null;
+    let concepto = String(m.concepto ?? "").trim();
+    const ref = String(m.referencia ?? "").trim();
+    if (concepto === op) concepto = "";
+    if (!concepto && ref) concepto = ref;
+    if (concepto === op) concepto = "";
     return {
-      fecha: parseFechaExtracto(m.fecha),
+      fecha: parsearFechaInputAPI(m.fecha),
       sucOrigen: m.sucOrigen ?? null,
       descSucursal: m.descSucursal ?? null,
       codOperativo: m.codOperativo ?? null,
       referencia: m.referencia ?? null,
-      concepto: m.concepto ?? "",
+      concepto,
       importePesos: new Decimal(m.importePesos ?? 0),
       saldoPesos: new Decimal(0),
       cuentaId: cuentaIdMov,

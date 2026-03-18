@@ -98,7 +98,8 @@ export function NovedadesLiquidadoresContent() {
     setPlanillaLoading(true);
     try {
       const res = await fetch(
-        `/api/novedades-liquidadores/planilla?periodo=${encodeURIComponent(periodoSeleccionado)}`
+        `/api/novedades-liquidadores/planilla?periodo=${encodeURIComponent(periodoSeleccionado)}`,
+        { cache: "no-store" }
       );
       const json = await res.json();
       if (res.ok) {

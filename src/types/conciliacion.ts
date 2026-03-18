@@ -35,6 +35,8 @@ export interface FilaConciliacion {
   id: number;
   fecha: string;
   concepto: string;
+  /** Cód. operativo distinto del código de cuenta, o "—" */
+  codOperativo: string;
   cuentaCodigo: string;
   cuentaNombre: string;
   tipo: TipoCuenta;

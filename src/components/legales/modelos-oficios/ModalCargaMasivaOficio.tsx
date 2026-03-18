@@ -27,6 +27,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import type { TipoOficio } from "./types";
+import { esWordModeloPermitido, quitarExtensionWord } from "@/lib/legales/modelosOficioWordShared";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_FILES = 50;
@@ -59,7 +60,7 @@ function formatSize(bytes: number): string {
 }
 
 function nombreSinExtension(name: string): string {
-  return name.replace(/\.docx$/i, "") || name;
+  return quitarExtensionWord(name);
 }
 
 type ModalCargaMasivaOficioProps = {
@@ -138,9 +139,9 @@ export function ModalCargaMasivaOficio({
       currentNames.add(nameLower);
       let status: "pendiente" | "invalido" = "pendiente";
       let error: string | undefined;
-      if (!nameLower.endsWith(".docx")) {
+      if (!esWordModeloPermitido(name)) {
         status = "invalido";
-        error = "Formato no permitido";
+        error = "Solo .doc o .docx";
       } else if (file.size > MAX_FILE_SIZE) {
         status = "invalido";
         error = "Supera 10 MB";
@@ -341,13 +342,13 @@ export function ModalCargaMasivaOficio({
                 <input
                   id="carga-masiva-input"
                   type="file"
-                  accept=".docx"
+                  accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   multiple
                   className="hidden"
                   onChange={(e) => addFiles(e.target.files)}
                 />
                 <p className="text-gray-600">
-                  Arrastrá los archivos .docx o hacé clic para seleccionar
+                  Archivos Word .doc o .docx — arrastrá o hacé clic para seleccionar
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
                   Máximo {MAX_FILES} archivos, 10 MB cada uno

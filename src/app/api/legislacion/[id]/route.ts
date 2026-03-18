@@ -7,6 +7,7 @@ import path from "path";
 import { randomBytes } from "crypto";
 import { SeccionLegislacion } from "@prisma/client";
 import { unlink } from "fs/promises";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES_WRITE = ["ADMIN", "SECRETARIA", "SUPER_ADMIN"] as const;
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -30,16 +31,6 @@ function canWrite(roles: unknown): boolean {
 function parseId(id: string): number | null {
   const n = parseInt(id, 10);
   return isNaN(n) ? null : n;
-}
-
-function parseFechaArgentina(str: string): Date | null {
-  if (!str) return null;
-  const parts = str.split("/").map((x) => parseInt(x, 10));
-  if (parts.length !== 3) return null;
-  const [d, m, y] = parts;
-  const date = new Date(y, m - 1, d);
-  if (isNaN(date.getTime())) return null;
-  return date;
 }
 
 function validarSeccion(s: string): s is SeccionLegislacion {
@@ -95,7 +86,7 @@ export async function PUT(
       const cid = parseInt(categoriaIdStr, 10);
       if (!isNaN(cid)) data.categoriaId = cid;
     }
-    const fd = parseFechaArgentina(fechaDocumentoStr ?? "");
+    const fd = parsearFechaSegura(fechaDocumentoStr ?? "");
     if (fechaDocumentoStr !== undefined) data.fechaDocumento = fd ?? null;
 
     if (quitarArchivo && doc.urlArchivo) {

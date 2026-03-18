@@ -25,6 +25,7 @@ import { ModalEditarMovimiento, type MovimientoFondoFijo } from "./ModalEditarMo
 import { MultiCodigoInput } from "../MultiCodigoInput";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatearFechaUTC } from "@/lib/utils/fecha";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -35,12 +36,7 @@ const TZ = "America/Argentina/Buenos_Aires";
 
 function formatFecha(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("es-AR", {
-      timeZone: TZ,
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return formatearFechaUTC(new Date(iso));
   } catch {
     return iso.slice(0, 10);
   }

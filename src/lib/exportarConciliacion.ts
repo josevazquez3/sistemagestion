@@ -32,26 +32,35 @@ export async function exportarConciliacionExcel(
   const XLSX = await import("xlsx");
 
   const datos: (string | number)[][] = [
-    ["Fecha", "Concepto", "Cuenta", "Tipo", "Ingreso", "Salida / Gasto"],
-    ["", "Saldo Anterior", "", "", fmt(resumen.saldoAnterior), ""],
+    ["Fecha", "Cód. op.", "Concepto", "Cuenta", "Tipo", "Ingreso", "Salida / Gasto"],
+    ["", "", "Saldo Anterior", "", "", fmt(resumen.saldoAnterior), ""],
     ...filas.map((f) => [
       new Date(f.fecha).toLocaleDateString("es-AR"),
+      f.codOperativo ?? "—",
       f.concepto,
-      `${f.cuentaCodigo} – ${f.cuentaNombre}`,
+      f.cuentaNombre ? `${f.cuentaCodigo} – ${f.cuentaNombre}` : f.cuentaCodigo,
       f.tipo,
       f.tipo === "INGRESO" ? fmt(Math.abs(f.monto)) : "",
       f.tipo !== "INGRESO" ? fmt(Math.abs(f.monto)) : "",
     ]),
     [],
-    ["", "", "", "", "Total Ingresos", fmt(resumen.totalIngresos)],
-    ["", "", "", "", "Subtotal", fmt(resumen.subtotal)],
-    ["", "", "", "", "Total Salidas", fmt(resumen.totalSalidas)],
-    ["", "", "", "", "Total Gastos", fmt(resumen.totalGastos)],
-    ["", "", "", "", "TOTAL CONCILIADO", fmt(resumen.totalConciliado)],
+    ["", "", "", "", "", "Total Ingresos", fmt(resumen.totalIngresos)],
+    ["", "", "", "", "", "Subtotal", fmt(resumen.subtotal)],
+    ["", "", "", "", "", "Total Salidas", fmt(resumen.totalSalidas)],
+    ["", "", "", "", "", "Total Gastos", fmt(resumen.totalGastos)],
+    ["", "", "", "", "", "TOTAL CONCILIADO", fmt(resumen.totalConciliado)],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(datos);
-  ws["!cols"] = [{ wch: 12 }, { wch: 55 }, { wch: 28 }, { wch: 10 }, { wch: 18 }, { wch: 18 }];
+  ws["!cols"] = [
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 45 },
+    { wch: 24 },
+    { wch: 10 },
+    { wch: 18 },
+    { wch: 18 },
+  ];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Conciliación");
@@ -80,13 +89,14 @@ export async function exportarConciliacionPdf(
   doc.text(`Generado el ${new Date().toLocaleDateString("es-AR")}`, 14, 22);
 
   const filasSaldoAnterior = [
-    ["", "Saldo Anterior", "", "", fmt(resumen.saldoAnterior), ""],
+    ["", "", "Saldo Anterior", "", "", fmt(resumen.saldoAnterior), ""],
   ];
 
   const filasMovimientos = filas.map((f) => [
     new Date(f.fecha).toLocaleDateString("es-AR"),
+    f.codOperativo ?? "—",
     f.concepto,
-    `${f.cuentaCodigo} – ${f.cuentaNombre}`,
+    f.cuentaNombre ? `${f.cuentaCodigo} – ${f.cuentaNombre}` : f.cuentaCodigo,
     f.tipo,
     f.tipo === "INGRESO" ? fmt(Math.abs(f.monto)) : "",
     f.tipo !== "INGRESO" ? fmt(Math.abs(f.monto)) : "",
@@ -94,17 +104,18 @@ export async function exportarConciliacionPdf(
 
   autoTable(doc, {
     startY: 28,
-    head: [["Fecha", "Concepto", "Cuenta", "Tipo", "Ingreso", "Salida / Gasto"]],
+    head: [["Fecha", "Cód. op.", "Concepto", "Cuenta", "Tipo", "Ingreso", "Salida / Gasto"]],
     body: [...filasSaldoAnterior, ...filasMovimientos],
     styles: { fontSize: 8, cellPadding: 2 },
     headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: "bold" },
     columnStyles: {
-      0: { cellWidth: 22 },
-      1: { cellWidth: 90 },
-      2: { cellWidth: 55 },
-      3: { cellWidth: 18 },
-      4: { cellWidth: 28, halign: "right" },
-      5: { cellWidth: 28, halign: "right" },
+      0: { cellWidth: 20 },
+      1: { cellWidth: 18 },
+      2: { cellWidth: 68 },
+      3: { cellWidth: 42 },
+      4: { cellWidth: 16 },
+      5: { cellWidth: 26, halign: "right" },
+      6: { cellWidth: 26, halign: "right" },
     },
     alternateRowStyles: { fillColor: [249, 250, 251] },
     didParseCell: (data) => {

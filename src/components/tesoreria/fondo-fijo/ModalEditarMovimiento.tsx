@@ -11,7 +11,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputFecha } from "@/components/ui/InputFecha";
 import { formatearImporteAR, parsearImporteAR } from "@/lib/parsearExtracto";
+import { formatearFechaUTC } from "@/lib/utils/fecha";
 
 export type MovimientoFondoFijo = {
   id: number;
@@ -80,7 +82,9 @@ export function ModalEditarMovimiento({
       showMessage("error", "Fecha inválida (DD/MM/YYYY).");
       return;
     }
-    const fechaIso = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T12:00:00.000-03:00`;
+    const fechaIso = new Date(
+      Date.UTC(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), 12, 0, 0, 0)
+    ).toISOString();
     const conceptoT = concepto.trim();
     if (!conceptoT) {
       showMessage("error", "El concepto es obligatorio.");
@@ -126,12 +130,12 @@ export function ModalEditarMovimiento({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="edit-fecha">Fecha *</Label>
-            <Input
+            <InputFecha
               id="edit-fecha"
               value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
+              onChange={setFecha}
               placeholder="DD/MM/YYYY"
-              className="mt-1"
+              className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
             />
           </div>
           <div>

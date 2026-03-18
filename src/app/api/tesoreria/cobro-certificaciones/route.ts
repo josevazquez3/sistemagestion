@@ -4,24 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { recalcularSaldosCobroCertificaciones } from "@/lib/tesoreria/recalcularSaldosCobroCertificaciones";
+import { parsearFechaInputAPI } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "TESORERO", "SUPER_ADMIN"] as const;
 
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
-}
-
-function parsearFechaExtracto(fecha: string): Date {
-  const raw = (fecha ?? "").trim();
-  const normalized = /^\d{4}-\d{2}-\d{2}(T|$)/.test(raw)
-    ? raw
-    : /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)
-      ? (() => {
-          const [d, m, y] = raw.split("/");
-          return `${y!}-${m!.padStart(2, "0")}-${d!.padStart(2, "0")}T12:00:00.000-03:00`;
-        })()
-      : raw;
-  return new Date(normalized);
 }
 
 /** GET - Lista movimientos por mes, anio y opcional buscar */
@@ -99,7 +87,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "fecha es obligatoria" }, { status: 400 });
   }
 
-  const fecha = parsearFechaExtracto(fechaStr);
+  const fecha = parsearFechaInputAPI(fechaStr);
 
   const creado = await prisma.cobroCertificacion.create({
     data: {

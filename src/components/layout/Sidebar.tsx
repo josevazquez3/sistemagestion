@@ -131,7 +131,13 @@ export function Sidebar({ user }: { user: Session["user"] }) {
   }, [pathname]);
 
   const items = navItems.filter((item) => {
-    if ("configuracionesOnly" in item && item.configuracionesOnly && !isAdmin) return false;
+    if (
+      "configuracionesOnly" in item &&
+      item.configuracionesOnly &&
+      !isAdmin &&
+      !isSuperAdmin
+    )
+      return false;
     if (item.adminOnly && !isAdmin && !isRrhh) return false;
     if ("secretariaModule" in item && item.secretariaModule && !isAdmin && !isSecretaria && !isSuperAdmin) return false;
     if ("legalesModule" in item && item.legalesModule && !isAdmin && !isLegales) return false;

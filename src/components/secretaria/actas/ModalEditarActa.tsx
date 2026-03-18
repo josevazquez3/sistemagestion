@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import type { Acta } from "./types";
+import { esWordModeloPermitido } from "@/lib/legales/modelosOficioWordShared";
+import { InputFecha } from "@/components/ui/InputFecha";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const TZ = "America/Argentina/Buenos_Aires";
@@ -83,8 +85,8 @@ export function ModalEditarActa({
       showMessage("error", "El archivo no puede superar 10 MB.");
       return;
     }
-    if (file && !file.name.toLowerCase().endsWith(".docx")) {
-      showMessage("error", "Solo se permiten archivos .docx.");
+    if (file && file.size > 0 && !esWordModeloPermitido(file.name)) {
+      showMessage("error", "Solo se permiten archivos .doc o .docx.");
       return;
     }
 
@@ -142,10 +144,9 @@ export function ModalEditarActa({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fecha del acta * (DD/MM/YYYY)
             </label>
-            <input
-              type="text"
+            <InputFecha
               value={fechaActa}
-              onChange={(e) => setFechaActa(e.target.value)}
+              onChange={setFechaActa}
               placeholder="DD/MM/YYYY"
               className="w-full h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
             />
@@ -176,7 +177,9 @@ export function ModalEditarActa({
           )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {tieneArchivo ? "Reemplazar con otro .docx (opcional)" : "Adjuntar .docx (opcional)"}
+              {tieneArchivo
+                ? "Reemplazar con otro .doc o .docx (opcional)"
+                : "Adjuntar .doc o .docx (opcional)"}
             </label>
             <div
               className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
@@ -191,22 +194,34 @@ export function ModalEditarActa({
                 e.preventDefault();
                 setDrag(false);
                 const f = e.dataTransfer.files[0];
-                if (f?.name.toLowerCase().endsWith(".docx")) setFile(f);
+                if (f && esWordModeloPermitido(f.name)) setFile(f);
               }}
             >
               <input
                 type="file"
-                accept=".docx"
+                accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 className="hidden"
                 id="modal-editar-acta-file"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (!f) {
+                    setFile(null);
+                    return;
+                  }
+                  if (!esWordModeloPermitido(f.name)) {
+                    showMessage("error", "Solo se permiten archivos .doc o .docx.");
+                    e.target.value = "";
+                    return;
+                  }
+                  setFile(f);
+                }}
               />
               <label htmlFor="modal-editar-acta-file" className="cursor-pointer">
                 {file ? (
                   <span className="text-sm text-[#388E3C] font-medium">{file.name}</span>
                 ) : (
                   <span className="text-sm text-gray-500">
-                    Arrastrá un .docx o hacé clic para elegir
+                    Arrastrá un .doc o .docx o hacé clic para elegir
                   </span>
                 )}
               </label>

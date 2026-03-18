@@ -3,12 +3,14 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { subirArchivo } from "@/lib/blob";
-import { randomBytes } from "crypto";
+import {
+  validarArchivoWordModelo,
+  generarNombreAlmacenamientoModeloWord,
+  contentTypeWordSubida,
+} from "@/lib/legales/modelosOficioArchivo";
 
 const ROLES = ["ADMIN", "SECRETARIA"] as const;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const DOCX_MIME =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
@@ -89,48 +91,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tipo de nota no encontrado o inactivo" }, { status: 400 });
     }
 
-    if (!file || file.size === 0) {
-      return NextResponse.json(
-        { error: "Debe seleccionar un archivo .docx" },
-        { status: 400 }
-      );
+    const v = validarArchivoWordModelo(file, MAX_FILE_SIZE);
+    if (!v.ok) {
+      return NextResponse.json({ error: v.error }, { status: 400 });
     }
 
-    const name = file.name.toLowerCase();
-    if (!name.endsWith(".docx")) {
-      return NextResponse.json(
-        { error: "Solo se permiten archivos .docx" },
-        { status: 400 }
-      );
-    }
-
-    const contentType = file.type?.toLowerCase() ?? "";
-    const validMime =
-      contentType === DOCX_MIME ||
-      contentType === "application/octet-stream" ||
-      contentType === "";
-    if (!validMime) {
-      return NextResponse.json(
-        {
-          error:
-            "Tipo de archivo no válido. Debe ser .docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "El archivo no puede superar 10 MB" },
-        { status: 400 }
-      );
-    }
-
-    const timestamp = Date.now();
-    const random = randomBytes(4).toString("hex");
-    const safeName = `modelonota_${timestamp}_${random}.docx`;
+    const safeName = generarNombreAlmacenamientoModeloWord(file.name, "modelonota");
     const buffer = Buffer.from(await file.arrayBuffer());
-    const mime = file.type || DOCX_MIME;
+    const mime = contentTypeWordSubida(file.name, file.type);
     const urlArchivo = await subirArchivo("modelos-notas", safeName, buffer, mime);
 
     const modelo = await prisma.modeloNota.create({

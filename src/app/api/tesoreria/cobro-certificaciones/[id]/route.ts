@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { recalcularSaldosCobroCertificaciones } from "@/lib/tesoreria/recalcularSaldosCobroCertificaciones";
+import { parsearFechaInputAPI } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "TESORERO", "SUPER_ADMIN"] as const;
 
@@ -43,16 +44,7 @@ export async function PUT(
   const importeVal =
     body.importePesos !== undefined ? Math.abs(Number(body.importePesos)) : Number(mov.importe);
   const fechaStr = (body.fecha ?? "").trim();
-  const fecha = fechaStr
-    ? new Date(
-        /^\d{4}-\d{2}-\d{2}/.test(fechaStr)
-          ? fechaStr
-          : (() => {
-              const [d, m, y] = fechaStr.split("/");
-              return `${y}-${m!.padStart(2, "0")}-${d!.padStart(2, "0")}T12:00:00.000-03:00`;
-            })()
-      )
-    : mov.fecha;
+  const fecha = fechaStr ? parsearFechaInputAPI(fechaStr) : mov.fecha;
 
   await prisma.cobroCertificacion.update({
     where: { id },

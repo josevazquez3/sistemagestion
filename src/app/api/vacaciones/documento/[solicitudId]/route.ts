@@ -54,7 +54,7 @@ export async function GET(
   }
 
   const apellido = solicitud.legajo.apellidos.trim().replace(/\s+/g, "_");
-  const anio = solicitud.fechaDesde.getFullYear();
+  const anio = solicitud.fechaDesde.getUTCFullYear();
   const filename = `vacaciones_${apellido}_${anio}.docx`;
 
   return new NextResponse(new Uint8Array(buffer), {

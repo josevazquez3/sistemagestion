@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { EstadoReunion } from "@prisma/client";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "SECRETARIA", "SUPER_ADMIN"] as const;
 
@@ -17,16 +18,6 @@ function canAccess(roles: unknown): boolean {
 function parseId(id: string): number | null {
   const n = parseInt(id, 10);
   return isNaN(n) ? null : n;
-}
-
-function parseFechaArgentina(str: string): Date | null {
-  if (!str?.trim()) return null;
-  const parts = str.trim().split("/").map((x) => parseInt(x, 10));
-  if (parts.length !== 3) return null;
-  const [d, m, y] = parts;
-  if (!d || !m || !y) return null;
-  const date = new Date(y, m - 1, d);
-  return isNaN(date.getTime()) ? null : date;
 }
 
 /** GET - Obtener una reunión */
@@ -64,7 +55,7 @@ export async function PUT(
     const body = await req.json();
     const organismo = body.organismo?.trim();
     const fechaReunionStr = body.fechaReunion?.trim();
-    const fechaReunion = parseFechaArgentina(fechaReunionStr ?? "");
+    const fechaReunion = parsearFechaSegura(fechaReunionStr ?? "");
     if (organismo !== undefined && !organismo) {
       return NextResponse.json({ error: "Organismo / Institución es obligatorio" }, { status: 400 });
     }

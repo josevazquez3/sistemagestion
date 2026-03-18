@@ -12,6 +12,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil, Trash2, Download, FileText, Loader2, Copy } from "lucide-react";
 import type { ModeloOficio } from "./types";
+import {
+  etiquetaTipoWord,
+  esDocFormatoAntiguo,
+} from "@/lib/legales/modelosOficioWordShared";
 
 function formatFechaArgentina(iso: string): string {
   try {
@@ -67,7 +71,7 @@ export function ModelosOficioTabla({
           </span>
           <Button size="sm" variant="outline" onClick={onExportZip}>
             <Download className="h-4 w-4 mr-1" />
-            Exportar seleccionados DOCX
+            Exportar seleccionados Word
           </Button>
           <Button
             size="sm"
@@ -116,7 +120,9 @@ export function ModelosOficioTabla({
                   </TableCell>
                 </TableRow>
               ) : (
-                modelos.map((m) => (
+                modelos.map((m) => {
+                  const esDoc = esDocFormatoAntiguo(m.nombreArchivo);
+                  return (
                   <TableRow key={m.id}>
                     <TableCell>
                       <Checkbox
@@ -132,9 +138,13 @@ export function ModelosOficioTabla({
                         href={`/api/legales/modelos-oficio/${m.id}/download`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#388E3C] hover:underline"
+                        className="inline-flex items-center gap-2 text-[#388E3C] hover:underline"
                       >
-                        {m.nombreArchivo}
+                        <FileText className="h-4 w-4 shrink-0 text-[#2E7D32]" aria-hidden />
+                        <span>{m.nombreArchivo}</span>
+                        <span className="rounded bg-[#E8F5E9] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[#2E7D32]">
+                          {etiquetaTipoWord(m.nombreArchivo)}
+                        </span>
                       </a>
                     </TableCell>
                     <TableCell className="text-gray-600">
@@ -149,14 +159,28 @@ export function ModelosOficioTabla({
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onEditContenido(m)}
-                        title="Editar contenido DOCX"
+                      <span
+                        className="inline-flex"
+                        title={
+                          esDoc
+                            ? "Editar contenido no disponible para archivos .doc"
+                            : "Editar contenido"
+                        }
                       >
-                        <FileText className="h-4 w-4" />
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={esDoc}
+                          onClick={() => onEditContenido(m)}
+                          className={
+                            esDoc
+                              ? "opacity-40 cursor-not-allowed"
+                              : "hover:text-[#2E7D32]"
+                          }
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      </span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -169,7 +193,7 @@ export function ModelosOficioTabla({
                         variant="ghost"
                         size="sm"
                         onClick={() => onDownload(m)}
-                        title="Descargar DOCX"
+                        title="Descargar archivo"
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -184,7 +208,8 @@ export function ModelosOficioTabla({
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>

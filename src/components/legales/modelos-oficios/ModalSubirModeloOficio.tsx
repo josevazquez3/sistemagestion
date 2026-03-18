@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Upload, Loader2 } from "lucide-react";
 import type { TipoOficio } from "./types";
+import { esWordModeloPermitido } from "@/lib/legales/modelosOficioWordShared";
 
 type ModalSubirModeloOficioProps = {
   open: boolean;
@@ -52,11 +53,11 @@ export function ModalSubirModeloOficio({
       return;
     }
     if (!file || file.size === 0) {
-      showMessage("error", "Seleccioná un archivo .docx.");
+      showMessage("error", "Seleccioná un archivo .doc o .docx.");
       return;
     }
-    if (!file.name.toLowerCase().endsWith(".docx")) {
-      showMessage("error", "Solo se permiten archivos .docx.");
+    if (!esWordModeloPermitido(file.name)) {
+      showMessage("error", "Solo se permiten archivos .doc o .docx.");
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -92,7 +93,7 @@ export function ModalSubirModeloOficio({
         <DialogHeader>
           <DialogTitle>Subir modelo de oficio</DialogTitle>
           <DialogDescription>
-            Tipo, nombre y archivo .docx (máx. 10 MB).
+            Tipo, nombre y archivo Word .doc o .docx (máx. 10 MB).
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -125,7 +126,7 @@ export function ModalSubirModeloOficio({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Archivo .docx * (máx. 10 MB)
+              Archivo Word (.doc / .docx) * (máx. 10 MB)
             </label>
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
@@ -140,15 +141,18 @@ export function ModalSubirModeloOficio({
                 e.preventDefault();
                 setDrag(false);
                 const f = e.dataTransfer.files[0];
-                if (f?.name.toLowerCase().endsWith(".docx")) setFile(f);
+                if (f && esWordModeloPermitido(f.name)) setFile(f);
               }}
             >
               <input
                 type="file"
-                accept=".docx"
+                accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 className="hidden"
                 id="modal-subir-file"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  setFile(f && esWordModeloPermitido(f.name) ? f : null);
+                }}
               />
               <label htmlFor="modal-subir-file" className="cursor-pointer">
                 {file ? (
@@ -157,7 +161,7 @@ export function ModalSubirModeloOficio({
                   </span>
                 ) : (
                   <span className="text-sm text-gray-500">
-                    Arrastrá un .docx o hacé clic para elegir
+                    Arrastrá un .doc o .docx o hacé clic para elegir
                   </span>
                 )}
               </label>

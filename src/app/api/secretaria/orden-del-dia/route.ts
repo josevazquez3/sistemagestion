@@ -5,12 +5,18 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { subirArchivo } from "@/lib/blob";
 import { randomBytes } from "crypto";
 import type { Prisma } from "@prisma/client";
+import {
+  validarArchivoWordModelo,
+  contentTypeWordSubida,
+  generarNombreAlmacenamientoModeloWord,
+  MIME_WORD_DOC,
+} from "@/lib/legales/modelosOficioArchivo";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES_WRITE = ["ADMIN", "SECRETARIA", "SUPER_ADMIN"] as const;
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
-const DOCX_MIME =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PDF_MIME = "application/pdf";
+const DOC_MIME = MIME_WORD_DOC;
 
 function normalizeRole(r: unknown): string | null {
   if (typeof r === "string") return r;
@@ -25,15 +31,6 @@ function canWrite(roles: unknown): boolean {
   const list = Array.isArray(roles) ? roles : [];
   const names = list.map(normalizeRole).filter(Boolean) as string[];
   return ROLES_WRITE.some((r) => names.includes(r));
-}
-
-function parseFechaArgentina(str: string): Date | null {
-  if (!str) return null;
-  const [d, m, y] = str.split("/").map((x) => parseInt(x, 10));
-  if (!d || !m || !y) return null;
-  const date = new Date(y, m - 1, d);
-  if (isNaN(date.getTime())) return null;
-  return date;
 }
 
 /** GET - Listar documentos */
@@ -59,22 +56,18 @@ export async function GET(req: NextRequest) {
     if (!isNaN(cid)) where.categoriaId = cid;
   }
 
-  if (tipo === "PDF" || tipo === "DOCX") {
+  if (tipo === "PDF" || tipo === "DOCX" || tipo === "DOC") {
     where.tipoArchivo = tipo;
   }
 
   const fechaDoc: { gte?: Date; lte?: Date } = {};
   if (desde) {
-    const d = parseFechaArgentina(desde);
+    const d = parsearFechaSegura(desde);
     if (d) fechaDoc.gte = d;
   }
   if (hasta) {
-    const h = parseFechaArgentina(hasta);
-    if (h) {
-      const endOfDay = new Date(h);
-      endOfDay.setHours(23, 59, 59, 999);
-      fechaDoc.lte = endOfDay;
-    }
+    const h = parsearFechaSegura(hasta);
+    if (h) fechaDoc.lte = h;
   }
   if (fechaDoc.gte !== undefined || fechaDoc.lte !== undefined) {
     where.fechaDocumento = fechaDoc;
@@ -129,32 +122,40 @@ export async function POST(req: NextRequest) {
     }
     if (!file || file.size === 0) {
       return NextResponse.json(
-        { error: "Debe seleccionar un archivo PDF o DOCX" },
+        { error: "Debe seleccionar un archivo PDF, DOC o DOCX" },
         { status: 400 }
       );
     }
 
     const name = file.name.toLowerCase();
     const isPdf = name.endsWith(".pdf");
+    const isDoc = name.endsWith(".doc") && !name.endsWith(".docx");
     const isDocx = name.endsWith(".docx");
-    if (!isPdf && !isDocx) {
+
+    if (!isPdf && !isDoc && !isDocx) {
       return NextResponse.json(
-        { error: "Solo se permiten archivos PDF o DOCX" },
+        { error: "Solo se permiten archivos PDF, DOC o DOCX" },
         { status: 400 }
       );
     }
 
-    const contentType = file.type?.toLowerCase() ?? "";
-    const validMime =
-      contentType === PDF_MIME ||
-      contentType === DOCX_MIME ||
-      contentType === "application/octet-stream" ||
-      contentType === "";
-    if (!validMime && file.size > 0) {
-      return NextResponse.json(
-        { error: "Tipo de archivo no válido. Debe ser PDF o DOCX" },
-        { status: 400 }
-      );
+    if (isPdf) {
+      const contentType = file.type?.toLowerCase() ?? "";
+      const validMime =
+        contentType === PDF_MIME ||
+        contentType === "application/octet-stream" ||
+        contentType === "";
+      if (!validMime && file.size > 0) {
+        return NextResponse.json(
+          { error: "Tipo de archivo no válido. Debe ser PDF" },
+          { status: 400 }
+        );
+      }
+    } else {
+      const wordVal = validarArchivoWordModelo(file, MAX_FILE_SIZE);
+      if (!wordVal.ok) {
+        return NextResponse.json({ error: wordVal.error }, { status: 400 });
+      }
     }
 
     if (file.size > MAX_FILE_SIZE) {
@@ -172,15 +173,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Categoría inválida" }, { status: 400 });
     }
 
-    const fechaDocumento = parseFechaArgentina(fechaDocumentoStr ?? "") ?? null;
+    const fechaDocumento = parsearFechaSegura(fechaDocumentoStr ?? "") ?? null;
 
-    const ext = isPdf ? "pdf" : "docx";
-    const timestamp = Date.now();
-    const random = randomBytes(4).toString("hex");
-    const safeName = `ordendel_${timestamp}_${random}.${ext}`;
-    const mime = isPdf ? PDF_MIME : DOCX_MIME;
-    const urlArchivo = await subirArchivo("orden-del-dia", safeName, file, mime);
-    const tipoArchivo = isPdf ? "PDF" : "DOCX";
+    let urlArchivo: string;
+    let tipoArchivo: string;
+    if (isPdf) {
+      const timestamp = Date.now();
+      const random = randomBytes(4).toString("hex");
+      const safeName = `ordendel_${timestamp}_${random}.pdf`;
+      urlArchivo = await subirArchivo("orden-del-dia", safeName, file, PDF_MIME);
+      tipoArchivo = "PDF";
+    } else {
+      const safeName = generarNombreAlmacenamientoModeloWord(file.name, "ordendel");
+      const mime = contentTypeWordSubida(file.name, file.type ?? "");
+      urlArchivo = await subirArchivo("orden-del-dia", safeName, file, mime);
+      tipoArchivo = mime === DOC_MIME || isDoc ? "DOC" : "DOCX";
+    }
 
     const doc = await prisma.documentoOrdenDia.create({
       data: {

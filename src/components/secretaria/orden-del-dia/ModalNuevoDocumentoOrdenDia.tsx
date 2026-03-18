@@ -11,10 +11,21 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { FilePlus, Loader2 } from "lucide-react";
-import { formatDateInputWithSlashes } from "@/lib/legislacion.utils";
+import { InputFecha } from "@/components/ui/InputFecha";
 import type { CategoriaOrdenDia } from "./types";
+import { esWordModeloPermitido } from "@/lib/legales/modelosOficioWordShared";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+function validarArchivoCliente(file: File): string | null {
+  const n = file.name.toLowerCase();
+  if (file.size > MAX_FILE_SIZE) {
+    return "El archivo no puede superar 20 MB.";
+  }
+  if (n.endsWith(".pdf")) return null;
+  if (esWordModeloPermitido(file.name)) return null;
+  return "Solo se permiten archivos PDF, DOC o DOCX.";
+}
 
 type ModalNuevoDocumentoOrdenDiaProps = {
   open: boolean;
@@ -58,16 +69,12 @@ export function ModalNuevoDocumentoOrdenDia({
       return;
     }
     if (!file || file.size === 0) {
-      showMessage("error", "Debe seleccionar un archivo PDF o DOCX.");
+      showMessage("error", "Debe seleccionar un archivo PDF, DOC o DOCX.");
       return;
     }
-    const name = file.name.toLowerCase();
-    if (!name.endsWith(".pdf") && !name.endsWith(".docx")) {
-      showMessage("error", "Solo se permiten archivos PDF o DOCX.");
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      showMessage("error", "El archivo no puede superar 20 MB.");
+    const errArch = validarArchivoCliente(file);
+    if (errArch) {
+      showMessage("error", errArch);
       return;
     }
 
@@ -102,7 +109,7 @@ export function ModalNuevoDocumentoOrdenDia({
         <DialogHeader>
           <DialogTitle>Nuevo documento</DialogTitle>
           <DialogDescription>
-            Título, descripción, categoría opcional y archivo PDF o DOCX (máx. 20 MB).
+            Título, descripción, categoría opcional y archivo PDF, DOC o DOCX (máx. 20 MB).
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -139,16 +146,15 @@ export function ModalNuevoDocumentoOrdenDia({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha del documento (DD/MM/YYYY)</label>
-            <input
-              type="text"
+            <InputFecha
               value={fechaDocumento}
-              onChange={(e) => setFechaDocumento(formatDateInputWithSlashes(e.target.value))}
+              onChange={setFechaDocumento}
               placeholder="DD/MM/YYYY"
               className="w-full h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Archivo * (PDF o DOCX, máx. 20 MB)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Archivo * (PDF, DOC o DOCX, máx. 20 MB)</label>
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                 drag ? "border-[#4CAF50] bg-[#E8F5E9]" : "border-gray-300 bg-gray-50"
@@ -159,22 +165,40 @@ export function ModalNuevoDocumentoOrdenDia({
                 e.preventDefault();
                 setDrag(false);
                 const f = e.dataTransfer.files[0];
-                if (f && (f.name.toLowerCase().endsWith(".pdf") || f.name.toLowerCase().endsWith(".docx")))
-                  setFile(f);
+                if (!f) return;
+                const err = validarArchivoCliente(f);
+                if (err) {
+                  showMessage("error", err);
+                  return;
+                }
+                setFile(f);
               }}
             >
               <input
                 type="file"
-                accept=".pdf,.docx"
+                accept=".pdf,.doc,.docx"
                 className="hidden"
                 id="modal-nuevo-doc-od-file"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (!f) {
+                    setFile(null);
+                    return;
+                  }
+                  const err = validarArchivoCliente(f);
+                  if (err) {
+                    showMessage("error", err);
+                    e.target.value = "";
+                    return;
+                  }
+                  setFile(f);
+                }}
               />
               <label htmlFor="modal-nuevo-doc-od-file" className="cursor-pointer">
                 {file ? (
                   <span className="text-sm text-[#388E3C] font-medium">{file.name}</span>
                 ) : (
-                  <span className="text-sm text-gray-500">Arrastrá un PDF o DOCX o hacé clic para elegir</span>
+                  <span className="text-sm text-gray-500">Arrastrá un PDF, DOC o DOCX o hacé clic para elegir</span>
                 )}
               </label>
             </div>

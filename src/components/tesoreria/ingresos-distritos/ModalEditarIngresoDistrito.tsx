@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputFecha } from "@/components/ui/InputFecha";
 import { Label } from "@/components/ui/label";
 import { formatearImporteAR, parsearImporteAR } from "@/lib/parsearExtracto";
 import type { IngresoDistrito } from "@/types/ingresos-distritos";
@@ -164,11 +165,11 @@ export function ModalEditarIngresoDistrito({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Fecha (DD/MM/YYYY)</Label>
-              <Input
+              <InputFecha
                 value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
+                onChange={setFecha}
                 placeholder="DD/MM/YYYY"
-                required
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
               />
             </div>
             <div>

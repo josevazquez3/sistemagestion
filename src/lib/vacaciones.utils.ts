@@ -2,6 +2,8 @@
  * Utilidades de negocio para el Módulo de Vacaciones
  */
 
+import { formatearFechaUTC, fechaLocalANoonUTC } from "@/lib/utils/fecha";
+
 const MESES_ES: readonly string[] = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
@@ -12,11 +14,7 @@ const MESES_ES: readonly string[] = [
  * Útil al recibir fechas del calendario.
  */
 export function normalizarFecha(fecha: Date): Date {
-  return new Date(
-    fecha.getFullYear(),
-    fecha.getMonth(),
-    fecha.getDate()
-  );
+  return fechaLocalANoonUTC(fecha);
 }
 
 /**
@@ -29,14 +27,14 @@ export function normalizarFecha(fecha: Date): Date {
  */
 export function calcularDiasVacaciones(desde: Date, hasta: Date): number {
   const inicioUTC = Date.UTC(
-    desde.getFullYear(),
-    desde.getMonth(),
-    desde.getDate()
+    desde.getUTCFullYear(),
+    desde.getUTCMonth(),
+    desde.getUTCDate()
   );
   const finUTC = Date.UTC(
-    hasta.getFullYear(),
-    hasta.getMonth(),
-    hasta.getDate()
+    hasta.getUTCFullYear(),
+    hasta.getUTCMonth(),
+    hasta.getUTCDate()
   );
   const msPerDay = 1000 * 60 * 60 * 24;
   const diffDias = Math.floor((finUTC - inicioUTC) / msPerDay);
@@ -113,14 +111,10 @@ export function numeroALetras(n: number): string {
 }
 
 /**
- * Formatea una fecha como DD/MM/YYYY
+ * Formatea una fecha como DD/MM/YYYY (día calendario en UTC, coherente con persistencia)
  */
 export function formatearFecha(fecha: Date): string {
-  const d = new Date(fecha);
-  const dia = d.getDate().toString().padStart(2, "0");
-  const mes = (d.getMonth() + 1).toString().padStart(2, "0");
-  const anio = d.getFullYear();
-  return `${dia}/${mes}/${anio}`;
+  return formatearFechaUTC(new Date(fecha));
 }
 
 /**
@@ -129,8 +123,8 @@ export function formatearFecha(fecha: Date): string {
  */
 export function formatearFechaLarga(fecha: Date): string {
   const d = new Date(fecha);
-  const dia = d.getDate();
-  const mes = MESES_ES[d.getMonth()];
-  const anio = d.getFullYear();
+  const dia = d.getUTCDate();
+  const mes = MESES_ES[d.getUTCMonth()];
+  const anio = d.getUTCFullYear();
   return `${dia} de ${mes} de ${anio}`;
 }

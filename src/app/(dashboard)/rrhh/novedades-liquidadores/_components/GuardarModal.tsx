@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import type { FilaPlanilla } from "./PlanillaEditable";
+import { InputFecha } from "@/components/ui/InputFecha";
 
 type Props = {
   open: boolean;
@@ -119,10 +120,9 @@ export function GuardarModal(
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Fecha</label>
-            <input
-              type="text"
+            <InputFecha
               value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
+              onChange={setFecha}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
               placeholder="DD/MM/YYYY"
             />

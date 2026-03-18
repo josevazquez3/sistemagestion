@@ -4,12 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import type { Prisma } from "@prisma/client";
 import { subirArchivo } from "@/lib/blob";
-import { randomBytes } from "crypto";
+import {
+  validarArchivoWordModelo,
+  generarNombreAlmacenamientoModeloWord,
+  contentTypeWordSubida,
+} from "@/lib/legales/modelosOficioArchivo";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "SECRETARIA"] as const;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const DOCX_MIME =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
@@ -41,16 +44,12 @@ export async function GET(req: NextRequest) {
 
   const fechaActaRange: { gte?: Date; lte?: Date } = {};
   if (desde) {
-    const d = parseFechaArgentina(desde);
+    const d = parsearFechaSegura(desde);
     if (d) fechaActaRange.gte = d;
   }
   if (hasta) {
-    const h = parseFechaArgentina(hasta);
-    if (h) {
-      const endOfDay = new Date(h);
-      endOfDay.setHours(23, 59, 59, 999);
-      fechaActaRange.lte = endOfDay;
-    }
+    const h = parsearFechaSegura(hasta);
+    if (h) fechaActaRange.lte = h;
   }
   if (fechaActaRange.gte !== undefined || fechaActaRange.lte !== undefined) {
     where.fechaActa = fechaActaRange;
@@ -90,7 +89,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const fechaActa = parseFechaArgentina(fechaActaStr ?? "");
+    const fechaActa = parsearFechaSegura(fechaActaStr ?? "");
     if (!fechaActa) {
       return NextResponse.json(
         { error: "La fecha del acta es obligatoria (formato DD/MM/YYYY)" },
@@ -102,35 +101,12 @@ export async function POST(req: NextRequest) {
     let urlArchivo: string | null = null;
 
     if (file && file.size > 0) {
-      const name = file.name.toLowerCase();
-      if (!name.endsWith(".docx")) {
-        return NextResponse.json(
-          { error: "Solo se permiten archivos .docx" },
-          { status: 400 }
-        );
+      const v = validarArchivoWordModelo(file, MAX_FILE_SIZE);
+      if (!v.ok) {
+        return NextResponse.json({ error: v.error }, { status: 400 });
       }
-      const contentType = file.type?.toLowerCase() ?? "";
-      const validMime =
-        contentType === DOCX_MIME ||
-        contentType === "application/octet-stream" ||
-        contentType === "";
-      if (!validMime) {
-        return NextResponse.json(
-          { error: "Tipo de archivo no válido. Debe ser .docx" },
-          { status: 400 }
-        );
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        return NextResponse.json(
-          { error: "El archivo no puede superar 10 MB" },
-          { status: 400 }
-        );
-      }
-
-      const timestamp = Date.now();
-      const random = randomBytes(4).toString("hex");
-      const safeName = `acta_${timestamp}_${random}.docx`;
-      const mime = file.type || DOCX_MIME;
+      const safeName = generarNombreAlmacenamientoModeloWord(file.name, "acta");
+      const mime = contentTypeWordSubida(file.name, file.type);
       urlArchivo = await subirArchivo("actas", safeName, file, mime);
       nombreArchivo = file.name;
     }
@@ -164,11 +140,3 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function parseFechaArgentina(str: string): Date | null {
-  if (!str) return null;
-  const [d, m, y] = str.split("/").map((x) => parseInt(x, 10));
-  if (!d || !m || !y) return null;
-  const date = new Date(y, m - 1, d);
-  if (isNaN(date.getTime())) return null;
-  return date;
-}

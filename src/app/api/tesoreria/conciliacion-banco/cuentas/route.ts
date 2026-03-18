@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  encontrarCuentaPorCodigoMovimientoExtracto,
+  tokensCodOperativoCuenta,
+  tokensCubiertosPorCuentaBancaria,
+} from "@/lib/tesoreria/encontrarCuentaPorCodOperativo";
 
 const ROLES = ["ADMIN", "TESORERO", "SUPER_ADMIN"] as const;
 
@@ -24,6 +29,8 @@ function nombreValido(nombre: string, codigo: string, codOp: string): boolean {
   const n = nombre.trim();
   if (!n || n.length < 2) return false;
   if (n === codigo || n === codOp) return false;
+  const tokensOp = tokensCodOperativoCuenta(codOp);
+  if (tokensOp.includes(n)) return false;
   return true;
 }
 
@@ -44,13 +51,37 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const resultado: CuentaFila[] = [];
-  const porCodigoCuenta = new Map<string, CuentaFila>();
-
   const cuentasDb = await prisma.cuentaBancaria.findMany({
     where: { activo: true },
     orderBy: [{ codigo: "asc" }, { id: "asc" }],
   });
+
+  const todosCodigos = await prisma.movimientoExtracto.findMany({
+    where: { codOperativo: { not: null } },
+    select: { codOperativo: true },
+    distinct: ["codOperativo"],
+    orderBy: { codOperativo: "asc" },
+  });
+
+  const codigosExtracto = new Set(
+    todosCodigos.map((row) => String(row.codOperativo ?? "").trim()).filter(Boolean)
+  );
+
+  /** Cualquier código de extracto que matchea codigo o algún token de codOperativo de la cuenta */
+  function cuentaApareceEnExtracto(r: (typeof cuentasDb)[0]): boolean {
+    const cg = String(r.codigo ?? "").trim();
+    if (codigosExtracto.has(cg)) return true;
+    return tokensCodOperativoCuenta(r.codOperativo).some((t) => codigosExtracto.has(t));
+  }
+
+  /** Todos los códigos de movimiento ya cubiertos por alguna cuenta del catálogo */
+  const cubiertosPorCatalogo = new Set<string>();
+  for (const r of cuentasDb) {
+    tokensCubiertosPorCuentaBancaria(r).forEach((t) => cubiertosPorCatalogo.add(t));
+  }
+
+  const resultado: CuentaFila[] = [];
+  const porCodigoCuenta = new Map<string, CuentaFila>();
 
   for (const r of cuentasDb) {
     const codigoRaw = String(r.codigo ?? "").trim();
@@ -60,21 +91,32 @@ export async function GET(_req: NextRequest) {
     const codigoFinal = codigoRaw || primerToken || "S/C";
     const codOpDisplay = codOpRaw;
 
-    if (!nombreValido(nombreRaw, codigoFinal, codOpDisplay || codigoFinal)) continue;
+    const validNombre = nombreValido(nombreRaw, codigoFinal, codOpDisplay || codigoFinal);
+    const necesariaParaExtracto = cuentaApareceEnExtracto(r);
 
+    if (!validNombre && !necesariaParaExtracto) continue;
     if (porCodigoCuenta.has(codigoFinal)) continue;
+
+    const nombreOut =
+      validNombre && nombreRaw.trim().length >= 2
+        ? nombreRaw
+        : nombreRaw.trim().length >= 2
+          ? nombreRaw
+          : necesariaParaExtracto
+            ? nombreRaw.trim() || `Cuenta ${codigoFinal}`
+            : nombreRaw;
 
     const fila: CuentaFila = {
       cuentaCodigo: codigoFinal,
       codigo: codigoFinal,
       codOperativo: codOpDisplay,
-      nombre: nombreRaw,
+      nombre: nombreOut.trim() || `Cuenta ${codigoFinal}`,
     };
     porCodigoCuenta.set(codigoFinal, fila);
     resultado.push(fila);
   }
 
-  const cubiertos = new Set<string>();
+  const cubiertos = new Set<string>(cubiertosPorCatalogo);
   for (const f of resultado) {
     tokensCubiertosPorFila(f).forEach((t) => cubiertos.add(t));
   }
@@ -95,35 +137,51 @@ export async function GET(_req: NextRequest) {
     const nombre = String(cu.nombre).trim();
     const codigo = String(cu.codigo).trim();
     const codOpCuenta = normalizarUnaLinea(cu.codOperativo ?? "") || codigo;
-    if (!nombreValido(nombre, codigo, cod)) continue;
+    const matchTok = tokensCodOperativoCuenta(cu.codOperativo).includes(cod);
+    if (!nombreValido(nombre, codigo, cod) && !matchTok) continue;
+    const nombreUsar = nombre.trim() || (matchTok ? `Cuenta ${codigo}` : "");
+    if (!nombreUsar) continue;
     const prev = nombrePorCodMov.get(cod);
-    if (!prev || prev.nombre.length < nombre.length) {
-      nombrePorCodMov.set(cod, { codigo, codOp: codOpCuenta, nombre });
+    if (!prev || nombreUsar.length > prev.nombre.length) {
+      nombrePorCodMov.set(cod, { codigo, codOp: codOpCuenta, nombre: nombreUsar });
     }
   }
-
-  const todosCodigos = await prisma.movimientoExtracto.findMany({
-    where: { codOperativo: { not: null } },
-    select: { codOperativo: true },
-    distinct: ["codOperativo"],
-    orderBy: { codOperativo: "asc" },
-  });
 
   for (const row of todosCodigos) {
     const cod = String(row.codOperativo ?? "").trim();
     if (!cod || cubiertos.has(cod)) continue;
+
+    const cuentaCat = encontrarCuentaPorCodigoMovimientoExtracto(cod, cuentasDb);
+    if (cuentaCat) {
+      const cg = String(cuentaCat.codigo ?? "").trim() || cod;
+      if (porCodigoCuenta.has(cg)) {
+        cubiertos.add(cod);
+        continue;
+      }
+      const nom = String(cuentaCat.nombre ?? "").trim() || `Cuenta ${cg}`;
+      resultado.push({
+        cuentaCodigo: cg,
+        codigo: cg,
+        codOperativo: normalizarUnaLinea(cuentaCat.codOperativo ?? "") || cg,
+        nombre: nom,
+      });
+      porCodigoCuenta.set(cg, resultado[resultado.length - 1]!);
+      tokensCubiertosPorCuentaBancaria(cuentaCat).forEach((t) => cubiertos.add(t));
+      continue;
+    }
+
     const info = nombrePorCodMov.get(cod);
     if (!info) continue;
     resultado.push({
-      cuentaCodigo: cod,
-      codigo: cod,
-      codOperativo: cod,
+      cuentaCodigo: info.codigo,
+      codigo: info.codigo,
+      codOperativo: info.codOp,
       nombre: info.nombre,
     });
     cubiertos.add(cod);
+    tokensCubiertosPorFila(resultado[resultado.length - 1]!).forEach((t) => cubiertos.add(t));
   }
 
-  /** Códigos que aparecen en el extracto pero sin fila en catálogo ni cuenta vinculada */
   const codigosPendientes = todosCodigos
     .map((row) => String(row.codOperativo ?? "").trim())
     .filter((cod) => cod && !cubiertos.has(cod));
@@ -135,11 +193,11 @@ export async function GET(_req: NextRequest) {
     });
     const mejorConcepto = new Map<string, string>();
     for (const m of movsConcepto) {
-      const cod = String(m.codOperativo ?? "").trim();
+      const c = String(m.codOperativo ?? "").trim();
       const con = normalizarUnaLinea(String(m.concepto ?? ""));
-      if (!con || con === cod) continue;
-      const prev = mejorConcepto.get(cod);
-      if (!prev || con.length > prev.length) mejorConcepto.set(cod, con);
+      if (!con || con === c) continue;
+      const prev = mejorConcepto.get(c);
+      if (!prev || con.length > prev.length) mejorConcepto.set(c, con);
     }
     const MAX_NOMBRE = 160;
     for (const cod of codigosPendientes) {

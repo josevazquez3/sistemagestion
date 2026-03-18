@@ -178,6 +178,15 @@ export function ModelosNotasContent() {
       if (!res.ok) {
         throw new Error((data?.error as string) || "No se pudo cargar el contenido");
       }
+      if (data.previewNoDisponible) {
+        showMessage(
+          "error",
+          (data.mensaje as string) ||
+            (data.mensajePreview as string) ||
+            "Vista previa no disponible para .doc. Descargá el archivo para visualizarlo."
+        );
+        return;
+      }
       abrirEditor({
         modeloId: m.id,
         nombre: data.nombre as string,

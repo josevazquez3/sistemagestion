@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  primerDiaMesNoonUTC,
+  ultimoDiaMesNoonUTC,
+  fechaSeguraParaPrisma,
+} from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "RRHH"] as const;
 
@@ -29,8 +34,8 @@ export async function GET(request: NextRequest) {
 
   if (periodo && /^\d{4}-\d{2}$/.test(periodo)) {
     const [año, mes] = periodo.split("-").map(Number);
-    const inicioMes = new Date(año, mes - 1, 1);
-    const finMes = new Date(año, mes, 0, 23, 59, 59);
+    const inicioMes = primerDiaMesNoonUTC(año, mes);
+    const finMes = ultimoDiaMesNoonUTC(año, mes);
     where.OR = [
       { fechaDesde: { gte: inicioMes, lte: finMes } },
       { fechaHasta: { gte: inicioMes, lte: finMes } },
@@ -62,8 +67,8 @@ export async function POST(req: NextRequest) {
     if (!legajoId || !tipo) {
       return NextResponse.json({ error: "legajoId y tipo son obligatorios" }, { status: 400 });
     }
-    const desde = fechaDesde ? new Date(fechaDesde) : new Date();
-    const hasta = fechaHasta ? new Date(fechaHasta) : new Date();
+    const desde = fechaDesde ? fechaSeguraParaPrisma(fechaDesde) : fechaSeguraParaPrisma(new Date());
+    const hasta = fechaHasta ? fechaSeguraParaPrisma(fechaHasta) : fechaSeguraParaPrisma(new Date());
     const dias = typeof diasTotal === "number" ? diasTotal : 1;
 
     const novedad = await prisma.novedadLiquidacion.create({

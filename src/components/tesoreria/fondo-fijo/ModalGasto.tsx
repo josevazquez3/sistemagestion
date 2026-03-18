@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputFecha } from "@/components/ui/InputFecha";
 import { parsearImporteAR } from "@/lib/parsearExtracto";
 
 type ModalGastoProps = {
@@ -25,8 +26,12 @@ type ModalGastoProps = {
 function parsearFechaDD_MM_YYYY(str: string): string {
   const [d, m, y] = str.trim().split("/");
   if (!d || !m || !y) return "";
-  const yy = y!.length === 2 ? `20${y}` : y!;
-  return `${yy}-${m!.padStart(2, "0")}-${d!.padStart(2, "0")}T12:00:00.000-03:00`;
+  const yy = (y!.length === 2 ? `20${y}` : y!) as string;
+  const day = parseInt(d!, 10);
+  const month = parseInt(m!, 10) - 1;
+  const year = parseInt(yy, 10);
+  if (!day || month < 0 || !year) return "";
+  return new Date(Date.UTC(year, month, day, 12, 0, 0, 0)).toISOString();
 }
 
 export function ModalGasto({
@@ -113,12 +118,12 @@ export function ModalGasto({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="gasto-fecha">Fecha *</Label>
-            <Input
+            <InputFecha
               id="gasto-fecha"
               value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
+              onChange={setFecha}
               placeholder="DD/MM/YYYY"
-              className="mt-1"
+              className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
             />
           </div>
           <div>

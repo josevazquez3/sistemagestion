@@ -6,11 +6,18 @@ import { subirArchivo, eliminarArchivo } from "@/lib/blob";
 import path from "path";
 import { randomBytes } from "crypto";
 import { unlink } from "fs/promises";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
+import {
+  validarArchivoWordModelo,
+  contentTypeWordSubida,
+  generarNombreAlmacenamientoModeloWord,
+  MIME_WORD_DOC,
+} from "@/lib/legales/modelosOficioArchivo";
 
 const ROLES_WRITE = ["ADMIN", "SECRETARIA", "SUPER_ADMIN"] as const;
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
-const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PDF_MIME = "application/pdf";
+const DOC_MIME = MIME_WORD_DOC;
 function normalizeRole(r: unknown): string | null {
   if (typeof r === "string") return r;
   if (r && typeof r === "object" && "nombre" in r && typeof (r as { nombre: unknown }).nombre === "string")
@@ -29,16 +36,6 @@ function canWrite(roles: unknown): boolean {
 function parseId(id: string): number | null {
   const n = parseInt(id, 10);
   return isNaN(n) ? null : n;
-}
-
-function parseFechaArgentina(str: string): Date | null {
-  if (!str) return null;
-  const parts = str.split("/").map((x) => parseInt(x, 10));
-  if (parts.length !== 3) return null;
-  const [d, m, y] = parts;
-  const date = new Date(y, m - 1, d);
-  if (isNaN(date.getTime())) return null;
-  return date;
 }
 
 export async function GET(
@@ -90,7 +87,7 @@ export async function PUT(
       const cid = parseInt(categoriaIdStr, 10);
       if (!isNaN(cid)) data.categoriaId = cid;
     }
-    const fd = parseFechaArgentina(fechaDocumentoStr ?? "");
+    const fd = parsearFechaSegura(fechaDocumentoStr ?? "");
     if (fechaDocumentoStr !== undefined) data.fechaDocumento = fd ?? null;
 
     if (quitarArchivo && doc.urlArchivo) {
@@ -109,9 +106,21 @@ export async function PUT(
     if (file && file.size > 0) {
       const name = file.name.toLowerCase();
       const isPdf = name.endsWith(".pdf");
+      const isDoc = name.endsWith(".doc") && !name.endsWith(".docx");
       const isDocx = name.endsWith(".docx");
-      if (!isPdf && !isDocx) {
-        return NextResponse.json({ error: "Solo se permiten PDF o DOCX" }, { status: 400 });
+      if (!isPdf && !isDoc && !isDocx) {
+        return NextResponse.json({ error: "Solo se permiten PDF, DOC o DOCX" }, { status: 400 });
+      }
+      if (isPdf) {
+        const ct = file.type?.toLowerCase() ?? "";
+        const okMime =
+          ct === PDF_MIME || ct === "application/octet-stream" || ct === "";
+        if (!okMime) {
+          return NextResponse.json({ error: "Tipo de archivo no válido. Debe ser PDF" }, { status: 400 });
+        }
+      } else {
+        const wordVal = validarArchivoWordModelo(file, MAX_FILE_SIZE);
+        if (!wordVal.ok) return NextResponse.json({ error: wordVal.error }, { status: 400 });
       }
       if (file.size > MAX_FILE_SIZE) {
         return NextResponse.json({ error: "El archivo no puede superar 20 MB" }, { status: 400 });
@@ -122,12 +131,17 @@ export async function PUT(
           try { await unlink(path.join(process.cwd(), "public", doc.urlArchivo)); } catch {}
         }
       }
-      const ext = isPdf ? "pdf" : "docx";
-      const safeName = `ordendel_${Date.now()}_${randomBytes(4).toString("hex")}.${ext}`;
-      const contentType = isPdf ? PDF_MIME : DOCX_MIME;
-      data.urlArchivo = await subirArchivo("orden-del-dia", safeName, file, contentType);
+      if (isPdf) {
+        const safeName = `ordendel_${Date.now()}_${randomBytes(4).toString("hex")}.pdf`;
+        data.urlArchivo = await subirArchivo("orden-del-dia", safeName, file, PDF_MIME);
+        data.tipoArchivo = "PDF";
+      } else {
+        const safeName = generarNombreAlmacenamientoModeloWord(file.name, "ordendel");
+        const mime = contentTypeWordSubida(file.name, file.type ?? "");
+        data.urlArchivo = await subirArchivo("orden-del-dia", safeName, file, mime);
+        data.tipoArchivo = mime === DOC_MIME || isDoc ? "DOC" : "DOCX";
+      }
       data.nombreArchivo = file.name;
-      data.tipoArchivo = isPdf ? "PDF" : "DOCX";
     }
 
     const updated = await prisma.documentoOrdenDia.update({

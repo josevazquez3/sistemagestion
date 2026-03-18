@@ -4,11 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import type { Prisma } from "@prisma/client";
 import { subirArchivo } from "@/lib/blob";
-import { randomBytes } from "crypto";
+import {
+  validarArchivoWordModelo,
+  generarNombreAlmacenamientoModeloWord,
+  contentTypeWordSubida,
+} from "@/lib/legales/modelosOficioArchivo";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
@@ -70,25 +73,19 @@ export async function POST(req: NextRequest) {
     if (!tipo || !tipo.activo) {
       return NextResponse.json({ error: "Tipo de oficio no encontrado o inactivo" }, { status: 400 });
     }
-    if (!file || file.size === 0) {
-      return NextResponse.json({ error: "Debe seleccionar un archivo .docx" }, { status: 400 });
-    }
-    const name = file.name.toLowerCase();
-    if (!name.endsWith(".docx")) {
-      return NextResponse.json({ error: "Solo se permiten archivos .docx" }, { status: 400 });
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "El archivo no puede superar 10 MB" }, { status: 400 });
+    const v = validarArchivoWordModelo(file, MAX_FILE_SIZE);
+    if (!v.ok) {
+      return NextResponse.json({ error: v.error }, { status: 400 });
     }
 
-    const safeName = `modelooficio_${Date.now()}_${randomBytes(4).toString("hex")}.docx`;
+    const safeName = generarNombreAlmacenamientoModeloWord(file.name);
     const buffer = Buffer.from(await file.arrayBuffer());
     const arrayBuffer = buffer.buffer.slice(
       buffer.byteOffset,
       buffer.byteOffset + buffer.byteLength
     ) as ArrayBuffer;
     const bytes = new Uint8Array(arrayBuffer);
-    const contentType = file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const contentType = contentTypeWordSubida(file.name, file.type);
     const urlArchivo = await subirArchivo("modelos-oficios", safeName, buffer, contentType);
 
     const modelo = await prisma.modeloOficio.create({

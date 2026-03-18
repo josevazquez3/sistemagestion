@@ -10,8 +10,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { formatDateInputWithSlashes } from "@/lib/legislacion.utils";
+import { InputFecha } from "@/components/ui/InputFecha";
 import type { Reunion } from "./types";
+import { formatearFechaUTC } from "@/lib/utils/fecha";
 
 const TZ = "America/Argentina/Buenos_Aires";
 
@@ -63,14 +64,7 @@ export function ModalReunion({
   useEffect(() => {
     if (reunion) {
       setOrganismo(reunion.organismo);
-      setFechaReunion(
-        new Date(reunion.fechaReunion).toLocaleDateString("es-AR", {
-          timeZone: TZ,
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        })
-      );
+      setFechaReunion(formatearFechaUTC(new Date(reunion.fechaReunion)));
       setHora(reunion.hora ?? "");
       setObservacion(reunion.observacion ?? "");
       setContactoNombre(reunion.contactoNombre ?? "");
@@ -173,10 +167,9 @@ export function ModalReunion({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Fecha de la reunión * (DD/MM/YYYY)
               </label>
-              <input
-                type="text"
+              <InputFecha
                 value={fechaReunion}
-                onChange={(e) => setFechaReunion(formatDateInputWithSlashes(e.target.value))}
+                onChange={setFechaReunion}
                 placeholder="DD/MM/YYYY"
                 className="w-full h-9 rounded-md border border-gray-300 px-3 text-sm"
               />

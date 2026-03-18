@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputFecha } from "@/components/ui/InputFecha";
 import {
   Table,
   TableBody,
@@ -19,18 +20,23 @@ import { ModalEditarActa } from "./ModalEditarActa";
 import { ModalCargaMasivaActas } from "./ModalCargaMasivaActas";
 import { exportarActaPDF, exportarActaDOCX } from "@/lib/exportarActas";
 import type { Acta } from "./types";
+import { esDocFormatoAntiguo } from "@/lib/legales/modelosOficioWordShared";
+import { formatearFechaUTC } from "@/lib/utils/fecha";
 
 const TZ = "America/Argentina/Buenos_Aires";
+
+function etiquetaTipoArchivoActa(nombreArchivo: string): string | null {
+  const l = nombreArchivo.toLowerCase();
+  if (l.endsWith(".pdf")) return "PDF";
+  if (l.endsWith(".docx")) return "DOCX";
+  if (l.endsWith(".doc")) return "DOC";
+  return null;
+}
 const PER_PAGE = 20;
 
 function formatFecha(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("es-AR", {
-      timeZone: TZ,
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return formatearFechaUTC(new Date(iso));
   } catch {
     return iso.slice(0, 10);
   }
@@ -172,18 +178,16 @@ export function ActasContent() {
                 className="pl-9"
               />
             </div>
-            <input
-              type="text"
+            <InputFecha
               placeholder="Desde (DD/MM/YYYY)"
               value={desde}
-              onChange={(e) => setDesde(e.target.value)}
+              onChange={setDesde}
               className="w-36 h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
-            <input
-              type="text"
+            <InputFecha
               placeholder="Hasta (DD/MM/YYYY)"
               value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
+              onChange={setHasta}
               className="w-36 h-9 rounded-md border border-gray-300 px-3 text-sm"
             />
             <Button
@@ -231,7 +235,13 @@ export function ActasContent() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.map((acta) => (
+                  data.map((acta) => {
+                    const badgeArchivo =
+                      acta.nombreArchivo ? etiquetaTipoArchivoActa(acta.nombreArchivo) : null;
+                    const esDocAntiguo = acta.nombreArchivo
+                      ? esDocFormatoAntiguo(acta.nombreArchivo)
+                      : false;
+                    return (
                     <TableRow key={acta.id}>
                       <TableCell className="font-medium max-w-[200px] truncate" title={acta.titulo}>
                         {acta.titulo}
@@ -242,9 +252,15 @@ export function ActasContent() {
                           <button
                             type="button"
                             onClick={() => handleDownload(acta)}
-                            className="text-[#388E3C] hover:underline text-sm"
+                            className="inline-flex items-center gap-2 text-left text-[#388E3C] hover:underline text-sm"
                           >
-                            {acta.nombreArchivo}
+                            <FileText className="h-4 w-4 shrink-0 text-[#2E7D32]" aria-hidden />
+                            <span>{acta.nombreArchivo}</span>
+                            {badgeArchivo && (
+                              <span className="rounded bg-[#E8F5E9] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[#2E7D32]">
+                                {badgeArchivo}
+                              </span>
+                            )}
                           </button>
                         ) : (
                           <span className="text-gray-400">Sin archivo</span>
@@ -307,20 +323,32 @@ export function ActasContent() {
                             <FileDown className="h-4 w-4" />
                           </Button>
                           {acta.urlArchivo && acta.nombreArchivo && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100"
-                              onClick={() => handleImprimir(acta)}
-                              title={`Imprimir ${acta.nombreArchivo}`}
+                            <span
+                              className="inline-flex"
+                              title={
+                                esDocAntiguo
+                                  ? "Vista previa no disponible para archivos .doc"
+                                  : `Imprimir ${acta.nombreArchivo}`
+                              }
                             >
-                              <Printer className="h-4 w-4" />
-                            </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className={`h-8 w-8 p-0 text-gray-600 hover:bg-gray-100 ${
+                                  esDocAntiguo ? "opacity-40 cursor-not-allowed" : ""
+                                }`}
+                                disabled={esDocAntiguo}
+                                onClick={() => handleImprimir(acta)}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            </span>
                           )}
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

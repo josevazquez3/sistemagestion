@@ -5,6 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import type { Prisma } from "@prisma/client";
 import { subirArchivo } from "@/lib/blob";
 import { randomBytes } from "crypto";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -12,15 +13,6 @@ const PDF_MIME = "application/pdf";
 
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
-}
-
-function parseFechaArgentina(str: string): Date | null {
-  if (!str) return null;
-  const [d, m, y] = str.split("/").map((x) => parseInt(x, 10));
-  if (!d || !m || !y) return null;
-  const date = new Date(y, m - 1, d);
-  if (isNaN(date.getTime())) return null;
-  return date;
 }
 
 /** GET - Listar oficios con búsqueda, filtro de fechas y paginación */
@@ -49,16 +41,12 @@ export async function GET(req: NextRequest) {
 
   const fechaOficioRange: { gte?: Date; lte?: Date } = {};
   if (desde) {
-    const d = parseFechaArgentina(desde);
+    const d = parsearFechaSegura(desde);
     if (d) fechaOficioRange.gte = d;
   }
   if (hasta) {
-    const h = parseFechaArgentina(hasta);
-    if (h) {
-      const endOfDay = new Date(h);
-      endOfDay.setHours(23, 59, 59, 999);
-      fechaOficioRange.lte = endOfDay;
-    }
+    const h = parsearFechaSegura(hasta);
+    if (h) fechaOficioRange.lte = h;
   }
   if (fechaOficioRange.gte !== undefined || fechaOficioRange.lte !== undefined) {
     where.fechaOficio = fechaOficioRange;
@@ -98,7 +86,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const fechaOficio = parseFechaArgentina(fechaOficioStr ?? "");
+    const fechaOficio = parsearFechaSegura(fechaOficioStr ?? "");
     if (!fechaOficio) {
       return NextResponse.json(
         { error: "La fecha del oficio es obligatoria (formato DD/MM/YYYY)" },

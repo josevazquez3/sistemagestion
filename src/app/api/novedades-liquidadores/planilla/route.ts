@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { EstadoLicencia } from "@prisma/client";
+import {
+  primerDiaMesNoonUTC,
+  ultimoDiaMesNoonUTC,
+  formatearFechaUTC,
+} from "@/lib/utils/fecha";
+
+export const dynamic = "force-dynamic";
 
 const ROLES = ["ADMIN", "RRHH"] as const;
 
@@ -9,11 +16,12 @@ function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
 }
 
+function rangosSeSolapan(aDesde: Date, aHasta: Date, bDesde: Date, bHasta: Date): boolean {
+  return aDesde <= bHasta && aHasta >= bDesde;
+}
+
 function formatDDMMYYYY(d: Date): string {
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  return formatearFechaUTC(d);
 }
 
 export type FilaPlanillaAPI = {
@@ -46,12 +54,14 @@ export async function GET(request: NextRequest) {
 
   if (periodo && /^\d{4}-\d{2}$/.test(periodo)) {
     const [año, mes] = periodo.split("-").map(Number);
-    inicioMes = new Date(año, mes - 1, 1);
-    finMes = new Date(año, mes, 0, 23, 59, 59);
+    inicioMes = primerDiaMesNoonUTC(año, mes);
+    finMes = ultimoDiaMesNoonUTC(año, mes);
   } else {
     const hoy = new Date();
-    inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
+    const y = hoy.getUTCFullYear();
+    const m = hoy.getUTCMonth() + 1;
+    inicioMes = primerDiaMesNoonUTC(y, m);
+    finMes = ultimoDiaMesNoonUTC(y, m);
   }
 
   const solicitudes = await prisma.solicitudVacaciones.findMany({
@@ -95,6 +105,28 @@ export async function GET(request: NextRequest) {
     },
     include: { legajo: { select: { id: true, numeroLegajo: true, nombres: true, apellidos: true } } },
   });
+
+  const legajosConNovedadVacaciones = [
+    ...new Set(novedades.filter((n) => n.tipo === "VACACIONES").map((n) => n.legajoId)),
+  ];
+  const solicitudesVacacionesRespaldoNovedad =
+    legajosConNovedadVacaciones.length > 0
+      ? await prisma.solicitudVacaciones.findMany({
+          where: {
+            estado: "APROBADA",
+            legajoId: { in: legajosConNovedadVacaciones },
+          },
+          select: { legajoId: true, fechaDesde: true, fechaHasta: true },
+        })
+      : [];
+
+  function tieneVacacionesAprobadasParaNovedad(legajoId: string, nDesde: Date, nHasta: Date): boolean {
+    return solicitudesVacacionesRespaldoNovedad.some(
+      (p) =>
+        p.legajoId === legajoId &&
+        rangosSeSolapan(p.fechaDesde, p.fechaHasta, nDesde, nHasta)
+    );
+  }
 
   const mapa = new Map<string, FilaPlanillaAPI>();
 
@@ -158,6 +190,12 @@ export async function GET(request: NextRequest) {
   }
 
   for (const n of novedades) {
+    if (
+      n.tipo === "VACACIONES" &&
+      !tieneVacacionesAprobadasParaNovedad(n.legajoId, n.fechaDesde, n.fechaHasta)
+    ) {
+      continue;
+    }
     const key = n.legajoId;
     const obs = n.observacion ?? "";
     if (!mapa.has(key)) {
@@ -204,8 +242,13 @@ export async function GET(request: NextRequest) {
     (a, b) => a.apellidoNombre.localeCompare(b.apellidoNombre)
   );
 
-  return NextResponse.json({
-    data: filas,
-    periodo: periodo || `${inicioMes.getFullYear()}-${String(inicioMes.getMonth() + 1).padStart(2, "0")}`,
-  });
+  return NextResponse.json(
+    {
+      data: filas,
+      periodo:
+        periodo ||
+        `${inicioMes.getUTCFullYear()}-${String(inicioMes.getUTCMonth() + 1).padStart(2, "0")}`,
+    },
+    { headers: { "Cache-Control": "private, no-store, must-revalidate" } }
+  );
 }

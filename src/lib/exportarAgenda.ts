@@ -17,6 +17,7 @@ import {
   AlignmentType,
   BorderStyle,
 } from "docx";
+import { formatearFechaUTC } from "@/lib/utils/fecha";
 
 const TZ = "America/Argentina/Buenos_Aires";
 
@@ -39,14 +40,14 @@ const estadoLabel = (e: string | undefined): string =>
   e === "FINALIZADA" ? "Finalizada" : "Pendiente";
 
 const formatearFecha = (fecha: Date | string): string =>
-  new Date(fecha).toLocaleDateString("es-AR", { timeZone: TZ });
+  formatearFechaUTC(new Date(fecha));
 
 const formatearFechaHora = (fecha: Date | string): string =>
   new Date(fecha).toLocaleString("es-AR", { timeZone: TZ });
 
 const formatearFechaArchivo = (fecha: Date | string): string => {
   const d = new Date(fecha);
-  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
 };
 
 /** Exportar todas las reuniones (filtradas) a PDF */

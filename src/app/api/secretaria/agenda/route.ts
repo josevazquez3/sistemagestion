@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import type { Prisma } from "@prisma/client";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "SECRETARIA", "SUPER_ADMIN"] as const;
 
@@ -12,16 +13,6 @@ function canAccess(roles: unknown): boolean {
     typeof r === "string" ? r : (r as { nombre?: string })?.nombre ?? (r as { name?: string })?.name
   ).filter(Boolean) as string[];
   return ROLES.some((r) => names.includes(r));
-}
-
-function parseFechaArgentina(str: string): Date | null {
-  if (!str?.trim()) return null;
-  const parts = str.trim().split("/").map((x) => parseInt(x, 10));
-  if (parts.length !== 3) return null;
-  const [d, m, y] = parts;
-  if (!d || !m || !y) return null;
-  const date = new Date(y, m - 1, d);
-  return isNaN(date.getTime()) ? null : date;
 }
 
 /** GET - Listar reuniones */
@@ -50,16 +41,12 @@ export async function GET(req: NextRequest) {
 
   const fechaRange: { gte?: Date; lte?: Date } = {};
   if (desde) {
-    const d = parseFechaArgentina(desde);
+    const d = parsearFechaSegura(desde);
     if (d) fechaRange.gte = d;
   }
   if (hasta) {
-    const h = parseFechaArgentina(hasta);
-    if (h) {
-      const end = new Date(h);
-      end.setHours(23, 59, 59, 999);
-      fechaRange.lte = end;
-    }
+    const h = parsearFechaSegura(hasta);
+    if (h) fechaRange.lte = h;
   }
   if (fechaRange.gte !== undefined || fechaRange.lte !== undefined) {
     where.fechaReunion = fechaRange;
@@ -99,7 +86,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const organismo = body.organismo?.trim();
     const fechaReunionStr = body.fechaReunion?.trim();
-    const fechaReunion = parseFechaArgentina(fechaReunionStr ?? "");
+    const fechaReunion = parsearFechaSegura(fechaReunionStr ?? "");
     if (!organismo) {
       return NextResponse.json({ error: "Organismo / Institución es obligatorio" }, { status: 400 });
     }

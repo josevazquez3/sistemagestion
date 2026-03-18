@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { esBlobUrl } from "@/lib/blob";
 import mammoth from "mammoth";
+import { esWordDocBinario } from "@/lib/legales/modelosOficioArchivo";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -57,9 +58,20 @@ export async function GET(
       buffer = await readFile(filePath);
     }
 
-    const resultado = await mammoth.convertToHtml({ buffer });
-    const htmlContenido = resultado.value;
     const titulo = acta.titulo ?? acta.nombreArchivo ?? "Acta";
+    let htmlContenido: string;
+    let autoPrint = true;
+    if (esWordDocBinario(acta.nombreArchivo)) {
+      autoPrint = false;
+      htmlContenido = `<div style="padding:2rem;font-family:Arial,sans-serif;max-width:560px;">
+        <p><strong>${titulo}</strong></p>
+        <p style="margin-top:1rem;color:#444;">Vista previa e impresión desde el navegador no están disponibles para archivos <strong>.doc</strong> (formato Word antiguo).</p>
+        <p style="margin-top:0.75rem;">Descargá el acta desde la lista para abrirlo en Microsoft Word.</p>
+      </div>`;
+    } else {
+      const resultado = await mammoth.convertToHtml({ buffer });
+      htmlContenido = resultado.value;
+    }
 
     const htmlCompleto = `<!DOCTYPE html>
 <html lang="es">
@@ -80,7 +92,7 @@ export async function GET(
 </head>
 <body>
   ${htmlContenido}
-  <script>window.addEventListener('load', () => { window.print(); });</script>
+  ${autoPrint ? `<script>window.addEventListener('load', () => { window.print(); });</script>` : ""}
 </body>
 </html>`;
 

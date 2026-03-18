@@ -5,7 +5,11 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import type { Prisma } from "@prisma/client";
 import { subirArchivo, eliminarArchivo } from "@/lib/blob";
 import path from "path";
-import { randomBytes } from "crypto";
+import {
+  validarArchivoWordModelo,
+  generarNombreAlmacenamientoModeloWord,
+  contentTypeWordSubida,
+} from "@/lib/legales/modelosOficioArchivo";
 import { unlink } from "fs/promises";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
@@ -65,12 +69,11 @@ export async function PUT(
         if (!isNaN(tid)) data.tipoOficioId = tid;
       }
       if (file && file.size > 0) {
-        const name = file.name.toLowerCase();
-        if (!name.endsWith(".docx")) return NextResponse.json({ error: "Solo se permiten archivos .docx" }, { status: 400 });
-        if (file.size > MAX_FILE_SIZE) return NextResponse.json({ error: "El archivo no puede superar 10 MB" }, { status: 400 });
-        const safeName = `modelooficio_${Date.now()}_${randomBytes(4).toString("hex")}.docx`;
+        const v = validarArchivoWordModelo(file, MAX_FILE_SIZE);
+        if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+        const safeName = generarNombreAlmacenamientoModeloWord(file.name);
         const buffer = Buffer.from(await file.arrayBuffer());
-        const contentType = file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        const contentType = contentTypeWordSubida(file.name, file.type);
         data.urlArchivo = await subirArchivo("modelos-oficios", safeName, buffer, contentType);
         data.nombreArchivo = file.name;
         data.contenido = buffer;

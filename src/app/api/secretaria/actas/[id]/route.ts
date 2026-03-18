@@ -4,12 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { subirArchivo, eliminarArchivo } from "@/lib/blob";
 import path from "path";
-import { randomBytes } from "crypto";
+import {
+  validarArchivoWordModelo,
+  generarNombreAlmacenamientoModeloWord,
+  contentTypeWordSubida,
+} from "@/lib/legales/modelosOficioArchivo";
 import { unlink } from "fs/promises";
+import { parsearFechaSegura } from "@/lib/utils/fecha";
 
 const ROLES = ["ADMIN", "SECRETARIA"] as const;
-const DOCX_MIME =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));
@@ -18,15 +21,6 @@ function canAccess(roles: string[]) {
 function parseId(id: string): number | null {
   const n = parseInt(id, 10);
   return isNaN(n) ? null : n;
-}
-
-function parseFechaArgentina(str: string): Date | null {
-  if (!str) return null;
-  const [d, m, y] = str.split("/").map((x) => parseInt(x, 10));
-  if (!d || !m || !y) return null;
-  const date = new Date(y, m - 1, d);
-  if (isNaN(date.getTime())) return null;
-  return date;
 }
 
 /** GET - Obtener un acta por ID */
@@ -99,7 +93,7 @@ export async function PUT(
     } = {};
 
     if (titulo !== undefined) data.titulo = titulo;
-    const fechaActa = parseFechaArgentina(fechaActaStr ?? "");
+    const fechaActa = parsearFechaSegura(fechaActaStr ?? "");
     if (fechaActa) data.fechaActa = fechaActa;
 
     if (quitarArchivo && acta.urlArchivo) {
@@ -114,28 +108,8 @@ export async function PUT(
     }
 
     if (file && file.size > 0) {
-      const name = file.name.toLowerCase();
-      if (!name.endsWith(".docx")) {
-        return NextResponse.json(
-          { error: "Solo se permiten archivos .docx" },
-          { status: 400 }
-        );
-      }
-      const ct = file.type?.toLowerCase() ?? "";
-      const validMime =
-        ct === DOCX_MIME || ct === "application/octet-stream" || ct === "";
-      if (!validMime) {
-        return NextResponse.json(
-          { error: "Tipo de archivo no válido. Debe ser .docx" },
-          { status: 400 }
-        );
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        return NextResponse.json(
-          { error: "El archivo no puede superar 10 MB" },
-          { status: 400 }
-        );
-      }
+      const v = validarArchivoWordModelo(file, MAX_FILE_SIZE);
+      if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
       if (acta.urlArchivo) {
         await eliminarArchivo(acta.urlArchivo);
         if (acta.urlArchivo.startsWith("/")) {
@@ -144,11 +118,9 @@ export async function PUT(
           } catch {}
         }
       }
-      const timestamp = Date.now();
-      const random = randomBytes(4).toString("hex");
-      const safeName = `acta_${timestamp}_${random}.docx`;
-      const contentType = file.type || DOCX_MIME;
-      data.urlArchivo = await subirArchivo("actas", safeName, file, contentType);
+      const safeName = generarNombreAlmacenamientoModeloWord(file.name, "acta");
+      const mime = contentTypeWordSubida(file.name, file.type);
+      data.urlArchivo = await subirArchivo("actas", safeName, file, mime);
       data.nombreArchivo = file.name;
     }
 
