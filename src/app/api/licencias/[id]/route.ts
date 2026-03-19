@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { eliminarArchivo } from "@/lib/blob";
 import { EstadoLicencia } from "@prisma/client";
+import path from "path";
+import { unlink } from "fs/promises";
 
-const ROLES_LICENCIAS = ["ADMIN", "RRHH"] as const;
+const ROLES_LICENCIAS = ["SUPER_ADMIN", "ADMIN", "RRHH"] as const;
 
 function canManageLicencias(roles: string[]) {
   return ROLES_LICENCIAS.some((r) => roles.includes(r));
@@ -116,4 +119,66 @@ export async function PUT(
     });
   } catch {}
   return NextResponse.json(updated);
+}
+
+/** DELETE - Eliminar físicamente una licencia y sus certificados (SUPER_ADMIN y ADMIN) */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const puedeEliminarFisico = roles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
+  if (!puedeEliminarFisico) {
+    return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  }
+
+  const id = parseInt((await params).id, 10);
+  if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+
+  const licencia = await prisma.licencia.findUnique({
+    where: { id },
+    include: {
+      certificados: { select: { id: true, urlArchivo: true } },
+      legajo: { select: { numeroLegajo: true, apellidos: true, nombres: true } },
+    },
+  });
+  if (!licencia) {
+    return NextResponse.json({ error: "Licencia no encontrada" }, { status: 404 });
+  }
+
+  const urlsToDelete = licencia.certificados.map((c) => c.urlArchivo);
+  await prisma.$transaction([
+    prisma.observacionLicencia.deleteMany({ where: { licenciaId: id } }),
+    prisma.certificado.deleteMany({ where: { licenciaId: id } }),
+    prisma.licencia.delete({ where: { id } }),
+  ]);
+
+  for (const url of urlsToDelete) {
+    if (!url) continue;
+    try {
+      await eliminarArchivo(url);
+    } catch {}
+    if (url.startsWith("/")) {
+      try {
+        const filePath = path.join(process.cwd(), "public", url.replace(/^\//, ""));
+        await unlink(filePath);
+      } catch {}
+    }
+  }
+
+  const user = session?.user as { id?: string; name?: string; email?: string };
+  try {
+    await registrarAuditoria({
+      userId: user?.id ?? "",
+      userNombre: user?.name ?? "",
+      userEmail: user?.email ?? "",
+      accion: "Eliminó físicamente una licencia",
+      modulo: "Licencias",
+      detalle: `Licencia #${id} - ${licencia.legajo.apellidos} ${licencia.legajo.nombres} (Leg. ${licencia.legajo.numeroLegajo})`,
+      ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined,
+    });
+  } catch {}
+
+  return NextResponse.json({ ok: true });
 }

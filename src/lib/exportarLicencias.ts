@@ -21,6 +21,7 @@ import {
   diasTranscurridos,
   diasRestantes,
   TIPO_LICENCIA_LABEL,
+  parsearFechaLocalDesdeBD,
 } from "@/lib/licencias.utils";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Sistema de Gestión";
@@ -40,7 +41,7 @@ function observacionReciente(lic: LicenciaNomina): string {
 }
 
 function textoDiasRestantes(lic: LicenciaNomina): string {
-  const fin = lic.fechaFin ? new Date(lic.fechaFin) : null;
+  const fin = lic.fechaFin ? parsearFechaLocalDesdeBD(lic.fechaFin) : null;
   const rest = diasRestantes(fin);
   if (rest === null) return "—";
   if (rest < 0) return "VENCIDA";
@@ -79,7 +80,7 @@ export function exportarPDFTodos(licencias: LicenciaNomina[]): void {
     "Observaciones",
   ];
   const body = licencias.map((lic) => {
-    const inicio = new Date(lic.fechaInicio);
+    const inicio = parsearFechaLocalDesdeBD(lic.fechaInicio);
     const trans = diasTranscurridos(inicio);
     const rest = textoDiasRestantes(lic);
     const obs = observacionReciente(lic);
@@ -89,7 +90,7 @@ export function exportarPDFTodos(licencias: LicenciaNomina[]): void {
       `${lic.legajo.apellidos}, ${lic.legajo.nombres}`,
       TIPO_LICENCIA_LABEL[lic.tipoLicencia] ?? lic.tipoLicencia,
       formatearFechaLicencia(inicio),
-      lic.fechaFin ? formatearFechaLicencia(new Date(lic.fechaFin)) : "—",
+      lic.fechaFin ? formatearFechaLicencia(lic.fechaFin) : "—",
       String(trans),
       rest,
       obsCorta,
@@ -119,7 +120,7 @@ export function exportarPDFTodos(licencias: LicenciaNomina[]): void {
 export function exportarPDFIndividual(licencia: LicenciaNomina): void {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const fechaGen = formatearFechaLicencia(new Date());
-  const inicio = new Date(licencia.fechaInicio);
+  const inicio = parsearFechaLocalDesdeBD(licencia.fechaInicio);
   const trans = diasTranscurridos(inicio);
   const rest = textoDiasRestantes(licencia);
   const obs = observacionReciente(licencia);
@@ -141,7 +142,7 @@ export function exportarPDFIndividual(licencia: LicenciaNomina): void {
     ["Nombre y Apellido", `${licencia.legajo.apellidos}, ${licencia.legajo.nombres}`],
     ["Tipo de Licencia", TIPO_LICENCIA_LABEL[licencia.tipoLicencia] ?? licencia.tipoLicencia],
     ["Fecha Inicio", formatearFechaLicencia(inicio)],
-    ["Fecha Fin", licencia.fechaFin ? formatearFechaLicencia(new Date(licencia.fechaFin)) : "—"],
+    ["Fecha Fin", licencia.fechaFin ? formatearFechaLicencia(licencia.fechaFin) : "—"],
     ["Días transcurridos", String(trans)],
     ["Días restantes", rest],
     ["Observaciones", obs || "Sin observaciones"],
@@ -218,7 +219,7 @@ export async function exportarDOCXTodos(licencias: LicenciaNomina[]): Promise<vo
   ];
 
   for (const lic of licencias) {
-    const inicio = new Date(lic.fechaInicio);
+    const inicio = parsearFechaLocalDesdeBD(lic.fechaInicio);
     const trans = diasTranscurridos(inicio);
     const rest = textoDiasRestantes(lic);
     const obs = observacionReciente(lic);
@@ -230,7 +231,7 @@ export async function exportarDOCXTodos(licencias: LicenciaNomina[]): Promise<vo
           new TableCell({ children: [new Paragraph(`${lic.legajo.apellidos}, ${lic.legajo.nombres}`)] }),
           new TableCell({ children: [new Paragraph(TIPO_LICENCIA_LABEL[lic.tipoLicencia] ?? lic.tipoLicencia)] }),
           new TableCell({ children: [new Paragraph(formatearFechaLicencia(inicio))] }),
-          new TableCell({ children: [new Paragraph(lic.fechaFin ? formatearFechaLicencia(new Date(lic.fechaFin)) : "—")] }),
+          new TableCell({ children: [new Paragraph(lic.fechaFin ? formatearFechaLicencia(lic.fechaFin) : "—")] }),
           new TableCell({ children: [new Paragraph(String(trans))] }),
           new TableCell({
             children: [new Paragraph({ children: [new TextRun({ text: rest, bold: true })] })],
@@ -283,7 +284,7 @@ export async function exportarDOCXTodos(licencias: LicenciaNomina[]): Promise<vo
  */
 export async function exportarDOCXIndividual(licencia: LicenciaNomina): Promise<void> {
   const fechaGen = formatearFechaLicencia(new Date());
-  const inicio = new Date(licencia.fechaInicio);
+  const inicio = parsearFechaLocalDesdeBD(licencia.fechaInicio);
   const trans = diasTranscurridos(inicio);
   const rest = textoDiasRestantes(licencia);
   const obs = observacionReciente(licencia);
@@ -325,7 +326,7 @@ export async function exportarDOCXIndividual(licencia: LicenciaNomina): Promise<
             spacing: { after: 100 },
           }),
           new Paragraph({
-            text: `Fecha Fin: ${licencia.fechaFin ? formatearFechaLicencia(new Date(licencia.fechaFin)) : "—"}`,
+            text: `Fecha Fin: ${licencia.fechaFin ? formatearFechaLicencia(licencia.fechaFin) : "—"}`,
             spacing: { after: 100 },
           }),
           new Paragraph({ text: `Días transcurridos: ${trans}`, spacing: { after: 100 } }),

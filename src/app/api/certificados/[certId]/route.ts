@@ -6,7 +6,7 @@ import { eliminarArchivo } from "@/lib/blob";
 import path from "path";
 import { unlink } from "fs/promises";
 
-const ROLES_LICENCIAS = ["ADMIN", "RRHH"] as const;
+const ROLES_LICENCIAS = ["SUPER_ADMIN", "ADMIN"] as const;
 
 function canManageLicencias(roles: string[]) {
   return ROLES_LICENCIAS.some((r) => roles.includes(r));

@@ -1,6 +1,7 @@
-"use client";
+ "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import {
   Table,
   TableBody,
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { TIPO_LICENCIA_LABEL } from "@/lib/licencias.utils";
 import { formatearFechaLicencia } from "@/lib/licencias.utils";
-import { Download } from "lucide-react";
+import { Download, Trash2 } from "lucide-react";
 import type { TipoLicencia } from "@prisma/client";
 
 type CertificadoRow = {
@@ -31,6 +32,9 @@ export function HistorialCertificados() {
   const [certificados, setCertificados] = useState<CertificadoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroTipo, setFiltroTipo] = useState("");
+  const { data: session } = useSession();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const puedeEliminar = roles.includes("SUPER_ADMIN") || roles.includes("ADMIN");
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -46,6 +50,19 @@ export function HistorialCertificados() {
       setLoading(false);
     }
   }, [filtroTipo]);
+
+  const handleEliminar = useCallback(
+    async (id: number) => {
+      if (!confirm("¿Eliminar este certificado? Esta acción no se puede deshacer.")) return;
+      const res = await fetch(`/api/certificados/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setCertificados((prev) => prev.filter((c) => c.id !== id));
+      } else {
+        alert("Error al eliminar el certificado");
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     cargar();
@@ -83,12 +100,13 @@ export function HistorialCertificados() {
                 <TableHead>Tipo archivo</TableHead>
                 <TableHead>Etapa</TableHead>
                 <TableHead className="w-24">Ver / Descargar</TableHead>
+                {puedeEliminar && <TableHead className="w-24">Eliminar</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {certificados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                  <TableCell colSpan={puedeEliminar ? 8 : 7} className="text-center text-gray-500 py-8">
                     No hay certificados cargados.
                   </TableCell>
                 </TableRow>
@@ -98,7 +116,7 @@ export function HistorialCertificados() {
                     <TableCell>{c.legajo.numeroLegajo}</TableCell>
                     <TableCell>{c.legajo.apellidos}, {c.legajo.nombres}</TableCell>
                     <TableCell>{TIPO_LICENCIA_LABEL[c.licencia.tipoLicencia] ?? c.licencia.tipoLicencia}</TableCell>
-                    <TableCell>{formatearFechaLicencia(new Date(c.fechaCarga))}</TableCell>
+                    <TableCell>{formatearFechaLicencia(c.fechaCarga)}</TableCell>
                     <TableCell>{c.tipoArchivo}</TableCell>
                     <TableCell>{c.etapa === "INICIO" ? "Inicio" : "Cierre"}</TableCell>
                     <TableCell>
@@ -112,6 +130,18 @@ export function HistorialCertificados() {
                         Ver
                       </a>
                     </TableCell>
+                    {puedeEliminar && (
+                      <TableCell>
+                        <button
+                          onClick={() => handleEliminar(c.id)}
+                          className="text-red-500 hover:text-red-700 text-xs inline-flex items-center gap-1"
+                          title="Eliminar certificado"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Eliminar
+                        </button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}

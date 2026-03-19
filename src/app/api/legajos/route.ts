@@ -14,12 +14,12 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q")?.trim() ?? "";
-  const estado = searchParams.get("estado") ?? "activo"; // activo | baja
+  const estado = searchParams.get("estado") ?? "activo"; // activo | baja | todos
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
   const perPage = Math.min(500, Math.max(1, parseInt(searchParams.get("perPage") ?? "10")));
 
   const where: { fechaBaja?: null | { not: null }; OR?: object[] } =
-    estado === "baja" ? { fechaBaja: { not: null } } : { fechaBaja: null };
+    estado === "baja" ? { fechaBaja: { not: null } } : estado === "activo" ? { fechaBaja: null } : {};
 
   if (q) {
     const numLegajo = parseInt(q, 10);
@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
     }),
     prisma.legajo.count({ where }),
   ]);
+
+  console.log("[api/legajos] estado=%s q=%s page=%d perPage=%d total=%d returned=%d", estado, q, page, perPage, total, legajos.length);
 
   return NextResponse.json({
     data: legajos,

@@ -26,6 +26,7 @@ import {
   diasTranscurridos,
   diasRestantes,
   TIPO_LICENCIA_LABEL,
+  parsearFechaLocalDesdeBD,
 } from "@/lib/licencias.utils";
 import {
   exportarPDFTodos,
@@ -46,7 +47,7 @@ function observacionTexto(lic: LicenciaNomina): string {
 }
 
 function textoDiasRestantes(lic: LicenciaNomina): { texto: string; clase: string } {
-  const fin = lic.fechaFin ? new Date(lic.fechaFin) : null;
+  const fin = lic.fechaFin ? parsearFechaLocalDesdeBD(lic.fechaFin) : null;
   const rest = diasRestantes(fin);
   if (rest === null) return { texto: "—", clase: "text-gray-600" };
   if (rest < 0) return { texto: "VENCIDA", clase: "text-red-600 font-bold" };
@@ -59,6 +60,13 @@ export function NominaLicencias() {
   const rolesSession = (session?.user as { roles?: unknown })?.roles ?? [];
   const [rolesFromMe, setRolesFromMe] = useState<string[] | null>(null);
   const esSuperAdmin = isSuperAdmin(rolesSession) || isSuperAdmin(rolesFromMe ?? []);
+  const rolesCombinados = [
+    ...(Array.isArray(rolesSession) ? (rolesSession as string[]) : []),
+    ...(rolesFromMe ?? []),
+  ];
+  const puedeEliminarFisico = rolesCombinados.some((r) =>
+    ["SUPER_ADMIN", "ADMIN"].includes(String(r))
+  );
 
   useEffect(() => {
     if (!session?.user) return;
@@ -78,11 +86,6 @@ export function NominaLicencias() {
     empleadoNombre: string;
     tipoLicencia: string;
   } | null>(null);
-  const [eliminarObs, setEliminarObs] = useState<{
-    licenciaId: number;
-    observacionId: number;
-  } | null>(null);
-  const [eliminando, setEliminando] = useState(false);
   const [eliminarFisicoModal, setEliminarFisicoModal] = useState<{ id: number; nombre: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [eliminarFisicoSaving, setEliminarFisicoSaving] = useState(false);
@@ -114,23 +117,6 @@ export function NominaLicencias() {
   useEffect(() => {
     cargar();
   }, [cargar]);
-
-  const eliminarObservacion = async () => {
-    if (!eliminarObs) return;
-    setEliminando(true);
-    try {
-      const res = await fetch(
-        `/api/licencias/${eliminarObs.licenciaId}/observaciones/${eliminarObs.observacionId}`,
-        { method: "DELETE" }
-      );
-      if (res.ok) {
-        setEliminarObs(null);
-        cargar();
-      }
-    } finally {
-      setEliminando(false);
-    }
-  };
 
   const confirmarEliminarFisico = async () => {
     if (!eliminarFisicoModal || confirmText !== "ELIMINAR") return;
@@ -230,14 +216,13 @@ export function NominaLicencias() {
                 </TableRow>
               ) : (
                 licencias.map((lic) => {
-                  const inicio = new Date(lic.fechaInicio);
+                  const inicio = parsearFechaLocalDesdeBD(lic.fechaInicio);
                   const trans = diasTranscurridos(inicio);
                   const { texto: restTexto, clase: restClase } = textoDiasRestantes(lic);
                   const obs = observacionTexto(lic);
                   const nombreCompleto = `${lic.legajo.apellidos}, ${lic.legajo.nombres}`;
                   const tipoLabel = TIPO_LICENCIA_LABEL[lic.tipoLicencia] ?? lic.tipoLicencia;
                   const tieneObs = (lic.observacionesNomina?.length ?? 0) > 0;
-                  const ultimaObsId = lic.observacionesNomina?.[0]?.id;
 
                   return (
                     <TableRow key={lic.id}>
@@ -248,11 +233,11 @@ export function NominaLicencias() {
                       <TableCell className="max-w-0 overflow-hidden px-2 py-2" title={tipoLabel}>
                         <span className="block truncate">{tipoLabel}</span>
                       </TableCell>
-                      <TableCell className="overflow-hidden px-2 py-2">{formatearFechaLicencia(inicio)}</TableCell>
                       <TableCell className="overflow-hidden px-2 py-2">
-                        {lic.fechaFin
-                          ? formatearFechaLicencia(new Date(lic.fechaFin))
-                          : "—"}
+                        {formatearFechaLicencia(inicio)}
+                      </TableCell>
+                      <TableCell className="overflow-hidden px-2 py-2">
+                        {lic.fechaFin ? formatearFechaLicencia(lic.fechaFin) : "—"}
                       </TableCell>
                       <TableCell className="px-2 py-2 text-center">{trans}</TableCell>
                       <TableCell className={`px-2 py-2 text-center ${restClase}`}>
@@ -278,33 +263,19 @@ export function NominaLicencias() {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() =>
-                              ultimaObsId &&
-                              setEliminarObs({ licenciaId: lic.id, observacionId: ultimaObsId })
-                            }
-                            disabled={!tieneObs}
-                            title="Eliminar observación"
-                            className="text-orange-500 hover:text-orange-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                          {esSuperAdmin && (
+                          {puedeEliminarFisico && (
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="destructive"
                               size="icon-sm"
-                              onClick={() =>
+                              onClick={() => {
+                                console.log("[NominaLicencias] click eliminar físico", lic.id);
                                 setEliminarFisicoModal({
                                   id: lic.id,
                                   nombre: `${nombreCompleto} - ${tipoLabel}`,
-                                })
-                              }
+                                });
+                              }}
                               title="Eliminar permanentemente (irreversible)"
-                              className="text-red-700 hover:text-red-800 hover:bg-red-50"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -352,26 +323,6 @@ export function NominaLicencias() {
           onSuccess={cargar}
         />
       )}
-
-      <Dialog open={eliminarObs !== null} onOpenChange={(o) => !o && setEliminarObs(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Eliminar observación</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-gray-600">
-            ¿Estás seguro de eliminar la observación?
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEliminarObs(null)} disabled={eliminando}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={eliminarObservacion} disabled={eliminando}>
-              {eliminando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Modal eliminar licencia permanentemente (SUPER_ADMIN) */}
       <Dialog

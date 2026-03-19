@@ -6,10 +6,20 @@
 const TIMEZONE_AR = "America/Argentina/Buenos_Aires";
 
 /**
- * Formatea una fecha en formato DD/MM/YYYY (Argentina).
+ * Parsea una fecha de BD (UTC midnight) como fecha local sin aplicar offset horario.
+ * Evita que al convertir "2026-03-20T00:00:00.000Z" en Argentina (UTC-3) se muestre 19/03.
  */
-export function formatearFechaLicencia(fecha: Date): string {
-  const d = new Date(fecha);
+export function parsearFechaLocalDesdeBD(fecha: string | Date): Date {
+  const str = typeof fecha === "string" ? fecha : fecha.toISOString();
+  const [anio, mes, dia] = str.slice(0, 10).split("-").map(Number);
+  return new Date(anio, mes - 1, dia);
+}
+
+/**
+ * Formatea una fecha en formato DD/MM/YYYY (Argentina), interpretando la fecha de BD como local.
+ */
+export function formatearFechaLicencia(fecha: Date | string): string {
+  const d = parsearFechaLocalDesdeBD(fecha);
   return d.toLocaleDateString("es-AR", { timeZone: TIMEZONE_AR });
 }
 

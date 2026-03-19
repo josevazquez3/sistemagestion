@@ -1,9 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -13,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FinalizarLicencia } from "./FinalizarLicencia";
-import { Search, FileText, Pencil } from "lucide-react";
+import { Search, FileText, Pencil, Trash2 } from "lucide-react";
 import { TIPO_LICENCIA_LABEL, ESTADO_LICENCIA_LABEL, formatearFechaLicencia } from "@/lib/licencias.utils";
 import type { TipoLicencia } from "@prisma/client";
 
@@ -37,10 +46,16 @@ export interface HistorialLicenciasProps {
 }
 
 export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicenciasProps) {
+  const { data: session } = useSession();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const puedeEliminarFisico = roles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(String(r)));
+
   const [legajos, setLegajos] = useState<LegajoOption[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [legajoSeleccionado, setLegajoSeleccionado] = useState<LegajoOption | null>(null);
   const [mostrarSelector, setMostrarSelector] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const [licencias, setLicencias] = useState<LicenciaRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,12 +65,45 @@ export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicen
 
   const [finalizarId, setFinalizarId] = useState<number | null>(null);
   const [verCertificadosLicenciaId, setVerCertificadosLicenciaId] = useState<number | null>(null);
+  const [eliminarModal, setEliminarModal] = useState<{ id: number; tipo: TipoLicencia } | null>(null);
+  const [eliminandoFisico, setEliminandoFisico] = useState(false);
+
+  const handleFocus = () => {
+    if (typeof window !== "undefined" && inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      });
+    }
+    setMostrarSelector(true);
+  };
 
   const cargarLegajos = useCallback(async () => {
-    const res = await fetch("/api/legajos?estado=activo&perPage=500");
+    const res = await fetch("/api/legajos?estado=todos&perPage=500");
     if (!res.ok) return;
     const data = await res.json();
-    setLegajos(data.data || []);
+    console.log("[HistorialLicencias] RAW response legajos:", JSON.stringify(data, null, 2));
+
+    const lista = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+    const options: LegajoOption[] = lista.map((l: any) => ({
+      id: l.id,
+      numeroLegajo: l.numeroLegajo,
+      nombres: l.nombres,
+      apellidos: l.apellidos,
+    }));
+
+    console.log("[HistorialLicencias] legajos mapeados:", options.length, "pagination:", data.pagination);
+
+    options.sort((a, b) => {
+      const ap = a.apellidos.localeCompare(b.apellidos, "es", { sensitivity: "base" });
+      if (ap !== 0) return ap;
+      const nom = a.nombres.localeCompare(b.nombres, "es", { sensitivity: "base" });
+      if (nom !== 0) return nom;
+      return a.numeroLegajo - b.numeroLegajo;
+    });
+    setLegajos(options);
   }, []);
 
   useEffect(() => {
@@ -101,6 +149,27 @@ export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicen
     );
   });
 
+  const MAX_RESULTADOS_DROPDOWN = 200;
+
+  const handleEliminarFisico = useCallback(
+    async (id: number) => {
+      setEliminandoFisico(true);
+      try {
+        const res = await fetch(`/api/licencias/${id}`, { method: "DELETE" });
+        if (res.ok) {
+          setLicencias((prev) => prev.filter((l) => l.id !== id));
+          setEliminarModal(null);
+        } else {
+          const data = await res.json().catch(() => null);
+          alert(data?.error ?? "Error al eliminar la licencia");
+        }
+      } finally {
+        setEliminandoFisico(false);
+      }
+    },
+    []
+  );
+
   return (
     <div className="space-y-4">
       <div>
@@ -108,11 +177,12 @@ export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicen
         <div className="relative mt-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
+            ref={inputRef}
             type="text"
             placeholder="Buscar por nombre, apellido o legajo..."
             value={busqueda}
-            onChange={(e) => { setBusqueda(e.target.value); setMostrarSelector(true); }}
-            onFocus={() => setMostrarSelector(true)}
+            onChange={(e) => { setBusqueda(e.target.value); handleFocus(); }}
+            onFocus={handleFocus}
             className="h-9 w-full pl-9 pr-4 rounded-md border border-input text-sm"
           />
           {legajoSeleccionado && (
@@ -128,11 +198,19 @@ export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicen
           {mostrarSelector && !legajoSeleccionado && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMostrarSelector(false)} />
-              <div className="absolute top-full left-0 z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border bg-white shadow-lg">
+              <div
+                className="fixed z-[9999] rounded-lg border bg-white shadow-lg overflow-y-auto"
+                style={{
+                  top: dropdownPos?.top ?? 0,
+                  left: dropdownPos?.left ?? 0,
+                  width: dropdownPos?.width ?? "100%",
+                  maxHeight: "300px",
+                }}
+              >
                 {filtrados.length === 0 ? (
                   <p className="p-3 text-sm text-gray-500">Sin resultados</p>
                 ) : (
-                  filtrados.slice(0, 50).map((l) => (
+                  filtrados.slice(0, MAX_RESULTADOS_DROPDOWN).map((l) => (
                     <button
                       key={l.id}
                       type="button"
@@ -205,8 +283,8 @@ export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicen
                     licencias.map((lic) => (
                       <TableRow key={lic.id}>
                         <TableCell>{TIPO_LICENCIA_LABEL[lic.tipoLicencia] ?? lic.tipoLicencia}</TableCell>
-                        <TableCell>{formatearFechaLicencia(new Date(lic.fechaInicio))}</TableCell>
-                        <TableCell>{lic.fechaFin ? formatearFechaLicencia(new Date(lic.fechaFin)) : "—"}</TableCell>
+                        <TableCell>{formatearFechaLicencia(lic.fechaInicio)}</TableCell>
+                        <TableCell>{lic.fechaFin ? formatearFechaLicencia(lic.fechaFin) : "—"}</TableCell>
                         <TableCell>
                           <span className={lic.estado === "ACTIVA" ? "text-amber-700 font-medium" : "text-gray-600"}>
                             {ESTADO_LICENCIA_LABEL[lic.estado] ?? lic.estado}
@@ -242,6 +320,17 @@ export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicen
                                 Editar
                               </Button>
                             )}
+                            {puedeEliminarFisico && (
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon-sm"
+                                onClick={() => setEliminarModal({ id: lic.id, tipo: lic.tipoLicencia })}
+                                title="Eliminar permanentemente (irreversible)"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                             {lic.estado === "ACTIVA" && (
                               <Button type="button" variant="outline" size="sm" onClick={() => setFinalizarId(lic.id)}>
                                 Finalizar
@@ -262,6 +351,37 @@ export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicen
               certificados={licencias.find((l) => l.id === verCertificadosLicenciaId)?.certificados ?? []}
               onClose={() => setVerCertificadosLicenciaId(null)}
             />
+          )}
+
+          {eliminarModal && (
+            <Dialog open onOpenChange={() => !eliminandoFisico && setEliminarModal(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Eliminar licencia</DialogTitle>
+                  <DialogDescription>
+                    ¿Eliminar permanentemente esta licencia de{" "}
+                    {TIPO_LICENCIA_LABEL[eliminarModal.tipo] ?? eliminarModal.tipo}? Esta acción no se puede deshacer y
+                    borrará también sus certificados asociados.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEliminarModal(null)}
+                    disabled={eliminandoFisico}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleEliminarFisico(eliminarModal.id)}
+                    disabled={eliminandoFisico}
+                  >
+                    {eliminandoFisico ? "Eliminando..." : "Eliminar"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           )}
         </>
       )}
