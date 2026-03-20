@@ -52,7 +52,7 @@ function formatDateToDDMMYYYYAR(date: Date): string {
 }
 
 /** GET - Obtener configuración global de Extracto Banco (saldo inicial y fecha) */
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
   if (!canAccess(roles)) {

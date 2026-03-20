@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -44,7 +44,7 @@ function tokensCubiertosPorFila(f: CuentaFila): Set<string> {
   return s;
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
   if (!ROLES.some((r) => roles.includes(r))) {

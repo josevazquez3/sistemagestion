@@ -13,7 +13,6 @@ import {
 import { unlink } from "fs/promises";
 
 const ROLES = ["ADMIN", "LEGALES"] as const;
-const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 function canAccess(roles: string[]) {
   return ROLES.some((r) => roles.includes(r));

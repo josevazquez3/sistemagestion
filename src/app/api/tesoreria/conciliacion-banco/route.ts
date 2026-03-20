@@ -85,9 +85,6 @@ export async function GET(req: NextRequest) {
     include: { asignaciones: { orderBy: { orden: "asc" } } },
   });
 
-  const mesAnteriorRef = mes === 1 ? 12 : mes - 1;
-  const anioAnteriorRef = mes === 1 ? anio - 1 : anio;
-
   const ctxSaldo = await resolverSaldoAnteriorPeriodo(mes, anio);
 
   if (!conciliacion) {

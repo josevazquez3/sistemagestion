@@ -43,8 +43,6 @@ export async function GET(req: NextRequest) {
     prisma.legajo.count({ where }),
   ]);
 
-  console.log("[api/legajos] estado=%s q=%s page=%d perPage=%d total=%d returned=%d", estado, q, page, perPage, total, legajos.length);
-
   return NextResponse.json({
     data: legajos,
     pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) },

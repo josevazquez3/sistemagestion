@@ -206,7 +206,7 @@ export async function POST(request: Request) {
     }
     const raw = entry.getData().toString("utf8");
     backup = JSON.parse(raw) as { version?: string; tablas?: Record<string, unknown[]> };
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Archivo inválido o no es un backup válido." },
       { status: 400 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClipboardList } from "lucide-react";
@@ -21,18 +21,25 @@ export function RrhhNovedadesResumenCard() {
   const [data, setData] = useState<ResumenPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const cargar = useCallback(() => {
-    setLoading(true);
+  useEffect(() => {
+    let cancelled = false;
+
     fetch("/api/dashboard/rrhh-novedades-resumen", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((res: ResumenPayload | null) => setData(res))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, []);
+      .then((res: ResumenPayload | null) => {
+        if (!cancelled) setData(res);
+      })
+      .catch(() => {
+        if (!cancelled) setData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-  useEffect(() => {
-    cargar();
-  }, [cargar]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <Link href="/rrhh/novedades-liquidadores">

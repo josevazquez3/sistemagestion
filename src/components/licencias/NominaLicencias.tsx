@@ -269,7 +269,6 @@ export function NominaLicencias() {
                               variant="destructive"
                               size="icon-sm"
                               onClick={() => {
-                                console.log("[NominaLicencias] click eliminar físico", lic.id);
                                 setEliminarFisicoModal({
                                   id: lic.id,
                                   nombre: `${nombreCompleto} - ${tipoLabel}`,

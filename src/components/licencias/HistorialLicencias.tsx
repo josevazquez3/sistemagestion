@@ -84,7 +84,6 @@ export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicen
     const res = await fetch("/api/legajos?estado=todos&perPage=500");
     if (!res.ok) return;
     const data = await res.json();
-    console.log("[HistorialLicencias] RAW response legajos:", JSON.stringify(data, null, 2));
 
     const lista = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
     const options: LegajoOption[] = lista.map((l: any) => ({
@@ -93,8 +92,6 @@ export function HistorialLicencias({ legajoIdInicial, onEditar }: HistorialLicen
       nombres: l.nombres,
       apellidos: l.apellidos,
     }));
-
-    console.log("[HistorialLicencias] legajos mapeados:", options.length, "pagination:", data.pagination);
 
     options.sort((a, b) => {
       const ap = a.apellidos.localeCompare(b.apellidos, "es", { sensitivity: "base" });

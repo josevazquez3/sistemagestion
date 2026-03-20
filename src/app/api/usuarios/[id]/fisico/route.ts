@@ -11,9 +11,6 @@ export async function DELETE(
 ) {
   const session = await auth();
   const roles = (session?.user as { roles?: unknown })?.roles ?? [];
-  // Log para depuración: ver qué llega en la sesión
-  console.log("[DELETE FISICO usuario] session roles:", roles);
-  console.log("[DELETE FISICO usuario] session.user:", JSON.stringify(session?.user ? { id: (session.user as { id?: string }).id, email: (session.user as { email?: string }).email, roles } : null));
 
   let esSuperAdmin = isSuperAdmin(roles);
   const currentUserIdForRole = (session?.user as { id?: string })?.id;
