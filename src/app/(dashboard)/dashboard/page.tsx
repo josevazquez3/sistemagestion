@@ -8,13 +8,11 @@ import { DashboardLicenciasWidget } from "@/components/licencias/DashboardLicenc
 import { NovedadesLiquidadoresCard } from "@/components/dashboard/NovedadesLiquidadoresCard";
 import { SecretariaDashboardCard } from "@/components/dashboard/SecretariaDashboardCard";
 import { TesoreriaDashboardCard } from "@/components/dashboard/TesoreriaDashboardCard";
-import { RrhhNovedadesResumenCard } from "@/components/dashboard/RrhhNovedadesResumenCard";
 
 export const dynamic = "force-dynamic";
 
 const ROLES_ADMIN = ["ADMIN", "RRHH"] as const;
 const ROLES_TESORERIA_RESUMEN = ["ADMIN", "TESORERO", "SUPER_ADMIN"] as const;
-const ROLES_RRHH_RESUMEN = ["ADMIN", "RRHH", "SUPER_ADMIN"] as const;
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -43,7 +41,6 @@ export default async function DashboardPage() {
     : [[], 0];
 
   const verResumenTesoreria = ROLES_TESORERIA_RESUMEN.some((r) => roles.includes(r));
-  const verResumenRRHH = ROLES_RRHH_RESUMEN.some((r) => roles.includes(r));
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -122,7 +119,6 @@ export default async function DashboardPage() {
         </Link>
         <SecretariaDashboardCard />
         <TesoreriaDashboardCard showBalances={verResumenTesoreria} />
-        {verResumenRRHH && <RrhhNovedadesResumenCard />}
       </div>
     </div>
   );
