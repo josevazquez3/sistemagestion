@@ -3,14 +3,16 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { EstadoVacaciones } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Building2, CalendarDays } from "lucide-react";
+import { Users, CalendarDays } from "lucide-react";
 import { DashboardLicenciasWidget } from "@/components/licencias/DashboardLicenciasWidget";
 import { NovedadesLiquidadoresCard } from "@/components/dashboard/NovedadesLiquidadoresCard";
 import { SecretariaDashboardCard } from "@/components/dashboard/SecretariaDashboardCard";
+import { TesoreriaDashboardCard } from "@/components/dashboard/TesoreriaDashboardCard";
 
 export const dynamic = "force-dynamic";
 
 const ROLES_ADMIN = ["ADMIN", "RRHH"] as const;
+const ROLES_TESORERIA_RESUMEN = ["ADMIN", "TESORERO", "SUPER_ADMIN"] as const;
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -37,6 +39,8 @@ export default async function DashboardPage() {
         }),
       ])
     : [[], 0];
+
+  const verResumenTesoreria = ROLES_TESORERIA_RESUMEN.some((r) => roles.includes(r));
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -114,18 +118,7 @@ export default async function DashboardPage() {
           </Card>
         </Link>
         <SecretariaDashboardCard />
-        <Card className="rounded-xl border shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Tesorería
-            </CardTitle>
-            <Building2 className="h-4 w-4 text-[#4CAF50]" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-gray-800">Módulo</p>
-            <CardDescription>Próximamente</CardDescription>
-          </CardContent>
-        </Card>
+        <TesoreriaDashboardCard showBalances={verResumenTesoreria} />
       </div>
     </div>
   );
