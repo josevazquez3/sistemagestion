@@ -654,6 +654,18 @@ model ConciliacionAsignacion {
   @@map("conciliacion_asignacion")
 }
 
+model ConciliacionSaldoAnterior {
+  id        Int      @id @default(autoincrement())
+  cuentaId  Int
+  mes       Int
+  anio      Int
+  saldo     Decimal  @db.Decimal(15, 2)
+  updatedAt DateTime @updatedAt
+
+  @@unique([cuentaId, mes, anio])
+  @@map("conciliacion_saldo_anterior")
+}
+
 model CobroCertificacion {
   id              String   @id @default(cuid())
   fecha           DateTime
