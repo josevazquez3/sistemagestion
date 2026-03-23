@@ -116,6 +116,14 @@ function formatearFecha(fecha: Date | string): string {
   return `${dia}/${mes}/${anio}`;
 }
 
+function isUtedyc(nombre: string) {
+  return nombre.trim().toUpperCase().includes("UTEDYC");
+}
+
+function isFepuba(nombre: string) {
+  return nombre.trim().toUpperCase().includes("FEPUBA");
+}
+
 export function FacturasProveedoresContent() {
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth() + 1);
@@ -133,6 +141,11 @@ export function FacturasProveedoresContent() {
   const [editing, setEditing] = useState<Factura | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<FacturaForm>(formVacio);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
+  const [deletingBulk, setDeletingBulk] = useState(false);
+  const headerCheckboxRef = useRef<HTMLInputElement | null>(null);
+  const selectionZoneRef = useRef<HTMLDivElement | null>(null);
 
   const [searchProveedorOpen, setSearchProveedorOpen] = useState(false);
   const [searchProveedor, setSearchProveedor] = useState("");
@@ -185,6 +198,32 @@ export function FacturasProveedoresContent() {
     const t = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    const visibles = facturas.map((f) => f.id);
+    setSelectedIds((prev) => prev.filter((id) => visibles.includes(id)));
+  }, [facturas]);
+
+  useEffect(() => {
+    const total = facturas.length;
+    const seleccionados = selectedIds.length;
+    if (!headerCheckboxRef.current) return;
+    headerCheckboxRef.current.checked = total > 0 && seleccionados === total;
+    headerCheckboxRef.current.indeterminate = total > 0 && seleccionados > 0 && seleccionados < total;
+  }, [facturas, selectedIds]);
+
+  useEffect(() => {
+    function handleOutsideSelection(e: MouseEvent) {
+      if (confirmBulkOpen) return;
+      if (selectedIds.length === 0) return;
+      if (!selectionZoneRef.current) return;
+      if (!selectionZoneRef.current.contains(e.target as Node)) {
+        setSelectedIds([]);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideSelection);
+    return () => document.removeEventListener("mousedown", handleOutsideSelection);
+  }, [selectedIds.length, confirmBulkOpen]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -324,6 +363,36 @@ export function FacturasProveedoresContent() {
     }
   };
 
+  const aplicarCargaEspecial = (tipo: "UTEDYC" | "FEPUBA") => {
+    const m2 = String(mes).padStart(2, "0");
+    const mesAnt = mes === 1 ? 12 : mes - 1;
+    const anioAnt = mes === 1 ? anio - 1 : anio;
+    const mesAnt2 = String(mesAnt).padStart(2, "0");
+    const hoy = new Date();
+    const fechaHoy = `${String(hoy.getDate()).padStart(2, "0")}/${String(hoy.getMonth() + 1).padStart(2, "0")}/${hoy.getFullYear()}`;
+
+    if (tipo === "FEPUBA") {
+      setForm((f) => ({
+        ...f,
+        puntoVenta: "0",
+        nroFactura: "0",
+        tipoComprobante: "S/FACTURA",
+        descripcion: `CTA. ${m2}/${anio}`,
+        fecha: fechaHoy,
+      }));
+      return;
+    }
+
+    setForm((f) => ({
+      ...f,
+      puntoVenta: "0",
+      nroFactura: "0",
+      tipoComprobante: "S/FACTURA",
+      descripcion: `UTEDYC ${mesAnt2}/${anioAnt}`,
+      fecha: fechaHoy,
+    }));
+  };
+
   const eliminarFactura = async (id: number) => {
     if (!confirm("¿Eliminar esta factura?")) return;
     try {
@@ -334,6 +403,42 @@ export function FacturasProveedoresContent() {
       setToast({ tipo: "ok", text: "Factura eliminada." });
     } catch (e) {
       setToast({ tipo: "error", text: e instanceof Error ? e.message : "Error al eliminar." });
+    }
+  };
+
+  const toggleSeleccion = (id: number) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleTodos = () => {
+    const idsVisibles = facturas.map((f) => f.id);
+    const todos = idsVisibles.length > 0 && idsVisibles.every((id) => selectedIds.includes(id));
+    if (todos) setSelectedIds([]);
+    else setSelectedIds(idsVisibles);
+  };
+
+  const eliminarSeleccionados = async () => {
+    if (selectedIds.length === 0) return;
+    setDeletingBulk(true);
+    try {
+      const resultados = await Promise.all(
+        selectedIds.map(async (id) => {
+          const res = await fetch(`/api/facturas-proveedores/${id}`, { method: "DELETE" });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data?.error ?? `No se pudo eliminar la factura ${id}.`);
+          }
+          return id;
+        })
+      );
+      setFacturas((prev) => prev.filter((f) => !resultados.includes(f.id)));
+      setSelectedIds([]);
+      setConfirmBulkOpen(false);
+      setToast({ tipo: "ok", text: `Se eliminaron ${resultados.length} facturas correctamente.` });
+    } catch (e) {
+      setToast({ tipo: "error", text: e instanceof Error ? e.message : "Error al eliminar seleccionados." });
+    } finally {
+      setDeletingBulk(false);
     }
   };
 
@@ -366,7 +471,14 @@ export function FacturasProveedoresContent() {
 
     const rowStart = proyectadoData.length + 1;
     for (const [, grupo] of facturasPorProveedor) {
-      const nombre = grupo[0]?.proveedor?.proveedor ?? "Proveedor";
+      const prov = grupo[0]?.proveedor?.proveedor ?? "Proveedor";
+      const descRef = (grupo[0]?.descripcion ?? "").trim();
+      let nombre = prov;
+      if (isFepuba(prov) && descRef) nombre = `${prov} ${descRef}`;
+      if (isUtedyc(prov)) {
+        if (/UTEDYC\s+\d{2}\/\d{4}/i.test(descRef)) nombre = descRef;
+        else if (descRef) nombre = `${prov} ${descRef}`;
+      }
       const total = grupo.reduce((acc, f) => acc + Number(f.importe || 0), 0);
       proyectadoData.push([nombre, total]);
     }
@@ -527,7 +639,8 @@ export function FacturasProveedoresContent() {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div ref={selectionZoneRef} className="space-y-4">
+      <div className="flex flex-wrap gap-2 items-center">
         <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={abrirCrear}>
           <Plus className="h-4 w-4 mr-2" />
           Cargar Factura
@@ -538,6 +651,21 @@ export function FacturasProveedoresContent() {
             Generar Orden de Pago
           </Button>
         )}
+        <div
+          className={`transition-all duration-200 overflow-hidden ${
+            selectedIds.length > 0 ? "opacity-100 max-w-[320px]" : "opacity-0 max-w-0"
+          }`}
+        >
+          {selectedIds.length > 0 && (
+            <Button
+              className="bg-red-500 hover:bg-red-600 text-white whitespace-nowrap"
+              onClick={() => setConfirmBulkOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar seleccionados ({selectedIds.length})
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -549,6 +677,14 @@ export function FacturasProveedoresContent() {
             <table className="w-full text-sm min-w-[1200px]">
               <thead>
                 <tr className="border-b bg-gray-50 text-left text-gray-600">
+                  <th className="px-3 py-2 w-10">
+                    <input
+                      ref={headerCheckboxRef}
+                      type="checkbox"
+                      onChange={toggleTodos}
+                      className="w-4 h-4 accent-red-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="px-3 py-2">Proveedor</th>
                   <th className="px-3 py-2">Pto. Vta.</th>
                   <th className="px-3 py-2">N° Factura</th>
@@ -562,12 +698,20 @@ export function FacturasProveedoresContent() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-500">Cargando...</td></tr>
+                  <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-500">Cargando...</td></tr>
                 ) : facturas.length === 0 ? (
-                  <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-500">No hay facturas para este período.</td></tr>
+                  <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-500">No hay facturas para este período.</td></tr>
                 ) : (
                   facturas.map((f) => (
-                    <tr key={f.id} className="border-b hover:bg-gray-50">
+                    <tr key={f.id} className={`border-b hover:bg-gray-50 ${selectedIds.includes(f.id) ? "bg-red-50" : ""}`}>
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(f.id)}
+                          onChange={() => toggleSeleccion(f.id)}
+                          className="w-4 h-4 accent-red-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-3 py-2">{f.proveedor.proveedor}</td>
                       <td className="px-3 py-2">{f.puntoVenta}</td>
                       <td className="px-3 py-2">{f.nroFactura}</td>
@@ -592,7 +736,7 @@ export function FacturasProveedoresContent() {
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-semibold">
-                  <td colSpan={7} className="px-3 py-3 text-right">Total:</td>
+                  <td colSpan={8} className="px-3 py-3 text-right">Total:</td>
                   <td className="px-3 py-3 text-right">$ {totalImportes.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td />
                 </tr>
@@ -601,6 +745,7 @@ export function FacturasProveedoresContent() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       <Dialog open={openModal} onOpenChange={setOpenModal}>
         <DialogContent className="max-w-4xl">
@@ -661,6 +806,21 @@ export function FacturasProveedoresContent() {
                     }}
                   >
                     Cambiar
+                  </Button>
+                </div>
+              )}
+              {proveedorSeleccionado && (isUtedyc(proveedorSeleccionado.proveedor) || isFepuba(proveedorSeleccionado.proveedor)) && (
+                <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2">
+                  <p className="text-xs text-amber-800 mb-2">
+                    Este proveedor no emite factura. Podés autocompletar carga especial:
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => aplicarCargaEspecial(isUtedyc(proveedorSeleccionado.proveedor) ? "UTEDYC" : "FEPUBA")}
+                  >
+                    Asignar {isUtedyc(proveedorSeleccionado.proveedor) ? "UTEDYC" : "FEPUBA"} con un clic
                   </Button>
                 </div>
               )}
@@ -736,6 +896,30 @@ export function FacturasProveedoresContent() {
             </Button>
             <Button onClick={() => void guardarFactura()} disabled={saving}>
               {saving ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmBulkOpen} onOpenChange={setConfirmBulkOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar facturas seleccionadas</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro que querés eliminar {selectedIds.length} factura(s) seleccionada(s)?
+              Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmBulkOpen(false)} disabled={deletingBulk}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-red-500 hover:bg-red-600 text-white"
+              onClick={() => void eliminarSeleccionados()}
+              disabled={deletingBulk}
+            >
+              {deletingBulk ? "Eliminando..." : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
-  Calendar,
   Check,
   FileSpreadsheet,
   Pencil,
   Plus,
+  Search,
   Trash2,
   Upload,
   X,
@@ -17,11 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
 
 type Proveedor = {
   id: number;
@@ -64,16 +59,10 @@ const formVacio: ProveedorForm = {
 };
 
 export function ProveedoresContent() {
-  const hoy = new Date();
-  const [mes, setMes] = useState(hoy.getMonth() + 1);
-  const [anio, setAnio] = useState(hoy.getFullYear());
-  const [añoPicker, setAñoPicker] = useState(anio);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
-
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<Toast>(null);
+  const [search, setSearch] = useState("");
 
   const [openAlta, setOpenAlta] = useState(false);
   const [guardandoAlta, setGuardandoAlta] = useState(false);
@@ -107,16 +96,6 @@ export function ProveedoresContent() {
   }, [toast]);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
-        setPickerOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
     const visibleIds = proveedores.map((p) => p.id);
     setSelectedIds((prev) => prev.filter((id) => visibleIds.includes(id)));
   }, [proveedores]);
@@ -147,14 +126,14 @@ export function ProveedoresContent() {
     return () => document.removeEventListener("mousedown", handleOutsideSelection);
   }, [selectedIds.length]);
 
-  useEffect(() => {
-    if (pickerOpen) setAñoPicker(anio);
-  }, [pickerOpen, anio]);
-
   const fetchProveedores = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/proveedores");
+      const query = search.trim();
+      const url = query
+        ? `/api/proveedores?search=${encodeURIComponent(query)}`
+        : "/api/proveedores";
+      const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "No se pudieron cargar proveedores.");
       setProveedores(Array.isArray(data) ? data : []);
@@ -164,26 +143,11 @@ export function ProveedoresContent() {
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, search]);
 
   useEffect(() => {
     fetchProveedores();
   }, [fetchProveedores]);
-
-  const nombreMes = useMemo(() => MESES[mes - 1], [mes]);
-
-  const seleccionarMes = (m: number) => {
-    setMes(m);
-    setAnio(añoPicker);
-    setPickerOpen(false);
-  };
-
-  const esteMes = () => {
-    const now = new Date();
-    setMes(now.getMonth() + 1);
-    setAnio(now.getFullYear());
-    setPickerOpen(false);
-  };
 
   const handleCrear = async () => {
     if (!formAlta.proveedor.trim()) {
@@ -528,73 +492,6 @@ export function ProveedoresContent() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2" ref={pickerRef}>
-        <button
-          type="button"
-          onClick={() => setPickerOpen((o) => !o)}
-          className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white text-sm px-4 py-2 rounded-lg"
-        >
-          <Calendar className="w-4 h-4" />
-          {nombreMes} de {anio}
-        </button>
-
-        {pickerOpen && (
-          <div className="absolute left-4 top-24 z-50 w-[320px] rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
-            <div className="mb-4 text-center text-xl font-semibold text-gray-800">{añoPicker}</div>
-            <div className="mb-2 flex justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setAñoPicker((a) => a - 1)}
-                className="rounded bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
-              >
-                ← Año anterior
-              </button>
-              <button
-                type="button"
-                onClick={() => setAñoPicker((a) => a + 1)}
-                className="rounded bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
-              >
-                Año siguiente →
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {MESES.map((nombre, i) => {
-                const m = i + 1;
-                const activo = mes === m && anio === añoPicker;
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => seleccionarMes(m)}
-                    className={`rounded-lg px-3 py-3 text-base font-medium transition-colors ${
-                      activo ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                    }`}
-                  >
-                    {nombre.slice(0, 3)}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-4 flex justify-between border-t border-gray-100 pt-3">
-              <button
-                type="button"
-                onClick={() => setPickerOpen(false)}
-                className="text-sm font-medium text-gray-500 hover:text-gray-700"
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={esteMes}
-                className="text-sm font-medium text-blue-600 hover:text-blue-800"
-              >
-                Este mes
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       <div ref={selectionZoneRef} className="space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
         <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setOpenAlta(true)}>
@@ -624,6 +521,15 @@ export function ProveedoresContent() {
             </Button>
           )}
         </div>
+      </div>
+      <div className="relative max-w-md">
+        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por proveedor, CUIT, CBU, banco, contacto o email..."
+          className="pl-9"
+        />
       </div>
 
       <Card>
