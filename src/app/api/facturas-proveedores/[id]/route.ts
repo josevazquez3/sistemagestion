@@ -91,11 +91,6 @@ export async function PUT(
       return NextResponse.json({ error: "Fecha inválida." }, { status: 400 });
     }
 
-    const facturaProveedor = getFacturaProveedorDelegate();
-    if (!facturaProveedor) {
-      return NextResponse.json({ error: "Modelo FacturaProveedor no disponible en Prisma Client." }, { status: 500 });
-    }
-
     await ensureFacturaProveedorTable();
     await prisma.$executeRaw`
       UPDATE "FacturaProveedor"
