@@ -314,6 +314,42 @@ model Notificacion {
   @@index([usuarioId, leida])
 }
 
+model Proveedor {
+  id                  Int      @id @default(autoincrement())
+  proveedor           String
+  nombreContacto      String?
+  alias               String?
+  cuit                String?
+  cuentaDebitoTipoNum String?
+  banco               String?
+  direccion           String?
+  ciudad              String?
+  telefono            String?
+  email               String?
+  formaPago           String?
+  cbu                 String?
+  facturas            FacturaProveedor[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model FacturaProveedor {
+  id              Int       @id @default(autoincrement())
+  mes             Int
+  anio            Int
+  proveedorId     Int
+  proveedor       Proveedor @relation(fields: [proveedorId], references: [id])
+  puntoVenta      Int
+  nroFactura      Int
+  cuit            String
+  fecha           DateTime
+  descripcion     String
+  tipoComprobante String
+  importe         Float
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
 // === AUDITORÍA ===
 
 model AuditoriaLog {
