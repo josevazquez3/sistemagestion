@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InputFecha } from "@/components/ui/InputFecha";
-import { Search, FolderUp, Trash2, Pencil } from "lucide-react";
+import { Search, FolderUp, Trash2, Pencil, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { TablaMovimientos, type MovimientoExtracto } from "./TablaMovimientos";
 import { ModalImportarExtracto } from "./ModalImportarExtracto";
 import { ModalEditarCuentaMovimiento } from "./ModalEditarCuentaMovimiento";
@@ -25,7 +26,7 @@ export function ExtractoBancoContent() {
   const [hasta, setHasta] = useState("");
   const [cuentaId, setCuentaId] = useState<string>("");
   const [cuentas, setCuentas] = useState<{ id: number; codigo: string; nombre: string }[]>([]);
-  const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; text: string } | null>(null);
+  const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error" | "warning"; text: string } | null>(null);
   const [modalImportarOpen, setModalImportarOpen] = useState(false);
   const [modalEditarCuentaOpen, setModalEditarCuentaOpen] = useState(false);
   const [movimientoEditar, setMovimientoEditar] = useState<MovimientoExtracto | null>(null);
@@ -104,7 +105,7 @@ export function ExtractoBancoContent() {
     return () => clearTimeout(t);
   }, [mensaje]);
 
-  const showMessage = useCallback((tipo: "ok" | "error", text: string) => {
+  const showMessage = useCallback((tipo: "ok" | "error" | "warning", text: string) => {
     setMensaje({ tipo, text });
   }, []);
 
@@ -201,7 +202,8 @@ export function ExtractoBancoContent() {
     const t = (str ?? "").trim();
     const parts = t.split("/").map((p) => parseInt(p, 10));
     if (parts.length < 3) return null;
-    let [d, m, y] = parts;
+    const [d, m, yRaw] = parts;
+    let y = yRaw;
     if (!d || !m || !y) return null;
     if (y < 100) y += 2000;
     const monthIndex = m - 1;
@@ -246,6 +248,170 @@ export function ExtractoBancoContent() {
     }
   };
 
+  const formatFechaExcel = (iso: string): string => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+    return d.toLocaleDateString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const resolvePeriodoArchivo = useCallback((): string => {
+    const regex = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/;
+    const candidata = desde.trim() || hasta.trim();
+    const m = regex.exec(candidata);
+    if (!m) return "completo";
+    const month = m[2];
+    const year = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${month}-${year}`;
+  }, [desde, hasta]);
+
+  const fetchAllFilteredMovimientos = useCallback(async (): Promise<MovimientoExtracto[]> => {
+    const all: MovimientoExtracto[] = [];
+    let currentPage = 1;
+    let pages = 1;
+
+    while (currentPage <= pages) {
+      const params = new URLSearchParams();
+      params.set("page", String(currentPage));
+      params.set("perPage", "50");
+      if (search) params.set("q", search);
+      if (desde) params.set("desde", desde);
+      if (hasta) params.set("hasta", hasta);
+      if (cuentaId) params.set("cuentaId", cuentaId);
+
+      const res = await fetch(`${API_BASE}?${params}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "No se pudieron cargar los movimientos para exportar.");
+
+      const chunk: MovimientoExtracto[] = Array.isArray(json.data) ? json.data : [];
+      const totalRegistros = Number(json.total ?? 0);
+      pages = Math.max(1, Math.ceil(totalRegistros / 50));
+      all.push(...chunk);
+      currentPage += 1;
+    }
+
+    return all;
+  }, [search, desde, hasta, cuentaId]);
+
+  const exportarExcel = useCallback(async () => {
+    try {
+      const movimientos = await fetchAllFilteredMovimientos();
+      const incluirSaldoInicial = (() => {
+        if (!(saldoInicial > 0 && fechaSaldoInicial !== "")) return false;
+        if (!desde.trim()) return true;
+        const dDesde = parseFechaFiltro(desde);
+        const dFechaSaldo = parseFechaFiltro(fechaSaldoInicial);
+        if (!dDesde || !dFechaSaldo) return true;
+        return dFechaSaldo.getTime() >= dDesde.getTime();
+      })();
+
+      if (movimientos.length === 0 && !incluirSaldoInicial) {
+        showMessage("warning", "No hay movimientos para exportar");
+        return;
+      }
+
+      const rows: (string | number)[][] = [];
+      if (incluirSaldoInicial) {
+        rows.push([
+          fechaSaldoInicial,
+          "",
+          "",
+          "",
+          "",
+          "Saldo Inicial",
+          0,
+          saldoInicial,
+          "",
+        ]);
+      }
+
+      for (const m of movimientos) {
+        rows.push([
+          formatFechaExcel(m.fecha),
+          m.sucOrigen ?? "",
+          m.descSucursal ?? "",
+          m.codOperativo ?? "",
+          m.referencia ?? "",
+          m.concepto ?? "",
+          Number(m.importePesos),
+          Number(m.saldoPesos),
+          m.cuenta ? `${m.cuenta.codigo} - ${m.cuenta.nombre}` : "",
+        ]);
+      }
+
+      const sumaImportes = movimientos.reduce(
+        (acc, m) => acc + Number(m.importePesos || 0),
+        0
+      );
+      const saldoTotalExport = (saldoInicial > 0 ? saldoInicial : 0) + sumaImportes;
+      rows.push([
+        "",
+        "",
+        "",
+        "",
+        "",
+        "Saldo total: $",
+        0,
+        saldoTotalExport,
+        "",
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet([
+        ["Fecha", "Suc.", "Desc. Sucursal", "Cód. Op.", "Referencia", "Concepto", "Importe", "Saldo", "Cuenta"],
+        ...rows,
+      ]);
+
+      for (let r = 2; r <= rows.length + 1; r += 1) {
+        const importeRef = `G${r}`;
+        const saldoRef = `H${r}`;
+        if (ws[importeRef]) {
+          ws[importeRef].t = "n";
+          ws[importeRef].z = "#,##0.00";
+        }
+        if (ws[saldoRef]) {
+          ws[saldoRef].t = "n";
+          ws[saldoRef].z = "#,##0.00";
+        }
+      }
+
+      ws["!cols"] = [
+        { wch: 12 },
+        { wch: 8 },
+        { wch: 20 },
+        { wch: 12 },
+        { wch: 18 },
+        { wch: 32 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 24 },
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Extracto");
+
+      const periodo = resolvePeriodoArchivo();
+      const filename =
+        periodo === "completo"
+          ? "ExtractoBanco_completo.xlsx"
+          : `ExtractoBanco_${periodo}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      showMessage("ok", "Extracto exportado correctamente.");
+    } catch (e) {
+      showMessage("error", e instanceof Error ? e.message : "Error al exportar extracto.");
+    }
+  }, [
+    fetchAllFilteredMovimientos,
+    saldoInicial,
+    fechaSaldoInicial,
+    desde,
+    resolvePeriodoArchivo,
+    showMessage,
+  ]);
+
   const saldoTotal = saldoInicial + sumaMovimientosTotal;
 
   const mostrarFilaSaldoInicial =
@@ -270,7 +436,9 @@ export function ExtractoBancoContent() {
           className={`rounded-lg border px-4 py-3 text-sm ${
             mensaje.tipo === "ok"
               ? "border-green-200 bg-green-50 text-green-800"
-              : "border-red-200 bg-red-50 text-red-800"
+              : mensaje.tipo === "warning"
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : "border-red-200 bg-red-50 text-red-800"
           }`}
         >
           {mensaje.text}
@@ -377,6 +545,10 @@ export function ExtractoBancoContent() {
                 </option>
               ))}
             </select>
+            <Button size="sm" variant="outline" onClick={() => void exportarExcel()}>
+              <FileSpreadsheet className="h-4 w-4 mr-1" />
+              Exportar
+            </Button>
             <Button size="sm" className="bg-[#4CAF50] hover:bg-[#388E3C]" onClick={() => setModalImportarOpen(true)}>
               <FolderUp className="h-4 w-4 mr-1" />
               Importar
