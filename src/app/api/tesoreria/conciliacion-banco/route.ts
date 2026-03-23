@@ -3,7 +3,6 @@ import { Decimal } from "@prisma/client/runtime/library";
 import type { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { resolverSaldoAnteriorPeriodo } from "@/lib/tesoreria/configuracionTesoreria";
 
 type MovimientoConciliacion = Prisma.MovimientoExtractoGetPayload<{
   include: {
@@ -65,6 +64,19 @@ function nombreCuentaParaMostrar(
   return candidato;
 }
 
+async function getSaldoAnteriorInicial(mes: number, anio: number): Promise<number> {
+  const rows = await prisma.$queryRaw<{ saldo: string }[]>`
+    SELECT saldo
+    FROM conciliacion_saldo_anterior
+    WHERE "cuentaId" = 0
+      AND mes = ${mes}
+      AND anio = ${anio}
+    LIMIT 1
+  `;
+  const saldo = rows[0]?.saldo;
+  return saldo != null ? Number(saldo) : 0;
+}
+
 export async function GET(req: NextRequest) {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
@@ -85,14 +97,13 @@ export async function GET(req: NextRequest) {
     include: { asignaciones: { orderBy: { orden: "asc" } } },
   });
 
-  const ctxSaldo = await resolverSaldoAnteriorPeriodo(mes, anio);
-
   if (!conciliacion) {
+    const saldoInicial = await getSaldoAnteriorInicial(mes, anio);
     conciliacion = await prisma.conciliacionBanco.create({
       data: {
         mes,
         anio,
-        saldoAnterior: ctxSaldo.saldoAnterior,
+        saldoAnterior: saldoInicial,
       },
       include: { asignaciones: { orderBy: { orden: "asc" } } },
     });
@@ -250,10 +261,6 @@ export async function GET(req: NextRequest) {
       subtotal,
       totalConciliado,
     },
-    esUsandoSaldoInicial: ctxSaldo.esUsandoSaldoInicial,
-    saldoInicialConfigurado: ctxSaldo.saldoInicialConfigurado,
-    faltaConfigurarSaldoInicial: ctxSaldo.faltaConfigurarSaldoInicial,
-    hayConciliacionMesPrevio: ctxSaldo.hayConciliacionMesPrevio,
     movimientos: movimientos.map((m) => {
       const op = (m.codOperativo ?? "").trim();
       const meta = tokenToAsignacion.get(op);
@@ -315,12 +322,12 @@ export async function POST(req: NextRequest) {
     where: { mes_anio: { mes, anio } },
   });
   if (!conciliacion) {
-    const ctx = await resolverSaldoAnteriorPeriodo(mes, anio);
+    const saldoInicial = await getSaldoAnteriorInicial(mes, anio);
     conciliacion = await prisma.conciliacionBanco.create({
       data: {
         mes,
         anio,
-        saldoAnterior: ctx.saldoAnterior,
+        saldoAnterior: saldoInicial,
       },
     });
   }
