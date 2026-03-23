@@ -108,6 +108,7 @@ model Legajo {
   fechaBaja              DateTime?
   motivoBaja             String?
   celular                String?
+  mail                   String?
   deletedAt              DateTime?
   contactos              ContactoAdicional[]
   configuracionVacaciones ConfiguracionVacaciones?

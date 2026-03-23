@@ -53,7 +53,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const fields = [
       "numeroLegajo", "nombres", "apellidos", "dni", "cuil", "fotoUrl",
       "calle", "numero", "casa", "departamento", "piso",
-      "localidad", "codigoPostal", "fechaAlta", "fechaNacimiento", "celular",
+      "localidad", "codigoPostal", "fechaAlta", "fechaNacimiento", "celular", "mail",
     ];
     const dateFields = ["fechaAlta", "fechaNacimiento"];
     for (const f of fields) {

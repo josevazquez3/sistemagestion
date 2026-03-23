@@ -96,6 +96,7 @@ export function LegajoForm({
     fechaNacimiento: "",
     fechaBaja: "",
     celular: "",
+    mail: "",
     contactos: [] as Contacto[],
   });
 
@@ -122,6 +123,7 @@ export function LegajoForm({
             fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento).toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }) : "",
             fechaBaja: data.fechaBaja ? new Date(data.fechaBaja).toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }) : "",
             celular: celularSinPrefijo(data.celular),
+            mail: data.mail ?? "",
             contactos: (data.contactos ?? []).map((c: { nombres: string; apellidos: string; parentesco: string; calle?: string; numero?: string; casa?: string; departamento?: string; piso?: string; telefonos: { numero: string }[] }) => ({
               nombres: c.nombres,
               apellidos: c.apellidos,
@@ -157,6 +159,7 @@ export function LegajoForm({
         fechaNacimiento: "",
         fechaBaja: "",
         celular: "",
+        mail: "",
         contactos: [],
       });
       setShowContactos(false);
@@ -256,6 +259,7 @@ export function LegajoForm({
         fechaAlta: form.fechaAlta,
         fechaNacimiento: form.fechaNacimiento || null,
         celular: form.celular.trim() ? "+54 " + form.celular.trim() : null,
+        mail: form.mail.trim() || null,
         contactos: showContactos
           ? form.contactos
               .filter((c) => c.nombres || c.apellidos)
@@ -405,6 +409,18 @@ export function LegajoForm({
                   maxLength={15}
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Mail</Label>
+              <Input
+                type="email"
+                value={form.mail}
+                onChange={(e) => setForm((f) => ({ ...f, mail: e.target.value }))}
+                placeholder="ejemplo@dominio.com"
+              />
             </div>
           </div>
 

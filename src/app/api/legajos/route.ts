@@ -76,6 +76,7 @@ export async function POST(req: Request) {
       fechaAlta,
       fechaNacimiento,
       celular,
+      mail,
       contactos = [],
     } = body;
 
@@ -107,6 +108,7 @@ export async function POST(req: Request) {
         fechaAlta: new Date(fechaAlta + "T12:00:00.000Z"),
         fechaNacimiento: fechaNacimiento ? new Date(fechaNacimiento + "T12:00:00.000Z") : null,
         celular: celular || null,
+        mail: mail?.trim() ? String(mail).trim() : null,
         contactos: {
           create: contactos.map((c: { nombres: string; apellidos: string; parentesco: string; calle?: string; numero?: string; casa?: string; departamento?: string; piso?: string; telefonos?: string[] }) => ({
             nombres: c.nombres,

@@ -35,6 +35,7 @@ type LegajoData = {
   fechaBaja: string | null;
   motivoBaja: string | null;
   celular: string | null;
+  mail: string | null;
   contactos: {
     nombres: string;
     apellidos: string;
@@ -50,19 +51,13 @@ type LegajoData = {
 
 export function LegajoVerSheet({ legajoId, onClose }: { legajoId: string | null; onClose: () => void }) {
   const [legajo, setLegajo] = useState<LegajoData | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!legajoId) {
-      setLegajo(null);
-      return;
-    }
-    setLoading(true);
+    if (!legajoId) return;
     fetch(`/api/legajos/${legajoId}`)
       .then((r) => r.json())
       .then(setLegajo)
-      .catch(() => setLegajo(null))
-      .finally(() => setLoading(false));
+      .catch(() => setLegajo(null));
   }, [legajoId]);
 
   const formatFecha = (s: string | null) =>
@@ -75,7 +70,7 @@ export function LegajoVerSheet({ legajoId, onClose }: { legajoId: string | null;
           <SheetTitle>Ver legajo</SheetTitle>
           <SheetDescription>{legajo ? `Nº ${legajo.numeroLegajo} - ${legajo.apellidos}, ${legajo.nombres}` : ""}</SheetDescription>
         </SheetHeader>
-        {loading ? (
+        {legajoId && (!legajo || legajo.id !== legajoId) ? (
           <div className="py-12 flex justify-center">Cargando...</div>
         ) : legajo ? (
           <div className="space-y-6 py-6">
@@ -100,6 +95,7 @@ export function LegajoVerSheet({ legajoId, onClose }: { legajoId: string | null;
                 <span className="text-gray-500">CUIL:</span><span>{legajo.cuil ?? "—"}</span>
                 <span className="text-gray-500">Fecha de nacimiento:</span><span>{legajo.fechaNacimiento ? formatFecha(legajo.fechaNacimiento) : "—"}</span>
                 <span className="text-gray-500">Celular:</span><span>{legajo.celular ?? "—"}</span>
+                <span className="text-gray-500">Mail:</span><span>{legajo.mail ?? "—"}</span>
               </div>
             </div>
 
