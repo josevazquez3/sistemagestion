@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { UserPlus, Loader2, Trash2 } from "lucide-react";
+import { UserPlus, Loader2, Trash2, Pencil } from "lucide-react";
+import { EditUserModal } from "./EditUserModal";
 
 type User = {
   id: string;
@@ -31,7 +32,10 @@ type PermissionsByModule = Record<string, { id: string; accion: string }[]>;
 
 export default function UsuariosPage() {
   const { data: session } = useSession();
-  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const roles = useMemo(
+    () => (session?.user as { roles?: string[] })?.roles ?? [],
+    [session?.user]
+  );
   // Mostrar columna de eliminar físico si el JWT tiene SUPER_ADMIN o si el usuario actual en la lista lo tiene (por si no re-logó)
   const [showFisicoColumn, setShowFisicoColumn] = useState(roles.includes("SUPER_ADMIN"));
   const isSuperAdmin = showFisicoColumn;
@@ -59,6 +63,8 @@ export default function UsuariosPage() {
   const [eliminarFisicoModal, setEliminarFisicoModal] = useState<User | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [eliminarFisicoSaving, setEliminarFisicoSaving] = useState(false);
+  const [editingCredentialsUser, setEditingCredentialsUser] = useState<User | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -82,7 +88,7 @@ export default function UsuariosPage() {
     if (!currentId && !currentEmail || users.length === 0) return;
     const currentUser = users.find((u) => u.id === currentId || u.email === currentEmail);
     if (currentUser?.roles?.includes("SUPER_ADMIN")) setShowFisicoColumn(true);
-  }, [session?.user, users, roles.join(",")]);
+  }, [roles, session?.user, users]);
 
   const fetchRolesAndPermissions = async () => {
     try {
@@ -113,6 +119,16 @@ export default function UsuariosPage() {
       setLoading(false)
     );
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timeout);
+  }, [toast]);
+
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ type, message });
+  };
 
   const openEditSheet = async (user: User) => {
     setSelectedUser(user);
@@ -282,6 +298,7 @@ export default function UsuariosPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roles</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Legajo vinculado</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
               {isSuperAdmin && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase min-w-[100px]">Eliminar físico</th>}
             </tr>
           </thead>
@@ -314,6 +331,17 @@ export default function UsuariosPage() {
                   >
                     {user.activo ? "Activo" : "Inactivo"}
                   </span>
+                </td>
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="p-1.5 hover:bg-blue-50 text-blue-700 hover:text-blue-800"
+                    title="Editar email y contraseña"
+                    onClick={() => setEditingCredentialsUser(user)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                 </td>
                 {isSuperAdmin && (
                   <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
@@ -420,6 +448,16 @@ export default function UsuariosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditUserModal
+        open={!!editingCredentialsUser}
+        user={editingCredentialsUser}
+        onOpenChange={(open) => {
+          if (!open) setEditingCredentialsUser(null);
+        }}
+        onSaved={fetchUsers}
+        showToast={showToast}
+      />
 
       {/* Modal eliminar usuario permanentemente (SUPER_ADMIN) */}
       <Dialog
@@ -565,6 +603,20 @@ export default function UsuariosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {toast && (
+        <div className="fixed right-4 top-4 z-[60]">
+          <div
+            className={`rounded-md px-4 py-2 text-sm shadow-md ${
+              toast.type === "success"
+                ? "bg-green-600 text-white"
+                : "bg-red-600 text-white"
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
