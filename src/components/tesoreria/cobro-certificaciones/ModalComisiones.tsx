@@ -44,6 +44,17 @@ function parseFechaToDate(str: string): Date | null {
   return new Date(year, month, day, 0, 0, 0, 0);
 }
 
+/** Primer y último día del mes (calendario local), formato DD/MM/YYYY para la API */
+function rangoMesInicial(mes: number, anio: number): { desde: string; hasta: string } {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const first = new Date(anio, mes - 1, 1);
+  const last = new Date(anio, mes, 0);
+  return {
+    desde: `${pad(first.getDate())}/${pad(first.getMonth() + 1)}/${first.getFullYear()}`,
+    hasta: `${pad(last.getDate())}/${pad(last.getMonth() + 1)}/${last.getFullYear()}`,
+  };
+}
+
 export type MovimientoCobroCertificacion = {
   id: string;
   fecha: string;
@@ -94,6 +105,7 @@ export function ModalComisiones({
   const [guardando, setGuardando] = useState(false);
   const legajoDropdownRef = useRef<HTMLDivElement>(null);
   const [movimientosRango, setMovimientosRango] = useState<MovimientoRango[]>([]);
+  const [errorSaldo, setErrorSaldo] = useState<string | null>(null);
 
   const totalComision =
     saldoPeriodo != null && porcentaje !== ""
@@ -102,14 +114,47 @@ export function ModalComisiones({
   const montoPorLegajo =
     legajos.length > 0 ? Math.round((totalComision / legajos.length) * 100) / 100 : 0;
 
+  /**
+   * Período inicial = mes/año del módulo (siempre válido: Desde ≤ Hasta).
+   * El padre remonta este modal con `key` al abrir para evitar carrera con el fetch del saldo.
+   */
+  useEffect(() => {
+    if (!isOpen) return;
+    const { desde: d0, hasta: h0 } = rangoMesInicial(mes, anio);
+    setDesde(d0);
+    setHasta(h0);
+    setErrorSaldo(null);
+    setSaldoPeriodo(null);
+    setMovimientosRango([]);
+    setPorcentaje("");
+    setLegajos([]);
+    setBusquedaLegajo("");
+    setLegajoDropdownOpen(false);
+  }, [isOpen, mes, anio]);
+
   useEffect(() => {
     if (!isOpen) return;
     const d = parseFechaToDate(desde);
     const h = parseFechaToDate(hasta);
-    if (!d || !h || d > h) {
+    if (!desde.trim() || !hasta.trim()) {
       setSaldoPeriodo(null);
+      setMovimientosRango([]);
+      setErrorSaldo(null);
       return;
     }
+    if (!d || !h) {
+      setSaldoPeriodo(null);
+      setMovimientosRango([]);
+      setErrorSaldo("Revisá el formato de las fechas (DD/MM/YYYY).");
+      return;
+    }
+    if (d > h) {
+      setSaldoPeriodo(null);
+      setMovimientosRango([]);
+      setErrorSaldo("La fecha Desde no puede ser posterior a Hasta.");
+      return;
+    }
+    setErrorSaldo(null);
     setLoadingSaldo(true);
     const params = new URLSearchParams({
       desde,
@@ -117,21 +162,43 @@ export function ModalComisiones({
       mes: String(mes),
       anio: String(anio),
     });
+    let cancelled = false;
     fetch(`/api/tesoreria/cobro-certificaciones/saldo-periodo?${params}`)
-      .then((res) => res.json())
-      .then((data) => {
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as {
+          saldoTotal?: number;
+          movimientos?: MovimientoRango[];
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!res.ok) {
+          setSaldoPeriodo(null);
+          setMovimientosRango([]);
+          setErrorSaldo(
+            data.error ?? (res.status === 403 ? "No autorizado." : `Error al calcular saldo (${res.status}).`)
+          );
+          return;
+        }
         if (data.saldoTotal != null) {
           setSaldoPeriodo(data.saldoTotal);
         } else {
           setSaldoPeriodo(null);
         }
         setMovimientosRango(Array.isArray(data.movimientos) ? data.movimientos : []);
+        setErrorSaldo(null);
       })
       .catch(() => {
+        if (cancelled) return;
         setSaldoPeriodo(null);
         setMovimientosRango([]);
+        setErrorSaldo("No se pudo obtener el saldo. Revisá la conexión o probá de nuevo.");
       })
-      .finally(() => setLoadingSaldo(false));
+      .finally(() => {
+        if (!cancelled) setLoadingSaldo(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, desde, hasta, mes, anio]);
 
   useEffect(() => {
@@ -349,7 +416,12 @@ export function ModalComisiones({
             {loadingSaldo && (
               <p className="text-sm text-gray-500">Calculando saldo…</p>
             )}
-            {!loadingSaldo && saldoPeriodo != null && (
+            {!loadingSaldo && errorSaldo && (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                {errorSaldo}
+              </p>
+            )}
+            {!loadingSaldo && !errorSaldo && saldoPeriodo != null && (
               <p className="text-sm font-semibold text-green-700">
                 Saldo Total del Período: $ {formatearImporteAR(saldoPeriodo)}
               </p>
@@ -452,8 +524,13 @@ export function ModalComisiones({
           <Button
             type="button"
             onClick={handleGuardar}
-            disabled={guardando || saldoPeriodo == null}
-            className="bg-blue-600 hover:bg-blue-700"
+            disabled={guardando || saldoPeriodo == null || !!errorSaldo}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
+            title={
+              saldoPeriodo == null || errorSaldo
+                ? "Corregí el período o esperá a que cargue el saldo del período."
+                : undefined
+            }
           >
             {guardando ? "Guardando…" : "Guardar"}
           </Button>

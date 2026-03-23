@@ -77,6 +77,7 @@ export function CobroCertificacionesContent() {
   const [importando, setImportando] = useState(false);
   const inputImportarRef = useRef<HTMLInputElement>(null);
   const [modalComisionesOpen, setModalComisionesOpen] = useState(false);
+  const [comisionesModalKey, setComisionesModalKey] = useState(0);
   const [movimientosPreview, setMovimientosPreview] = useState<MovimientoImportado[]>([]);
   const [modalPreviewImportar, setModalPreviewImportar] = useState(false);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
@@ -640,7 +641,10 @@ export function CobroCertificacionesContent() {
 
         <button
           type="button"
-          onClick={() => setModalComisionesOpen(true)}
+          onClick={() => {
+            setComisionesModalKey((k) => k + 1);
+            setModalComisionesOpen(true);
+          }}
           className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm px-4 py-2 rounded-lg"
         >
           <Percent className="w-4 h-4" />
@@ -844,6 +848,7 @@ export function CobroCertificacionesContent() {
       />
 
       <ModalComisiones
+        key={comisionesModalKey}
         isOpen={modalComisionesOpen}
         onClose={() => setModalComisionesOpen(false)}
         mes={mes}

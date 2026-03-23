@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 type Proveedor = {
   id: number;
@@ -580,8 +581,8 @@ export function ProveedoresContent() {
           <CardTitle>Listado de Proveedores</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto border rounded-lg">
-            <table className="w-full text-sm min-w-[1100px]">
+          <div className="overflow-x-auto border rounded-lg overflow-y-visible">
+            <table className="w-full text-sm min-w-[1200px]">
               <thead>
                 <tr className="border-b bg-gray-50 text-left text-gray-600">
                   <th className="px-3 py-2 w-10">
@@ -599,7 +600,12 @@ export function ProveedoresContent() {
                   <th className="px-3 py-2">CBU</th>
                   <th className="px-3 py-2">Teléfono</th>
                   <th className="px-3 py-2">Email</th>
-                  <th className="px-3 py-2 text-right">Acciones</th>
+                  <th
+                    scope="col"
+                    className="sticky right-0 z-30 min-w-[11rem] w-[11rem] border-l border-gray-200 bg-gray-50 px-3 py-2 text-right align-middle whitespace-nowrap text-sm font-semibold text-gray-900 shadow-[-8px_0_12px_-6px_rgba(0,0,0,0.08)]"
+                  >
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -617,7 +623,10 @@ export function ProveedoresContent() {
                     return (
                       <tr
                         key={p.id}
-                        className={`border-b hover:bg-gray-50 ${selectedIds.includes(p.id) ? "bg-red-50" : ""}`}
+                        className={cn(
+                          "group border-b",
+                          selectedIds.includes(p.id) ? "bg-red-50" : "hover:bg-gray-50"
+                        )}
                       >
                         <td className="px-3 py-2">
                           <input
@@ -694,14 +703,21 @@ export function ProveedoresContent() {
                             />
                           ) : p.email ?? "—"}
                         </td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center justify-end gap-1">
+                        <td
+                          className={cn(
+                            "sticky right-0 z-20 min-w-[11rem] w-[11rem] border-l border-gray-200 px-2 py-2 align-middle shadow-[-8px_0_12px_-6px_rgba(0,0,0,0.08)]",
+                            selectedIds.includes(p.id)
+                              ? "bg-red-50"
+                              : "bg-white group-hover:bg-gray-50"
+                          )}
+                        >
+                          <div className="flex items-center justify-end gap-2">
                             {!edit && (
                               <Button
                                 type="button"
                                 size="icon"
                                 variant="ghost"
-                                className={`h-8 w-8 ${
+                                className={`h-8 w-8 shrink-0 cursor-pointer ${
                                   p.noEmiteFactura
                                     ? "text-amber-500 hover:bg-amber-50"
                                     : "text-gray-400 hover:bg-gray-100"
@@ -711,9 +727,9 @@ export function ProveedoresContent() {
                                 title={p.noEmiteFactura ? "No emite factura" : "Emite factura"}
                               >
                                 {p.noEmiteFactura ? (
-                                  <FileX className="h-4 w-4" />
+                                  <FileX className="h-4 w-4 shrink-0" />
                                 ) : (
-                                  <FileText className="h-4 w-4" />
+                                  <FileText className="h-4 w-4 shrink-0" />
                                 )}
                               </Button>
                             )}
@@ -722,11 +738,11 @@ export function ProveedoresContent() {
                                 type="button"
                                 size="icon"
                                 variant="ghost"
-                                className="h-8 w-8"
+                                className="h-8 w-8 shrink-0 cursor-pointer text-gray-800 hover:bg-gray-100"
                                 onClick={() => empezarEdicion(p)}
                                 title="Editar"
                               >
-                                <Pencil className="h-4 w-4" />
+                                <Pencil className="h-4 w-4 shrink-0" />
                               </Button>
                             ) : (
                               <>
@@ -734,23 +750,23 @@ export function ProveedoresContent() {
                                   type="button"
                                   size="icon"
                                   variant="ghost"
-                                  className="h-8 w-8 text-green-700 hover:bg-green-50"
+                                  className="h-8 w-8 shrink-0 cursor-pointer text-green-700 hover:bg-green-50"
                                   onClick={() => void guardarEdicion(p.id)}
                                   disabled={savingInline}
                                   title="Guardar"
                                 >
-                                  <Check className="h-4 w-4" />
+                                  <Check className="h-4 w-4 shrink-0" />
                                 </Button>
                                 <Button
                                   type="button"
                                   size="icon"
                                   variant="ghost"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 shrink-0 cursor-pointer"
                                   onClick={cancelarEdicion}
                                   disabled={savingInline}
                                   title="Cancelar"
                                 >
-                                  <X className="h-4 w-4" />
+                                  <X className="h-4 w-4 shrink-0" />
                                 </Button>
                               </>
                             )}
@@ -758,11 +774,11 @@ export function ProveedoresContent() {
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8 text-red-700 hover:bg-red-50"
+                              className="h-8 w-8 shrink-0 cursor-pointer text-red-700 hover:bg-red-50"
                               onClick={() => void eliminarProveedor(p.id)}
                               title="Eliminar"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4 shrink-0" />
                             </Button>
                           </div>
                         </td>
