@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { InputFecha } from "@/components/ui/InputFecha";
 import { Label } from "@/components/ui/label";
 import { parsearImporteAR } from "@/lib/parsearExtracto";
+import { cn } from "@/lib/utils";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -37,6 +38,7 @@ type Proveedor = {
   email: string | null;
   formaPago: string | null;
   cbu: string | null;
+  noEmiteFactura?: boolean;
 };
 
 type Factura = {
@@ -154,6 +156,9 @@ export function FacturasProveedoresContent() {
   const [proveedorSeleccionado, setProveedorSeleccionado] = useState<Proveedor | null>(null);
 
   const nombreMes = MESES[mes - 1];
+  const bloqueoNoEmiteFactura = proveedorSeleccionado?.noEmiteFactura === true;
+  const claseCampoFacturaBloqueado =
+    "bg-gray-100 text-gray-400 cursor-not-allowed disabled:opacity-100";
 
   const totalImportes = useMemo(
     () => facturas.reduce((acc, f) => acc + Number(f.importe || 0), 0),
@@ -240,6 +245,16 @@ export function FacturasProveedoresContent() {
   }, [pickerOpen, anio]);
 
   useEffect(() => {
+    if (!openModal || !proveedorSeleccionado?.noEmiteFactura) return;
+    setForm((f) => ({
+      ...f,
+      puntoVenta: "0",
+      nroFactura: "0",
+      tipoComprobante: "0",
+    }));
+  }, [openModal, proveedorSeleccionado?.id, proveedorSeleccionado?.noEmiteFactura]);
+
+  useEffect(() => {
     if (!openModal || !searchProveedorOpen) return;
     const t = setTimeout(async () => {
       const q = searchProveedor.trim();
@@ -287,15 +302,19 @@ export function FacturasProveedoresContent() {
 
   const abrirEditar = (f: Factura) => {
     setEditing(f);
-    setProveedorSeleccionado(f.proveedor);
+    const noEmite = Boolean(f.proveedor.noEmiteFactura);
+    setProveedorSeleccionado({
+      ...f.proveedor,
+      noEmiteFactura: noEmite,
+    });
     setForm({
       proveedorId: f.proveedorId,
       cuit: f.cuit,
-      puntoVenta: String(f.puntoVenta),
-      nroFactura: String(f.nroFactura),
+      puntoVenta: noEmite ? "0" : String(f.puntoVenta),
+      nroFactura: noEmite ? "0" : String(f.nroFactura),
       fecha: toDateInputAR(f.fecha),
       descripcion: f.descripcion ?? "",
-      tipoComprobante: f.tipoComprobante ?? "A",
+      tipoComprobante: noEmite ? "0" : (f.tipoComprobante ?? "A"),
       importeStr: Number(f.importe).toLocaleString("es-AR", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -305,11 +324,15 @@ export function FacturasProveedoresContent() {
   };
 
   const seleccionarProveedor = (p: Proveedor) => {
-    setProveedorSeleccionado(p);
+    const normalized: Proveedor = { ...p, noEmiteFactura: Boolean(p.noEmiteFactura) };
+    setProveedorSeleccionado(normalized);
     setForm((prev) => ({
       ...prev,
-      proveedorId: p.id,
-      cuit: p.cuit ?? "",
+      proveedorId: normalized.id,
+      cuit: normalized.cuit ?? "",
+      ...(normalized.noEmiteFactura
+        ? { puntoVenta: "0", nroFactura: "0", tipoComprobante: "0" }
+        : { puntoVenta: "", nroFactura: "", tipoComprobante: "A" }),
     }));
     setSearchProveedorOpen(false);
   };
@@ -363,7 +386,9 @@ export function FacturasProveedoresContent() {
     }
   };
 
-  const aplicarCargaEspecial = (tipo: "UTEDYC" | "FEPUBA") => {
+  const aplicarCargaEspecial = () => {
+    if (!proveedorSeleccionado) return;
+    const nombreProv = proveedorSeleccionado.proveedor;
     const m2 = String(mes).padStart(2, "0");
     const mesAnt = mes === 1 ? 12 : mes - 1;
     const anioAnt = mes === 1 ? anio - 1 : anio;
@@ -371,13 +396,19 @@ export function FacturasProveedoresContent() {
     const hoy = new Date();
     const fechaHoy = `${String(hoy.getDate()).padStart(2, "0")}/${String(hoy.getMonth() + 1).padStart(2, "0")}/${hoy.getFullYear()}`;
 
-    if (tipo === "FEPUBA") {
+    if (isFepuba(nombreProv)) {
       setForm((f) => ({
         ...f,
-        puntoVenta: "0",
-        nroFactura: "0",
-        tipoComprobante: "S/FACTURA",
         descripcion: `CTA. ${m2}/${anio}`,
+        fecha: fechaHoy,
+      }));
+      return;
+    }
+
+    if (isUtedyc(nombreProv)) {
+      setForm((f) => ({
+        ...f,
+        descripcion: `UTEDYC ${mesAnt2}/${anioAnt}`,
         fecha: fechaHoy,
       }));
       return;
@@ -385,10 +416,7 @@ export function FacturasProveedoresContent() {
 
     setForm((f) => ({
       ...f,
-      puntoVenta: "0",
-      nroFactura: "0",
-      tipoComprobante: "S/FACTURA",
-      descripcion: `UTEDYC ${mesAnt2}/${anioAnt}`,
+      descripcion: `${nombreProv.trim()} ${m2}/${anio}`,
       fecha: fechaHoy,
     }));
   };
@@ -474,10 +502,13 @@ export function FacturasProveedoresContent() {
       const prov = grupo[0]?.proveedor?.proveedor ?? "Proveedor";
       const descRef = (grupo[0]?.descripcion ?? "").trim();
       let nombre = prov;
+      const pObj = grupo[0]?.proveedor;
       if (isFepuba(prov) && descRef) nombre = `${prov} ${descRef}`;
-      if (isUtedyc(prov)) {
+      else if (isUtedyc(prov)) {
         if (/UTEDYC\s+\d{2}\/\d{4}/i.test(descRef)) nombre = descRef;
         else if (descRef) nombre = `${prov} ${descRef}`;
+      } else if (pObj?.noEmiteFactura && descRef) {
+        nombre = `${prov} ${descRef}`;
       }
       const total = grupo.reduce((acc, f) => acc + Number(f.importe || 0), 0);
       proyectadoData.push([nombre, total]);
@@ -802,25 +833,27 @@ export function FacturasProveedoresContent() {
                     variant="outline"
                     onClick={() => {
                       setProveedorSeleccionado(null);
-                      setForm((f) => ({ ...f, proveedorId: null, cuit: "" }));
+                      setForm((f) => ({
+                        ...f,
+                        proveedorId: null,
+                        cuit: "",
+                        puntoVenta: "",
+                        nroFactura: "",
+                        tipoComprobante: "A",
+                      }));
                     }}
                   >
                     Cambiar
                   </Button>
                 </div>
               )}
-              {proveedorSeleccionado && (isUtedyc(proveedorSeleccionado.proveedor) || isFepuba(proveedorSeleccionado.proveedor)) && (
+              {proveedorSeleccionado?.noEmiteFactura === true && (
                 <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2">
                   <p className="text-xs text-amber-800 mb-2">
-                    Este proveedor no emite factura. Podés autocompletar carga especial:
+                    Este proveedor está marcado como no emite factura. Podés autocompletar los datos con un clic:
                   </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => aplicarCargaEspecial(isUtedyc(proveedorSeleccionado.proveedor) ? "UTEDYC" : "FEPUBA")}
-                  >
-                    Asignar {isUtedyc(proveedorSeleccionado.proveedor) ? "UTEDYC" : "FEPUBA"} con un clic
+                  <Button type="button" size="sm" variant="outline" onClick={() => aplicarCargaEspecial()}>
+                    Asignar {proveedorSeleccionado.proveedor.trim()} con un clic
                   </Button>
                 </div>
               )}
@@ -833,6 +866,8 @@ export function FacturasProveedoresContent() {
                   type="number"
                   value={form.puntoVenta}
                   onChange={(e) => setForm((f) => ({ ...f, puntoVenta: e.target.value }))}
+                  disabled={bloqueoNoEmiteFactura}
+                  className={cn(bloqueoNoEmiteFactura && claseCampoFacturaBloqueado)}
                 />
               </div>
               <div className="space-y-2">
@@ -841,6 +876,8 @@ export function FacturasProveedoresContent() {
                   type="number"
                   value={form.nroFactura}
                   onChange={(e) => setForm((f) => ({ ...f, nroFactura: e.target.value }))}
+                  disabled={bloqueoNoEmiteFactura}
+                  className={cn(bloqueoNoEmiteFactura && claseCampoFacturaBloqueado)}
                 />
               </div>
               <div className="space-y-2">
@@ -870,6 +907,8 @@ export function FacturasProveedoresContent() {
                   value={form.tipoComprobante}
                   onChange={(e) => setForm((f) => ({ ...f, tipoComprobante: e.target.value.toUpperCase() }))}
                   placeholder="A, B o C"
+                  disabled={bloqueoNoEmiteFactura}
+                  className={cn(bloqueoNoEmiteFactura && claseCampoFacturaBloqueado)}
                 />
               </div>
               <div className="space-y-2">

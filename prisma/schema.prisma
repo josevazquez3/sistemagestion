@@ -328,6 +328,7 @@ model Proveedor {
   email               String?
   formaPago           String?
   cbu                 String?
+  noEmiteFactura      Boolean  @default(false)
   facturas            FacturaProveedor[]
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

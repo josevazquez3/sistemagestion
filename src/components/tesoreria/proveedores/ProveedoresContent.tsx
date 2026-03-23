@@ -5,6 +5,8 @@ import * as XLSX from "xlsx";
 import {
   Check,
   FileSpreadsheet,
+  FileText,
+  FileX,
   Pencil,
   Plus,
   Search,
@@ -32,6 +34,7 @@ type Proveedor = {
   email: string | null;
   formaPago: string | null;
   cbu: string | null;
+  noEmiteFactura: boolean;
 };
 
 type Toast = { tipo: "ok" | "error" | "warning"; text: string } | null;
@@ -56,6 +59,7 @@ const formVacio: ProveedorForm = {
   email: "",
   formaPago: "TRANSFERENCIA",
   cbu: "",
+  noEmiteFactura: false,
 };
 
 export function ProveedoresContent() {
@@ -84,6 +88,7 @@ export function ProveedoresContent() {
   const [bulkChecking, setBulkChecking] = useState(false);
   const [includeDuplicates, setIncludeDuplicates] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ insertados: number; actualizados: number; errores: string[] } | null>(null);
+  const [togglingNoEmiteId, setTogglingNoEmiteId] = useState<number | null>(null);
 
   const showToast = useCallback((tipo: "ok" | "error" | "warning", text: string) => {
     setToast({ tipo, text });
@@ -136,7 +141,13 @@ export function ProveedoresContent() {
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "No se pudieron cargar proveedores.");
-      setProveedores(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setProveedores(
+        list.map((p: Proveedor & { noEmiteFactura?: boolean }) => ({
+          ...p,
+          noEmiteFactura: Boolean(p.noEmiteFactura),
+        }))
+      );
     } catch (e) {
       setProveedores([]);
       showToast("error", e instanceof Error ? e.message : "Error al cargar proveedores.");
@@ -189,6 +200,7 @@ export function ProveedoresContent() {
       email: p.email ?? "",
       formaPago: p.formaPago ?? "",
       cbu: p.cbu ?? "",
+      noEmiteFactura: p.noEmiteFactura ?? false,
     });
   };
 
@@ -219,6 +231,36 @@ export function ProveedoresContent() {
       showToast("error", e instanceof Error ? e.message : "Error al actualizar proveedor.");
     } finally {
       setSavingInline(false);
+    }
+  };
+
+  const toggleNoEmiteFactura = async (p: Proveedor) => {
+    if (editingId === p.id) return;
+    const next = !p.noEmiteFactura;
+    setProveedores((prev) =>
+      prev.map((x) => (x.id === p.id ? { ...x, noEmiteFactura: next } : x))
+    );
+    setTogglingNoEmiteId(p.id);
+    try {
+      const res = await fetch(`/api/proveedores/${p.id}/no-emite-factura`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noEmiteFactura: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "No se pudo actualizar.");
+      const serverVal = Boolean(data?.noEmiteFactura);
+      setProveedores((prev) =>
+        prev.map((x) => (x.id === p.id ? { ...x, noEmiteFactura: serverVal } : x))
+      );
+      showToast("ok", next ? "Marcado como no emite factura." : "Marcado como emite factura.");
+    } catch (e) {
+      setProveedores((prev) =>
+        prev.map((x) => (x.id === p.id ? { ...x, noEmiteFactura: !next } : x))
+      );
+      showToast("error", e instanceof Error ? e.message : "Error al actualizar.");
+    } finally {
+      setTogglingNoEmiteId(null);
     }
   };
 
@@ -355,6 +397,7 @@ export function ProveedoresContent() {
     email: String(row["Correo electrónico"] ?? "").trim(),
     formaPago: String(row["Formas de Pago"] ?? "").trim() || "TRANSFERENCIA",
     cbu: String(row["CBU"] ?? "").trim(),
+    noEmiteFactura: false,
   });
 
   const checkDuplicados = useCallback(async (rows: ProveedorForm[]) => {
@@ -591,7 +634,16 @@ export function ProveedoresContent() {
                               value={draft?.proveedor ?? ""}
                               onChange={(e) => setDraft((d) => (d ? { ...d, proveedor: e.target.value } : d))}
                             />
-                          ) : p.proveedor}
+                          ) : (
+                            <span className="inline-flex flex-wrap items-center gap-2">
+                              <span>{p.proveedor}</span>
+                              {p.noEmiteFactura && (
+                                <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800">
+                                  Sin factura
+                                </span>
+                              )}
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2">
                           {edit ? (
@@ -644,6 +696,27 @@ export function ProveedoresContent() {
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex items-center justify-end gap-1">
+                            {!edit && (
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className={`h-8 w-8 ${
+                                  p.noEmiteFactura
+                                    ? "text-amber-500 hover:bg-amber-50"
+                                    : "text-gray-400 hover:bg-gray-100"
+                                }`}
+                                onClick={() => void toggleNoEmiteFactura(p)}
+                                disabled={togglingNoEmiteId === p.id}
+                                title={p.noEmiteFactura ? "No emite factura" : "Emite factura"}
+                              >
+                                {p.noEmiteFactura ? (
+                                  <FileX className="h-4 w-4" />
+                                ) : (
+                                  <FileText className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
                             {!edit ? (
                               <Button
                                 type="button"
