@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
     recibo?: string | null;
     distrito?: string | null;
     concepto: string;
+    periodo?: string | null;
     ctaColeg?: number | null;
     nMatriculados?: number | null;
     importe: number;
@@ -122,6 +123,9 @@ export async function POST(req: NextRequest) {
   if (Number.isNaN(ctaColeg!)) ctaColeg = null;
   if (Number.isNaN(nMatriculados!)) nMatriculados = null;
 
+  const periodoRaw = body.periodo != null ? String(body.periodo).trim() : "";
+  const periodo = periodoRaw || null;
+
   const creado = await prisma.ingresoDistrito.create({
     data: {
       mes,
@@ -131,6 +135,7 @@ export async function POST(req: NextRequest) {
       recibo: (body.recibo ?? "").trim() || null,
       distrito: (body.distrito ?? "").trim() || null,
       concepto,
+      periodo,
       ctaColeg: ctaColeg != null ? new Decimal(ctaColeg) : null,
       nMatriculados: nMatriculados != null ? new Decimal(nMatriculados) : null,
       importe: new Decimal(importeVal),

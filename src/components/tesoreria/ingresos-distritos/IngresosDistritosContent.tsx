@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,6 @@ import {
   Calendar,
   Pencil,
   Plus,
-  X,
   Search,
   Upload,
   Download,
@@ -16,12 +15,26 @@ import {
   Trash2,
   FileText,
   RefreshCw,
+  BookmarkPlus,
 } from "lucide-react";
 import { formatearImporteAR } from "@/lib/parsearExtracto";
 import { MultiCodigoInput } from "../MultiCodigoInput";
 import { ModalEditarIngresoDistrito } from "./ModalEditarIngresoDistrito";
 import { ModalImportarIngresosDistritos } from "./ModalImportarIngresosDistritos";
-import type { IngresoDistrito } from "@/types/ingresos-distritos";
+import { ModalCuitDistritos } from "./ModalCuitDistritos";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import type { CuitDistrito, IngresoDistrito } from "@/types/ingresos-distritos";
+import {
+  extraerCuitDelConcepto,
+  normalizarCuitParaMatch,
+} from "@/lib/tesoreria/extraerCuitConcepto";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -32,6 +45,8 @@ const MESES = [
 ];
 
 const TZ = "America/Argentina/Buenos_Aires";
+
+const API_CUIT_DISTRITOS = "/api/tesoreria/ingresos-distritos/cuit-distritos";
 
 function formatFecha(iso: string): string {
   try {
@@ -72,7 +87,39 @@ export function IngresosDistritosContent() {
   const [menuExportarOpen, setMenuExportarOpen] = useState(false);
   const [buscar, setBuscar] = useState("");
   const [modalImportarOpen, setModalImportarOpen] = useState(false);
+  const [modalCuitDistritosOpen, setModalCuitDistritosOpen] = useState(false);
+  const [cuitDistritos, setCuitDistritos] = useState<CuitDistrito[]>([]);
+  const [guardarCuitModal, setGuardarCuitModal] = useState<{
+    open: boolean;
+    distrito: string;
+    cuit: string;
+  }>({ open: false, distrito: "", cuit: "" });
+  const [guardandoCuitPreset, setGuardandoCuitPreset] = useState(false);
   const [cargandoActualizar, setCargandoActualizar] = useState(false);
+
+  const cuitDistritoPorCuitNorm = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of cuitDistritos) {
+      const k = normalizarCuitParaMatch(c.cuit);
+      if (k) m.set(k, c.distrito);
+    }
+    return m;
+  }, [cuitDistritos]);
+
+  const fetchCuitDistritos = useCallback(async () => {
+    try {
+      const res = await fetch(API_CUIT_DISTRITOS);
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) setCuitDistritos(data as CuitDistrito[]);
+      else setCuitDistritos([]);
+    } catch {
+      setCuitDistritos([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchCuitDistritos();
+  }, [fetchCuitDistritos]);
 
   const fetchRegistros = useCallback(async () => {
     setLoading(true);
@@ -214,6 +261,62 @@ export function IngresosDistritosContent() {
     }
   };
 
+  function distritoVisualRegistro(reg: IngresoDistrito): string {
+    const cuitExt = extraerCuitDelConcepto(reg.concepto);
+    const norm = cuitExt ? normalizarCuitParaMatch(cuitExt) : "";
+    if (norm && cuitDistritoPorCuitNorm.has(norm)) {
+      return cuitDistritoPorCuitNorm.get(norm)!;
+    }
+    return reg.distrito?.trim() || "—";
+  }
+
+  function mostrarBotonGuardarCuit(reg: IngresoDistrito): boolean {
+    if (!reg.distrito?.trim()) return false;
+    const cuitExt = extraerCuitDelConcepto(reg.concepto);
+    if (!cuitExt) return false;
+    const norm = normalizarCuitParaMatch(cuitExt);
+    if (!norm) return false;
+    return !cuitDistritoPorCuitNorm.has(norm);
+  }
+
+  const abrirGuardarCuitDesdeFila = (reg: IngresoDistrito) => {
+    const cuitExt = extraerCuitDelConcepto(reg.concepto) ?? "";
+    setGuardarCuitModal({
+      open: true,
+      distrito: reg.distrito?.trim() ?? "",
+      cuit: cuitExt,
+    });
+  };
+
+  const confirmarGuardarCuitPreset = async () => {
+    const distrito = guardarCuitModal.distrito.trim();
+    const cuit = guardarCuitModal.cuit.trim();
+    if (!distrito || !cuit) {
+      showMessage("error", "Completá distrito y CUIT.");
+      return;
+    }
+    setGuardandoCuitPreset(true);
+    try {
+      const res = await fetch(API_CUIT_DISTRITOS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ distrito, cuit }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showMessage("error", data?.error || "Error al guardar.");
+        return;
+      }
+      showMessage("ok", "CUIT guardado en la lista.");
+      setGuardarCuitModal({ open: false, distrito: "", cuit: "" });
+      await fetchCuitDistritos();
+    } catch {
+      showMessage("error", "Error de conexión.");
+    } finally {
+      setGuardandoCuitPreset(false);
+    }
+  };
+
   const eliminarRegistro = (reg: IngresoDistrito) => {
     if (!confirm("¿Eliminar este registro?")) return;
     fetch(`/api/tesoreria/ingresos-distritos/${reg.id}`, { method: "DELETE" })
@@ -251,31 +354,32 @@ export function IngresosDistritosContent() {
           ["Mes y Año:", `${nombreMes} ${data.anio}`],
           ["PLANILLA DE RECAUDACION DTOS."],
           [],
-          ["FECHA", "RECIBO Nº", "DISTRITO", "CONCEPTO", "CTA. COLEG.", "N. MATRICULADOS", "IMPORTE", "SALDO"],
-          ...movs.map((m: { fecha: string; recibo: string; distrito: string; concepto: string; ctaColeg: number | null; nMatriculados: number | null; importe: number; saldo: number }) => [
+          ["FECHA", "RECIBO Nº", "DISTRITO", "CONCEPTO", "PERIODO", "CTA. COLEG.", "N. MATRICULADOS", "IMPORTE", "SALDO"],
+          ...movs.map((m: { fecha: string; recibo: string; distrito: string; concepto: string; periodo?: string; ctaColeg: number | null; nMatriculados: number | null; importe: number; saldo: number }) => [
             m.fecha,
             m.recibo ?? "",
             m.distrito ?? "",
             m.concepto,
+            m.periodo ?? "",
             m.ctaColeg ?? "",
             m.nMatriculados ?? "",
             m.importe,
             m.saldo,
           ]),
           [],
-          ["TOTAL", "", "", "", data.totalCtaColeg ?? 0, data.totalNMatriculados ?? 0, data.totalImporte ?? 0, ""],
+          ["TOTAL", "", "", "", "", data.totalCtaColeg ?? 0, data.totalNMatriculados ?? 0, data.totalImporte ?? 0, ""],
         ];
         const ws = XLSX.utils.aoa_to_sheet(filas);
         const firstDataRow = 4;
         const lastDataRow = 3 + movs.length;
         for (let r = firstDataRow; r <= lastDataRow; r++) {
-          for (const c of [4, 5, 6, 7]) {
+          for (const c of [5, 6, 7, 8]) {
             const cell = ws[XLSX.utils.encode_cell({ r, c })];
             if (cell && cell.t === "n") cell.z = numFormat;
           }
         }
         const totalRow = 5 + movs.length;
-        for (const c of [4, 5, 6]) {
+        for (const c of [5, 6, 7]) {
           const cell = ws[XLSX.utils.encode_cell({ r: totalRow, c })];
           if (cell && cell.t === "n") cell.z = numFormat;
         }
@@ -304,11 +408,12 @@ export function IngresosDistritosContent() {
         );
         doc.setFontSize(10);
         const tableData = movs.map(
-          (m: { fecha: string; recibo: string; distrito: string; concepto: string; ctaColegFormato: string; nMatriculadosFormato: string; importeFormato: string; saldoFormato: string }) => [
+          (m: { fecha: string; recibo: string; distrito: string; concepto: string; periodo?: string; ctaColegFormato: string; nMatriculadosFormato: string; importeFormato: string; saldoFormato: string }) => [
             m.fecha,
             m.recibo ?? "",
             m.distrito ?? "",
             m.concepto,
+            m.periodo ?? "",
             m.ctaColegFormato ?? "",
             m.nMatriculadosFormato ?? "",
             m.importeFormato,
@@ -317,9 +422,21 @@ export function IngresosDistritosContent() {
         );
         autoTable(doc, {
           startY: 28,
-          head: [["FECHA", "RECIBO Nº", "DISTRITO", "CONCEPTO", "CTA. COLEG.", "N. MAT.", "IMPORTE", "SALDO"]],
+          head: [["FECHA", "RECIBO Nº", "DISTRITO", "CONCEPTO", "PERIODO", "CTA. COLEG.", "N. MAT.", "IMPORTE", "SALDO"]],
           body: tableData,
           theme: "grid",
+          styles: { fontSize: 7, cellPadding: 1.5 },
+          columnStyles: {
+            0: { cellWidth: 20 },
+            1: { cellWidth: 16 },
+            2: { cellWidth: 18 },
+            3: { cellWidth: 38 },
+            4: { cellWidth: 16 },
+            5: { cellWidth: 22 },
+            6: { cellWidth: 18 },
+            7: { cellWidth: 22 },
+            8: { cellWidth: 22 },
+          },
         });
         const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? 28;
         doc.text(
@@ -446,6 +563,15 @@ export function IngresosDistritosContent() {
 
         <Button
           type="button"
+          variant="secondary"
+          onClick={() => setModalCuitDistritosOpen(true)}
+          className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg"
+        >
+          Cuit Distritos
+        </Button>
+
+        <Button
+          type="button"
           onClick={() => {
             setRegistroEditar(null);
             setModalEditar(true);
@@ -533,6 +659,7 @@ export function IngresosDistritosContent() {
                   <th className="pb-2 pt-2">Recibo Nº</th>
                   <th className="pb-2 pt-2">Distrito</th>
                   <th className="pb-2 pt-2">Concepto</th>
+                  <th className="pb-2 pt-2 w-28 min-w-[7rem]">Periodo</th>
                   <th className="pb-2 pt-2 text-right">Cta. Coleg.</th>
                   <th className="pb-2 pt-2 text-right">N. Matriculados</th>
                   <th className="pb-2 pt-2 text-right">Importe</th>
@@ -543,13 +670,13 @@ export function IngresosDistritosContent() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-gray-400">
+                    <td colSpan={10} className="py-8 text-center text-gray-400">
                       Cargando…
                     </td>
                   </tr>
                 ) : registros.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-gray-500">
+                    <td colSpan={10} className="py-8 text-center text-gray-500">
                       No hay registros para este período.
                     </td>
                   </tr>
@@ -558,9 +685,26 @@ export function IngresosDistritosContent() {
                     <tr key={reg.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 pl-2 whitespace-nowrap">{formatFecha(reg.fecha)}</td>
                       <td className="py-3">{reg.recibo ?? "—"}</td>
-                      <td className="py-3">{reg.distrito ?? "—"}</td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span>{distritoVisualRegistro(reg)}</span>
+                          {mostrarBotonGuardarCuit(reg) && (
+                            <button
+                              type="button"
+                              title="Guardar en Cuit Distritos"
+                              onClick={() => abrirGuardarCuitDesdeFila(reg)}
+                              className="text-gray-400 hover:text-amber-600 p-0.5 shrink-0"
+                            >
+                              <BookmarkPlus className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-3 max-w-[220px] truncate" title={reg.concepto}>
                         {reg.concepto}
+                      </td>
+                      <td className="py-3 w-28 min-w-[7rem] whitespace-nowrap text-gray-700">
+                        {reg.periodo?.trim() ? reg.periodo : "—"}
                       </td>
                       <td className="py-3 text-right whitespace-nowrap text-gray-700">
                         {reg.ctaColeg != null ? `$ ${formatearImporteAR(reg.ctaColeg)}` : "—"}
@@ -626,6 +770,69 @@ export function IngresosDistritosContent() {
         onSuccess={fetchRegistros}
         showMessage={showMessage}
       />
+
+      <ModalCuitDistritos
+        open={modalCuitDistritosOpen}
+        onOpenChange={(open) => {
+          setModalCuitDistritosOpen(open);
+          if (!open) void fetchCuitDistritos();
+        }}
+        showMessage={showMessage}
+        registros={registros}
+      />
+
+      <Dialog
+        open={guardarCuitModal.open}
+        onOpenChange={(open) => {
+          if (!open) setGuardarCuitModal({ open: false, distrito: "", cuit: "" });
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Guardar en Cuit Distritos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>Distrito</Label>
+              <Input
+                value={guardarCuitModal.distrito}
+                onChange={(e) =>
+                  setGuardarCuitModal((s) => ({ ...s, distrito: e.target.value }))
+                }
+                placeholder="I, II, VI…"
+              />
+            </div>
+            <div>
+              <Label>CUIT</Label>
+              <Input
+                value={guardarCuitModal.cuit}
+                onChange={(e) =>
+                  setGuardarCuitModal((s) => ({ ...s, cuit: e.target.value }))
+                }
+                placeholder="XX-XXXXXXXX-X"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setGuardarCuitModal({ open: false, distrito: "", cuit: "" })
+              }
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={guardandoCuitPreset}
+              onClick={() => void confirmarGuardarCuitPreset()}
+            >
+              {guardandoCuitPreset ? "Guardando…" : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

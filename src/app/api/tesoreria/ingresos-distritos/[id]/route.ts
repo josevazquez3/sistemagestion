@@ -49,6 +49,7 @@ export async function PUT(
     recibo?: string | null;
     distrito?: string | null;
     concepto?: string;
+    periodo?: string | null;
     ctaColeg?: number | null;
     nMatriculados?: number | null;
     importe?: number;
@@ -75,6 +76,11 @@ export async function PUT(
   if (Number.isNaN(ctaColeg!)) ctaColeg = null;
   if (Number.isNaN(nMatriculados!)) nMatriculados = null;
 
+  const periodoData =
+    body.periodo !== undefined
+      ? (String(body.periodo).trim() || null)
+      : undefined;
+
   await prisma.ingresoDistrito.update({
     where: { id },
     data: {
@@ -82,6 +88,7 @@ export async function PUT(
       recibo: body.recibo !== undefined ? (body.recibo?.trim() || null) : reg.recibo,
       distrito: body.distrito !== undefined ? (body.distrito?.trim() || null) : reg.distrito,
       concepto,
+      ...(periodoData !== undefined ? { periodo: periodoData } : {}),
       ctaColeg: ctaColeg != null ? new Decimal(ctaColeg) : null,
       nMatriculados: nMatriculados != null ? new Decimal(nMatriculados) : null,
       importe: new Decimal(importeVal),

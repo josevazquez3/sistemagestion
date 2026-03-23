@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
       recibo: r.recibo ?? "",
       distrito: r.distrito ?? "",
       concepto: r.concepto,
+      periodo: r.periodo ?? "",
       ctaColeg: r.ctaColeg != null ? Number(r.ctaColeg) : null,
       nMatriculados: r.nMatriculados != null ? Number(r.nMatriculados) : null,
       importe: Number(r.importe),

@@ -56,6 +56,7 @@ export function ModalEditarIngresoDistrito({
   const [recibo, setRecibo] = useState("");
   const [distrito, setDistrito] = useState("");
   const [concepto, setConcepto] = useState("");
+  const [periodo, setPeriodo] = useState("");
   const [ctaColeg, setCtaColeg] = useState("");
   const [nMatriculados, setNMatriculados] = useState("");
   const [importe, setImporte] = useState("");
@@ -68,6 +69,7 @@ export function ModalEditarIngresoDistrito({
         setRecibo(registro.recibo ?? "");
         setDistrito(registro.distrito ?? "");
         setConcepto(registro.concepto);
+        setPeriodo(registro.periodo ?? "");
         setCtaColeg(registro.ctaColeg != null ? formatearImporteAR(registro.ctaColeg) : "");
         setNMatriculados(registro.nMatriculados != null ? formatearImporteAR(registro.nMatriculados) : "");
         setImporte(formatearImporteAR(registro.importe));
@@ -76,6 +78,7 @@ export function ModalEditarIngresoDistrito({
         setRecibo("");
         setDistrito("");
         setConcepto("");
+        setPeriodo("");
         setCtaColeg("");
         setNMatriculados("");
         setImporte("");
@@ -96,6 +99,7 @@ export function ModalEditarIngresoDistrito({
       showMessage("error", "El concepto es obligatorio.");
       return;
     }
+    const periodoT = periodo.trim();
     const importeVal = Math.abs(parsearImporteAR(importe));
     const ctaVal = ctaColeg.trim() ? parsearImporteAR(ctaColeg) : null;
     const nMatVal = nMatriculados.trim() ? parsearImporteAR(nMatriculados) : null;
@@ -114,6 +118,7 @@ export function ModalEditarIngresoDistrito({
             recibo: recibo.trim() || null,
             distrito: distrito.trim() || null,
             concepto: conceptoT,
+            periodo: periodoT || null,
             ctaColeg: ctaVal,
             nMatriculados: nMatVal,
             importe: importeVal,
@@ -134,6 +139,7 @@ export function ModalEditarIngresoDistrito({
             recibo: recibo.trim() || null,
             distrito: distrito.trim() || null,
             concepto: conceptoT,
+            periodo: periodoT || null,
             ctaColeg: ctaVal,
             nMatriculados: nMatVal,
             importe: importeVal,
@@ -197,6 +203,17 @@ export function ModalEditarIngresoDistrito({
               placeholder="Ej: CTA. COLEG. 08/2025"
               required
             />
+          </div>
+          <div>
+            <Label>Periodo</Label>
+            <Input
+              value={periodo}
+              onChange={(e) => setPeriodo(e.target.value)}
+              placeholder="Ej: 03/2026 o texto libre"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Podés usar <span className="font-medium">MM/YYYY</span>, solo texto o ambos (ej. &quot;03/2026 — Nuevos matriculados&quot;).
+            </p>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>

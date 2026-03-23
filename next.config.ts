@@ -6,6 +6,19 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.0.39"],
+  /** Alias documentado: CRUD Cuit Distritos vive bajo /api/tesoreria/... */
+  async rewrites() {
+    return [
+      {
+        source: "/api/ingresos-distritos/cuit-distritos",
+        destination: "/api/tesoreria/ingresos-distritos/cuit-distritos",
+      },
+      {
+        source: "/api/ingresos-distritos/cuit-distritos/:path*",
+        destination: "/api/tesoreria/ingresos-distritos/cuit-distritos/:path*",
+      },
+    ];
+  },
   env: {
     NEXTAUTH_URL:
       process.env.NEXTAUTH_URL ||

@@ -7,6 +7,7 @@ export interface IngresoDistrito {
   recibo: string | null;
   distrito: string | null;
   concepto: string;
+  periodo: string | null;
   ctaColeg: number | null;
   nMatriculados: number | null;
   importe: number;
@@ -21,4 +22,11 @@ export interface IngresoDistritoFormData {
   distrito: string;
   ctaColeg: string;
   nMatriculados: string;
+}
+
+export interface CuitDistrito {
+  id: number;
+  distrito: string;
+  cuit: string;
+  createdAt: string;
 }

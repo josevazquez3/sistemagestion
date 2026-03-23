@@ -756,6 +756,7 @@ model IngresoDistrito {
   recibo           String?
   distrito         String?
   concepto         String
+  periodo          String?
   ctaColeg         Decimal?  @db.Decimal(15, 2)
   nMatriculados    Decimal?  @db.Decimal(15, 2)
   importe          Decimal   @db.Decimal(15, 2)
@@ -778,4 +779,13 @@ model ConfigIngresoDistrito {
 
   @@unique([mes, anio])
   @@map("config_ingreso_distrito")
+}
+
+model CuitDistrito {
+  id        Int      @id @default(autoincrement())
+  distrito  String
+  cuit      String
+  createdAt DateTime @default(now())
+
+  @@map("cuit_distritos")
 }
