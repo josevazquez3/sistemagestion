@@ -24,6 +24,18 @@ function formatDDMMYYYY(d: Date): string {
   return formatearFechaUTC(d);
 }
 
+function mergeObservacion(actual: string | null, nueva: string): string {
+  const incoming = nueva.trim();
+  if (!incoming) return actual ?? "";
+  if (!actual) return incoming;
+  const partes = actual
+    .split("|")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (partes.includes(incoming)) return actual;
+  return `${actual} | ${incoming}`;
+}
+
 export type FilaPlanillaAPI = {
   legajoId: string;
   numeroLegajo: number;
@@ -152,8 +164,7 @@ export async function GET(request: NextRequest) {
     } else {
       const f = mapa.get(key)!;
       f.vacaciones = 2501;
-      if (f.observacion && !f.observacion.includes(obs)) f.observacion += " | " + obs;
-      else if (!f.observacion) f.observacion = obs;
+      f.observacion = mergeObservacion(f.observacion, obs);
     }
   }
 
@@ -184,8 +195,7 @@ export async function GET(request: NextRequest) {
       const f = mapa.get(key)!;
       if (lic.tipoLicencia === "ESTUDIO") f.diaUtedyc = 2601;
       if (["ART", "ENFERMEDAD"].includes(lic.tipoLicencia)) f.carpeta = 2641;
-      if (f.observacion && !f.observacion.includes(obs)) f.observacion += " | " + obs;
-      else if (!f.observacion) f.observacion = obs;
+      f.observacion = mergeObservacion(f.observacion, obs);
     }
   }
 
@@ -197,7 +207,10 @@ export async function GET(request: NextRequest) {
       continue;
     }
     const key = n.legajoId;
-    const obs = n.observacion ?? "";
+    const obs =
+      n.tipo === "VACACIONES"
+        ? `${formatDDMMYYYY(n.fechaDesde)} al ${formatDDMMYYYY(n.fechaHasta)}`
+        : (n.observacion ?? "").trim();
     if (!mapa.has(key)) {
       mapa.set(key, {
         legajoId: n.legajo.id,
@@ -215,7 +228,7 @@ export async function GET(request: NextRequest) {
     } else {
       const f = mapa.get(key)!;
       f.novedadIds.push(n.id);
-      if (n.observacion) f.observacion = f.observacion ? `${f.observacion} | ${n.observacion}` : n.observacion;
+      if (obs) f.observacion = mergeObservacion(f.observacion, obs);
       switch (n.tipo) {
         case "FERIADO":
           f.feriado = n.codigo ?? 2611;
