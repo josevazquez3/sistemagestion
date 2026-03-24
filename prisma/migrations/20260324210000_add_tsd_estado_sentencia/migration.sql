@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TsdEstado" ADD VALUE 'SENTENCIA';

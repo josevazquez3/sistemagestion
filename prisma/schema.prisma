@@ -5,9 +5,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// DIRECT_URL: conexión sin pooler para `prisma migrate` (evita P1002 con Neon).
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // === AUTENTICACIÓN Y ROLES ===
@@ -427,6 +429,19 @@ model OficioRespondido {
   actualizadoEn DateTime  @updatedAt
 
   @@map("oficios_respondidos")
+}
+
+model LegalHistorialTsd {
+  id             Int      @id @default(autoincrement())
+  titulo         String
+  fechaOficio    DateTime
+  archivoNombre  String?
+  archivoUrl     String?
+  archivoKey     String?
+  fechaCarga     DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
+
+  @@map("legal_historial_tsd")
 }
 
 // === LEGISLACIÓN ===
@@ -880,4 +895,40 @@ model InformeUltimoAporte {
   informe        InformeTesoreria @relation(fields: [informeId], references: [id], onDelete: Cascade)
   distritoNumero Int
   fechaOverride  DateTime?
+}
+
+// === LEGALES — TSD (Seguimiento de Expedientes) ===
+
+model TsdExpediente {
+  id              Int             @id @default(autoincrement())
+  nroExpte        String          @unique
+  caratula        String
+  distrito        String
+  finalizado      Boolean         @default(false)
+  creadoEn        DateTime        @default(now())
+  actualizadoEn   DateTime        @updatedAt
+  movimientos     TsdMovimiento[]
+
+  @@map("tsd_expedientes")
+}
+
+model TsdMovimiento {
+  id            Int           @id @default(autoincrement())
+  expedienteId  Int
+  expediente    TsdExpediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  fecha         DateTime
+  estado        TsdEstado
+  observacion   String?
+  creadoEn      DateTime      @default(now())
+
+  @@index([expedienteId])
+  @@map("tsd_movimientos")
+}
+
+enum TsdEstado {
+  PARA_TRATAR
+  CEDULA_NOTIFICACION
+  APELACION
+  DEVUELTO_A_DTO
+  SENTENCIA
 }

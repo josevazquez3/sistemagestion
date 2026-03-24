@@ -21,6 +21,7 @@ import {
   Award,
   Building2,
   CheckSquare,
+  FileStack,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Session } from "next-auth";
@@ -47,6 +48,8 @@ const navItems = [
   { href: "/legales", label: "Legales", icon: Scale, expandable: true, legalesModule: true },
   { href: "/legales/modelos-oficios", label: "Modelos de Oficios", icon: FileText, parent: "legales", legalesModule: true },
   { href: "/legales/historial-oficios", label: "Historial de Oficios", icon: ClipboardList, parent: "legales", legalesModule: true },
+  { href: "/legales/historial-tsd", label: "Historial Exptes. TSD", icon: FileStack, parent: "legales", legalesModule: true },
+  { href: "/legales/tsd", label: "TSD — Expedientes", icon: FileStack, parent: "legales", legalesModule: true },
   { href: "/secretaria", label: "Secretaría", icon: FileText, secretariaModule: true, expandable: true },
   { href: "/secretaria/modelos-notas", label: "Modelos de Notas", icon: FileText, parent: "secretaria", secretariaModule: true },
   { href: "/secretaria/actas", label: "Actas", icon: ScrollText, parent: "secretaria", secretariaModule: true },
@@ -75,6 +78,8 @@ const secretariaSubItems = [
 const legalesSubItems = [
   { href: "/legales/modelos-oficios", label: "Modelos de Oficios", icon: FileText },
   { href: "/legales/historial-oficios", label: "Historial de Oficios", icon: ClipboardList },
+  { href: "/legales/historial-tsd", label: "Historial Exptes. TSD", icon: FileStack },
+  { href: "/legales/tsd", label: "TSD — Expedientes", icon: FileStack },
 ];
 
 const tesoreriaSubItems = [
@@ -104,9 +109,7 @@ export function Sidebar({ user }: { user: Session["user"] }) {
     pathname.startsWith("/rrhh")
   );
 
-  const [secretariaAbierta, setSecretariaAbierta] = useState(() =>
-    pathname.startsWith("/secretaria")
-  );
+  const [secretariaAbierta, setSecretariaAbierta] = useState(() => pathname.startsWith("/secretaria"));
 
   const [legalesAbierta, setLegalesAbierta] = useState(() =>
     pathname.startsWith("/legales")
@@ -150,13 +153,21 @@ export function Sidebar({ user }: { user: Session["user"] }) {
       return false;
     if (item.adminOnly && !isAdmin && !isRrhh) return false;
     if ("secretariaModule" in item && item.secretariaModule && !isAdmin && !isSecretaria && !isSuperAdmin) return false;
-    if ("legalesModule" in item && item.legalesModule && !isAdmin && !isLegales) return false;
+    if (
+      "legalesModule" in item &&
+      item.legalesModule &&
+      !isAdmin &&
+      !isLegales &&
+      !isSuperAdmin &&
+      !isSecretaria
+    )
+      return false;
     if ("tesoreriaModule" in item && item.tesoreriaModule && !isAdmin && !isTesorero && !isSuperAdmin) return false;
     return true;
   });
 
   const showSecretaria = isAdmin || isSecretaria || isSuperAdmin;
-  const showLegales = isAdmin || isLegales;
+  const showLegales = isAdmin || isLegales || isSuperAdmin || isSecretaria;
   const showTesoreria = isAdmin || isTesorero || isSuperAdmin;
 
   return (
@@ -250,7 +261,10 @@ export function Sidebar({ user }: { user: Session["user"] }) {
                 </button>
                 {legalesAbierta && (
                   <div className="pl-6 space-y-1 overflow-hidden transition-all duration-200">
-                    {legalesSubItems.map((sub) => {
+                    {(isSecretaria && !isAdmin && !isLegales && !isSuperAdmin
+                      ? legalesSubItems.filter((s) => s.href === "/legales/tsd")
+                      : legalesSubItems
+                    ).map((sub) => {
                       const SubIcon = sub.icon;
                       const isActive = pathname === sub.href || pathname.startsWith(sub.href + "/");
                       return (
