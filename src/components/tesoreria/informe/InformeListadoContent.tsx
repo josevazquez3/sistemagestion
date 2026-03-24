@@ -20,6 +20,7 @@ export function InformeListadoContent() {
     null
   );
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [guardandoHistorialId, setGuardandoHistorialId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +50,39 @@ export function InformeListadoContent() {
     const t = setTimeout(() => setMensaje(null), 4000);
     return () => clearTimeout(t);
   }, [mensaje]);
+
+  const guardarEnHistorial = async (informeId: number) => {
+    if (
+      !confirm(
+        "Se guardará una copia en Historial Info. Tesorería y este informe se quitará del listado (no quedará duplicado). ¿Continuar?"
+      )
+    ) {
+      return;
+    }
+    setGuardandoHistorialId(informeId);
+    try {
+      const res = await fetch(`/api/tesoreria/informe/${informeId}/historial`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMensaje({
+          tipo: "error",
+          text: data?.error || "No se pudo guardar en el historial.",
+        });
+        return;
+      }
+      setItems((prev) => prev.filter((x) => x.id !== informeId));
+      setMensaje({
+        tipo: "ok",
+        text: `Archivado en historial: ${data?.nombreArchivo ?? "informe"}. Ya no figura en el listado de informes activos.`,
+      });
+    } catch {
+      setMensaje({ tipo: "error", text: "Error de conexión al guardar en historial." });
+    } finally {
+      setGuardandoHistorialId(null);
+    }
+  };
 
   const eliminar = async (id: number) => {
     if (!confirm("¿Eliminar este informe? Esta acción no se puede deshacer.")) return;
@@ -114,12 +148,21 @@ export function InformeListadoContent() {
                         {formatearFechaUTC(new Date(it.createdAt))}
                       </td>
                       <td className="p-3 pr-4">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end flex-wrap gap-2">
                           <Link href={`/tesoreria/informe/${it.id}`}>
                             <Button type="button" size="sm" variant="outline">
                               Ver
                             </Button>
                           </Link>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            disabled={guardandoHistorialId === it.id}
+                            onClick={() => void guardarEnHistorial(it.id)}
+                          >
+                            {guardandoHistorialId === it.id ? "Guardando…" : "Guardar en Historial"}
+                          </Button>
                           <Button
                             type="button"
                             size="sm"

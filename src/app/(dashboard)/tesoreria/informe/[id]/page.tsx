@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { InputFecha } from "@/components/ui/InputFecha";
 import { formatearFechaUTC, parsearFechaSegura } from "@/lib/utils/fecha";
 import { ExportarExcelButton } from "@/components/tesoreria/informe/ExportarExcelButton";
+import { COMPROMISOS_PREDEFINIDOS } from "@/lib/tesoreria/informeCompromisosPredeterminados";
 import * as XLSX from "xlsx";
 
 type ApiInforme = {
@@ -199,25 +200,6 @@ function ddmmyyyyToIso(ddmmyyyy: string): string | null {
   if (!d) return null;
   return d.toISOString().slice(0, 10);
 }
-
-const COMPROMISOS_PREDEFINIDOS = [
-  "Luz, Gas, T.E, Imp. Y Serv.",
-  "Cargas Sociales",
-  "Sindicato UTEDYC",
-  "Asesoría Legal",
-  "Asesoría Contable",
-  "Asesoría Comunicación Pág. Web C.S.",
-  "Mantenimiento pág. Web C.S.",
-  "Tarj. de crédito C.S.",
-  "Gustavo Papa (com. Prof. -radio)",
-  "SP (alarma)",
-  "FEPUBA CTA.",
-  "The Site",
-  "Sparkling (Dispenser agua)",
-  "La Segunda (Seguro casa)",
-  "Berkley (Seguro de vida Personal)",
-  "Mensajería",
-] as const;
 
 const COMPROMISOS_ALIAS: Record<string, string[]> = {
   "Luz, Gas, T.E, Imp. Y Serv.": ["luz gas t e imp y serv", "luz, gas, t.e, imp. y serv"],
