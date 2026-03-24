@@ -789,3 +789,42 @@ model CuitDistrito {
 
   @@map("cuit_distritos")
 }
+
+model MayorCuenta {
+  id          Int               @id @default(autoincrement())
+  nombre      String
+  orden       Int               @default(0)
+  createdAt   DateTime          @default(now())
+  movimientos MayorMovimiento[]
+  reglas      MayorRegla[]
+
+  @@map("mayor_cuentas")
+}
+
+model MayorRegla {
+  id        Int         @id @default(autoincrement())
+  palabra   String      @unique
+  cuentaId  Int
+  cuenta    MayorCuenta @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+
+  @@index([cuentaId])
+  @@map("mayor_reglas")
+}
+
+model MayorMovimiento {
+  id        Int         @id @default(autoincrement())
+  cuentaId  Int
+  cuenta    MayorCuenta @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  fecha     DateTime?
+  concepto  String
+  importe   Float
+  origen    String
+  origenId  Int?
+  createdAt DateTime    @default(now())
+
+  @@index([cuentaId])
+  @@index([origen, origenId])
+  @@unique([origen, origenId])
+  @@map("mayor_movimientos")
+}
