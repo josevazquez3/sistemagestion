@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { History, Plus } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -24,12 +24,20 @@ export default async function InformeTesoreriaPage() {
             Listado de informes por período y acceso a edición completa.
           </p>
         </div>
-        <Link href="/tesoreria/informe/nuevo">
-          <Button type="button" className="bg-green-600 hover:bg-green-700 text-white">
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Informe
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/tesoreria/informe/historial">
+            <Button type="button" variant="outline">
+              <History className="w-4 h-4 mr-2" />
+              Historial Info. Tesorería
+            </Button>
+          </Link>
+          <Link href="/tesoreria/informe/nuevo">
+            <Button type="button" className="bg-green-600 hover:bg-green-700 text-white">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Informe
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <InformeListadoContent />

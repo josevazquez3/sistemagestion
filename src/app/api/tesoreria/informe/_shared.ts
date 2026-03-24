@@ -145,12 +145,26 @@ export async function ensureInformeTables(): Promise<void> {
           CONSTRAINT "InformeUltimoAporte_pkey" PRIMARY KEY ("id")
         );
       `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "HistorialInformeTesoreria" (
+          "id" SERIAL NOT NULL,
+          "nombreArchivo" TEXT NOT NULL,
+          "fechaArchivo" TIMESTAMP(3),
+          "sheetName" TEXT NOT NULL,
+          "sheetData" JSONB NOT NULL,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "HistorialInformeTesoreria_pkey" PRIMARY KEY ("id")
+        );
+      `);
 
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "InformeEgreso_informeId_idx" ON "InformeEgreso"("informeId");`);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "InformeCompromiso_informeId_idx" ON "InformeCompromiso"("informeId");`);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "InformeTextBox_informeId_idx" ON "InformeTextBox"("informeId");`);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "InformeUltimoAporte_informeId_idx" ON "InformeUltimoAporte"("informeId");`);
       await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "InformeUltimoAporte_informeId_distritoNumero_key" ON "InformeUltimoAporte"("informeId","distritoNumero");`);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "HistorialInformeTesoreria_fechaArchivo_idx" ON "HistorialInformeTesoreria"("fechaArchivo");`);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "HistorialInformeTesoreria_createdAt_idx" ON "HistorialInformeTesoreria"("createdAt");`);
 
       await prisma.$executeRawUnsafe(`
         DO $f$

@@ -30,6 +30,17 @@ function rangoMesAnio(from: Date, to: Date): Array<{ mes: number; anio: number }
   return out;
 }
 
+function normalizarPeriodo(raw: unknown): string | null {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  const m = /^(\d{1,2})\/(\d{4})$/.exec(s);
+  if (!m) return null;
+  const mm = Number(m[1]);
+  const yyyy = Number(m[2]);
+  if (!Number.isFinite(mm) || mm < 1 || mm > 12 || !Number.isFinite(yyyy)) return null;
+  return `${String(mm).padStart(2, "0")}/${yyyy}`;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -158,11 +169,21 @@ export async function GET(
         (acc: number, r: Record<string, unknown>) => acc + toNumber(r.nMatriculados),
         0
       );
-      const periodos = formatoPeriodoMeses(
-        rows
-          .map((r: Record<string, unknown>) => r.fecha)
-          .filter((f): f is Date => f instanceof Date)
-      );
+      const periodosDesdeCampo = [
+        ...new Set(
+          rows
+            .map((r: Record<string, unknown>) => normalizarPeriodo(r.periodo))
+            .filter((p): p is string => p != null)
+        ),
+      ];
+      const periodos =
+        periodosDesdeCampo.length > 0
+          ? periodosDesdeCampo.join(" y ")
+          : formatoPeriodoMeses(
+              rows
+                .map((r: Record<string, unknown>) => r.fecha)
+                .filter((f): f is Date => f instanceof Date)
+            );
       distritos.push({
         distritoNumero: n,
         periodos,
