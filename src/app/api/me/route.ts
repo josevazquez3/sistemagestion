@@ -22,6 +22,7 @@ export async function GET() {
       nombre: true,
       apellido: true,
       roles: { include: { role: true } },
+      legajo: { select: { fotoUrl: true } },
     },
   });
 
@@ -30,11 +31,16 @@ export async function GET() {
   }
 
   const roles = user.roles.map((r) => r.role.nombre);
+  const legajoFotoUrl =
+    user.legajo?.fotoUrl && user.legajo.fotoUrl.trim() !== ""
+      ? user.legajo.fotoUrl.trim()
+      : null;
   return NextResponse.json({
     id: user.id,
     email: user.email,
     nombre: user.nombre,
     apellido: user.apellido,
     roles,
+    legajoFotoUrl,
   });
 }

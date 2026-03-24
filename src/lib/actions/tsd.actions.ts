@@ -17,6 +17,11 @@ export type TsdMovimientoConExpediente = TsdMovimiento & {
 
 const TSD_ROLES = new Set(["SUPER_ADMIN", "ADMIN", "LEGALES", "SECRETARIA"]);
 
+function revalidateTsdViews() {
+  revalidatePath("/legales/tsd");
+  revalidatePath("/dashboard");
+}
+
 async function assertTsdAccess() {
   const session = await auth();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
@@ -88,7 +93,7 @@ export async function createExpediente(data: {
     },
   });
 
-  revalidatePath("/legales/tsd");
+  revalidateTsdViews();
 }
 
 export async function addMovimiento(data: {
@@ -107,7 +112,7 @@ export async function addMovimiento(data: {
       observacion: data.observacion?.trim() || null,
     },
   });
-  revalidatePath("/legales/tsd");
+  revalidateTsdViews();
 }
 
 export async function updateMovimiento(
@@ -128,7 +133,7 @@ export async function updateMovimiento(
       observacion: data.observacion?.trim() || null,
     },
   });
-  revalidatePath("/legales/tsd");
+  revalidateTsdViews();
 }
 
 export async function deleteMovimiento(id: number): Promise<void> {
@@ -149,7 +154,7 @@ export async function deleteMovimiento(id: number): Promise<void> {
     await prisma.tsdExpediente.delete({ where: { id: mov.expedienteId } });
   }
 
-  revalidatePath("/legales/tsd");
+  revalidateTsdViews();
 }
 
 export async function getMovimientosByNroExpte(
@@ -189,5 +194,5 @@ export async function setExpedienteFinalizado(expedienteId: number, finalizado: 
     where: { id: expedienteId },
     data: { finalizado },
   });
-  revalidatePath("/legales/tsd");
+  revalidateTsdViews();
 }

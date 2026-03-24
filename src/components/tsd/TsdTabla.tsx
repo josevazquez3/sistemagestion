@@ -115,8 +115,13 @@ export function TsdTabla({ expedientes, onEditar, onSeguimiento, onChanged, onEr
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8"
-                  title="Editar"
+                  className="h-8 w-8 disabled:cursor-not-allowed disabled:opacity-50"
+                  title={
+                    f.expediente.finalizado
+                      ? "No se puede editar: expediente finalizado"
+                      : "Editar"
+                  }
+                  disabled={f.expediente.finalizado}
                   onClick={() =>
                     onEditar({
                       expediente: {
@@ -139,7 +144,13 @@ export function TsdTabla({ expedientes, onEditar, onSeguimiento, onChanged, onEr
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-8"
+                  className="h-8 disabled:cursor-not-allowed disabled:opacity-50"
+                  title={
+                    f.expediente.finalizado
+                      ? "No disponible: expediente finalizado"
+                      : "Seguimiento del expediente"
+                  }
+                  disabled={f.expediente.finalizado}
                   onClick={() =>
                     onSeguimiento({
                       id: f.expediente.id,
