@@ -41,6 +41,7 @@ const navItems = [
   { href: "/tesoreria/proveedores", label: "Proveedores", icon: Building2, parent: "tesoreria", tesoreriaModule: true },
   { href: "/tesoreria/proveedores/facturas", label: "Cargar Facturas", icon: FileText, parent: "tesoreria", tesoreriaModule: true },
   { href: "/tesoreria/mayores-cuentas", label: "Mayores - Cuentas", icon: BookOpen, parent: "tesoreria", tesoreriaModule: true },
+  { href: "/tesoreria/informe", label: "Informe Tesorería", icon: FileText, parent: "tesoreria", tesoreriaModule: true },
   { href: "/legislacion", label: "Legislación", icon: BookOpen },
   { href: "/legales", label: "Legales", icon: Scale, expandable: true, legalesModule: true },
   { href: "/legales/modelos-oficios", label: "Modelos de Oficios", icon: FileText, parent: "legales", legalesModule: true },
@@ -85,6 +86,7 @@ const tesoreriaSubItems = [
   { href: "/tesoreria/cobro-certificaciones", label: "Cobro Certificaciones", icon: Award },
   { href: "/tesoreria/ingresos-distritos", label: "Ingresos Distritos", icon: Building2 },
   { href: "/tesoreria/mayores-cuentas", label: "Mayores - Cuentas", icon: BookOpen },
+  { href: "/tesoreria/informe", label: "Informe Tesorería", icon: FileText },
 ];
 
 export function Sidebar({ user }: { user: Session["user"] }) {

@@ -828,3 +828,56 @@ model MayorMovimiento {
   @@unique([origen, origenId])
   @@map("mayor_movimientos")
 }
+
+model InformeTesoreria {
+  id         Int      @id @default(autoincrement())
+  fechaDesde DateTime
+  fechaHasta DateTime
+  chequesADepositar      Decimal? @db.Decimal(15, 2)
+  saldoBancoRioOverride  Decimal? @db.Decimal(15, 2)
+  saldoFondoFijoOverride Decimal? @db.Decimal(15, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  egresos        InformeEgreso[]
+  compromisos    InformeCompromiso[]
+  textBoxes      InformeTextBox[]
+  ultimosAportes InformeUltimoAporte[]
+}
+
+model InformeEgreso {
+  id        Int              @id @default(autoincrement())
+  informeId Int
+  informe   InformeTesoreria @relation(fields: [informeId], references: [id], onDelete: Cascade)
+  numero    String?
+  concepto  String
+  importe   Decimal          @db.Decimal(15, 2)
+  orden     Int              @default(0)
+}
+
+model InformeCompromiso {
+  id        Int              @id @default(autoincrement())
+  informeId Int
+  informe   InformeTesoreria @relation(fields: [informeId], references: [id], onDelete: Cascade)
+  numero    String?
+  concepto  String
+  importe   Decimal          @db.Decimal(15, 2)
+  orden     Int              @default(0)
+}
+
+model InformeTextBox {
+  id        Int              @id @default(autoincrement())
+  informeId Int
+  informe   InformeTesoreria @relation(fields: [informeId], references: [id], onDelete: Cascade)
+  numero    Int
+  contenido String           @db.Text
+  orden     Int              @default(0)
+}
+
+model InformeUltimoAporte {
+  id             Int              @id @default(autoincrement())
+  informeId      Int
+  informe        InformeTesoreria @relation(fields: [informeId], references: [id], onDelete: Cascade)
+  distritoNumero Int
+  fechaOverride  DateTime?
+}
