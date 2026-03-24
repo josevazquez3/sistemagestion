@@ -15,6 +15,8 @@ import {
   Plus,
   Zap,
   Search,
+  FileSpreadsheet,
+  ListOrdered,
 } from "lucide-react";
 import type { MayorCuenta, MayorMovimiento } from "@/types/tesoreria";
 import { formatearFechaUTC, parsearFechaSegura } from "@/lib/utils/fecha";
@@ -27,6 +29,11 @@ import { ModalMayorGastosExtracto } from "./ModalMayorGastosExtracto";
 import { ModalMayorGastosFondoFijo } from "./ModalMayorGastosFondoFijo";
 import { ModalMayorReglas } from "./ModalMayorReglas";
 import { ModalEditarMayorMovimiento } from "./ModalEditarMayorMovimiento";
+import { ModalExportarMinutaMayor } from "./ModalExportarMinutaMayor";
+import {
+  exportarMovimientosPeriodoExcel,
+  exportarMinutaMayorMovimientos,
+} from "@/lib/tesoreria/exportMayorMovimientosPeriodo";
 
 function etiquetaOrigen(o: string): string {
   if (o === "EXTRACTO") return "Extracto Banco";
@@ -69,6 +76,7 @@ export function MayoresCuentasContent() {
   const [modalReglas, setModalReglas] = useState(false);
   const [modalEditMov, setModalEditMov] = useState(false);
   const [movEditar, setMovEditar] = useState<MayorMovimiento | null>(null);
+  const [modalMinuta, setModalMinuta] = useState(false);
   const [busquedaMovs, setBusquedaMovs] = useState("");
 
   const periodoYmd = useMemo(() => {
@@ -545,9 +553,44 @@ export function MayoresCuentasContent() {
       <Card>
         <CardHeader className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <span className="font-semibold text-lg leading-snug">
-              Movimientos del período ({periodoDesde} — {periodoHasta})
-            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap sm:gap-2">
+              <span className="font-semibold text-lg leading-snug shrink-0">
+                Movimientos del período ({periodoDesde} — {periodoHasta})
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-green-600 text-green-700 hover:bg-green-50 hover:text-green-800 disabled:cursor-not-allowed"
+                  disabled={loading || movimientos.length === 0}
+                  title="Exportar Excel"
+                  onClick={() => {
+                    exportarMovimientosPeriodoExcel(
+                      movimientos,
+                      periodoDesde,
+                      periodoHasta
+                    );
+                    showMessage("ok", "Archivo exportado correctamente");
+                  }}
+                >
+                  <FileSpreadsheet className="mr-1.5 h-4 w-4 text-green-600" aria-hidden />
+                  Exportar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="disabled:cursor-not-allowed"
+                  disabled={loading || movimientos.length === 0}
+                  title="Exportar Minuta"
+                  onClick={() => setModalMinuta(true)}
+                >
+                  <ListOrdered className="mr-1.5 h-4 w-4" aria-hidden />
+                  Exportar Minuta
+                </Button>
+              </div>
+            </div>
             <div className="relative w-full sm:max-w-xs shrink-0">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <Input
@@ -686,6 +729,19 @@ export function MayoresCuentasContent() {
         onOpenChange={setModalReglas}
         cuentas={cuentasOrdenadas}
         showMessage={showMessage}
+      />
+      <ModalExportarMinutaMayor
+        open={modalMinuta}
+        onOpenChange={setModalMinuta}
+        onExportar={(agrupacion) => {
+          exportarMinutaMayorMovimientos(
+            movimientos,
+            periodoDesde,
+            periodoHasta,
+            agrupacion
+          );
+          showMessage("ok", "Archivo exportado correctamente");
+        }}
       />
     </div>
   );
