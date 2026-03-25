@@ -124,17 +124,12 @@ function filaMovimiento(m: MayorMovimiento): XLSX.CellObject[] {
   ];
 }
 
-/**
- * Export simple: título, cantidad, tabla con total al final.
- */
-export function exportarMovimientosPeriodoExcel(
-  movimientos: MayorMovimiento[],
+/** Workbook plano del período (título, cantidad, tabla, total). */
+function buildWorkbookMovimientosPlano(
+  sorted: MayorMovimiento[],
   desde: string,
   hasta: string
-): void {
-  const sorted = [...movimientos].sort(sortByFechaAsc);
-  const nombreCta = nombreCuentaParaArchivo(sorted);
-  const periodo = periodoParaArchivo(desde, hasta);
+): XLSX.WorkBook {
   const aoa: XLSX.CellObject[][] = [];
 
   aoa.push([
@@ -181,6 +176,21 @@ export function exportarMovimientosPeriodoExcel(
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Movimientos");
+  return wb;
+}
+
+/**
+ * Export simple: título, cantidad, tabla con total al final.
+ */
+export function exportarMovimientosPeriodoExcel(
+  movimientos: MayorMovimiento[],
+  desde: string,
+  hasta: string
+): void {
+  const sorted = [...movimientos].sort(sortByFechaAsc);
+  const nombreCta = nombreCuentaParaArchivo(sorted);
+  const periodo = periodoParaArchivo(desde, hasta);
+  const wb = buildWorkbookMovimientosPlano(sorted, desde, hasta);
   const fname = `movimientos_${nombreCta}_${periodo}.xlsx`;
   XLSX.writeFile(wb, fname);
 }
@@ -209,27 +219,13 @@ function claveGrupo(m: MayorMovimiento, t: AgrupacionMinuta): string {
   return "";
 }
 
-/**
- * Minuta con agrupación o plano (ninguno = igual estructura que export simple, otro nombre).
- */
-export function exportarMinutaMayorMovimientos(
-  movimientos: MayorMovimiento[],
+function buildWorkbookMinutaAgrupada(
+  sorted: MayorMovimiento[],
   desde: string,
   hasta: string,
   agrupacion: AgrupacionMinuta
-): void {
-  const sorted = [...movimientos].sort(sortByFechaAsc);
-  const nombreCta = nombreCuentaParaArchivo(sorted);
-  const periodo = periodoParaArchivo(desde, hasta);
-
-  if (agrupacion === "ninguno") {
-    const fname = `minuta_${nombreCta}_${periodo}.xlsx`;
-    exportarMovimientosPeriodoExcelConNombre(sorted, desde, hasta, fname);
-    return;
-  }
-
+): XLSX.WorkBook {
   const tagGrupo = etiquetaAgrupacion(agrupacion);
-  const fname = `minuta_${tagGrupo}_${nombreCta}_${periodo}.xlsx`;
 
   const grupos = new Map<string, MayorMovimiento[]>();
   for (const m of sorted) {
@@ -322,57 +318,49 @@ export function exportarMinutaMayorMovimientos(
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Minuta");
-  XLSX.writeFile(wb, fname);
+  return wb;
 }
 
-/** Igual que exportarMovimientosPeriodoExcel pero con nombre de archivo fijo. */
-function exportarMovimientosPeriodoExcelConNombre(
-  sorted: MayorMovimiento[],
+/**
+ * Genera el mismo Excel que la exportación de minuta, sin descargar (p. ej. guardar en historial).
+ */
+export function generarMinutaMayorMovimientosWorkbook(
+  movimientos: MayorMovimiento[],
   desde: string,
   hasta: string,
-  fileName: string
-): void {
-  const aoa: XLSX.CellObject[][] = [];
+  agrupacion: AgrupacionMinuta
+): { wb: XLSX.WorkBook; fileName: string } {
+  const sorted = [...movimientos].sort(sortByFechaAsc);
+  const nombreCta = nombreCuentaParaArchivo(sorted);
+  const periodo = periodoParaArchivo(desde, hasta);
 
-  aoa.push([
-    cell(`Movimientos del período: ${desde} — ${hasta}`, { t: "s", s: STY_BOLD }),
-    cell("", { t: "s" }),
-    cell("", { t: "s" }),
-    cell("", { t: "s" }),
-    cell("", { t: "s" }),
-  ]);
-  aoa.push([
-    cell(`Cantidad de movimientos: ${sorted.length}`, { t: "s" }),
-    cell("", { t: "s" }),
-    cell("", { t: "s" }),
-    cell("", { t: "s" }),
-    cell("", { t: "s" }),
-  ]);
-  aoa.push([cell("", { t: "s" }), cell("", { t: "s" }), cell("", { t: "s" }), cell("", { t: "s" }), cell("", { t: "s" })]);
-  aoa.push(filaEncabezadoTabla());
-
-  let suma = 0;
-  for (const m of sorted) {
-    aoa.push(filaMovimiento(m));
-    suma += importePos(m);
+  if (agrupacion === "ninguno") {
+    const fname = `minuta_${nombreCta}_${periodo}.xlsx`;
+    return { wb: buildWorkbookMovimientosPlano(sorted, desde, hasta), fileName: fname };
   }
 
-  aoa.push([
-    cell("TOTAL", { t: "s", s: STY_BOLD }),
-    cell("", { t: "s", s: STY_BOLD }),
-    cell(suma, { t: "n", s: STY_BOLD, z: NUM_FMT }),
-    cell("", { t: "s", s: STY_BOLD }),
-    cell("", { t: "s", s: STY_BOLD }),
-  ]);
+  const tagGrupo = etiquetaAgrupacion(agrupacion);
+  const fname = `minuta_${tagGrupo}_${nombreCta}_${periodo}.xlsx`;
+  return {
+    wb: buildWorkbookMinutaAgrupada(sorted, desde, hasta, agrupacion),
+    fileName: fname,
+  };
+}
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: COLS - 1 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: COLS - 1 } },
-  ];
-  aplicarAnchos(ws, COLS);
+/** Serializa el workbook a bytes .xlsx (navegador). */
+export function workbookMayorToXlsxUint8Array(wb: XLSX.WorkBook): Uint8Array {
+  return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as Uint8Array;
+}
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Movimientos");
+/**
+ * Minuta con agrupación o plano (ninguno = igual estructura que export simple, otro nombre).
+ */
+export function exportarMinutaMayorMovimientos(
+  movimientos: MayorMovimiento[],
+  desde: string,
+  hasta: string,
+  agrupacion: AgrupacionMinuta
+): void {
+  const { wb, fileName } = generarMinutaMayorMovimientosWorkbook(movimientos, desde, hasta, agrupacion);
   XLSX.writeFile(wb, fileName);
 }

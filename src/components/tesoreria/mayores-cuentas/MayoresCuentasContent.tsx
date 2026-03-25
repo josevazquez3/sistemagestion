@@ -33,6 +33,8 @@ import { ModalExportarMinutaMayor } from "./ModalExportarMinutaMayor";
 import {
   exportarMovimientosPeriodoExcel,
   exportarMinutaMayorMovimientos,
+  generarMinutaMayorMovimientosWorkbook,
+  workbookMayorToXlsxUint8Array,
 } from "@/lib/tesoreria/exportMayorMovimientosPeriodo";
 
 function etiquetaOrigen(o: string): string {
@@ -741,6 +743,31 @@ export function MayoresCuentasContent() {
             agrupacion
           );
           showMessage("ok", "Archivo exportado correctamente");
+        }}
+        onGuardarEnHistorial={async (agrupacion) => {
+          if (movimientos.length === 0) {
+            showMessage("error", "No hay movimientos para guardar.");
+            throw new Error("Sin movimientos");
+          }
+          const { wb, fileName } = generarMinutaMayorMovimientosWorkbook(
+            movimientos,
+            periodoDesde,
+            periodoHasta,
+            agrupacion
+          );
+          const u8 = workbookMayorToXlsxUint8Array(wb);
+          const file = new File([new Uint8Array(u8)], fileName, {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await fetch("/api/tesoreria/mayor-historial", { method: "POST", body: fd });
+          const j = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            showMessage("error", j?.error || "No se pudo guardar en el historial.");
+            throw new Error(String(j?.error ?? "Error"));
+          }
+          showMessage("ok", "Minuta guardada en Historial Mayores - cuentas.");
         }}
       />
     </div>

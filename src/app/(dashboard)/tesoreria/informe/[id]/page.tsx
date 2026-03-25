@@ -387,22 +387,61 @@ export default function InformeTesoreriaDetallePage() {
 
       const inf = baseInforme ?? informe;
       if (inf && inf.egresos.length > 0) {
+        /**
+         * Cuando hay egresos persistidos, no queremos perder los egresos calculados desde Mayores-Cuentas:
+         * - Los egresos calculados completan el listado (con `id: null`).
+         * - Los egresos persistidos sólo sobreescriben (por `orden`) concepto/importe/numero.
+         */
         setEgresosPersistidos(true);
-        setEgresos(
-          [...inf.egresos]
-            .sort((a, b) => a.orden - b.orden || a.id - b.id)
-            .map((x) => ({
-              id: x.id,
-              numero: x.numero ?? "",
-              concepto: x.concepto,
-              importe: x.importe,
-              orden: x.orden,
-              isEditing: false,
-              draftNumero: x.numero ?? "",
-              draftConcepto: x.concepto,
-              draftImporte: String(x.importe),
-            }))
-        );
+
+        const computed = d.egresosCuentas.map((x, idx): EgresoRow => ({
+          id: null,
+          numero: "",
+          concepto: x.nombreCuenta,
+          importe: x.totalMovimientos,
+          orden: idx,
+          isEditing: false,
+          draftNumero: "",
+          draftConcepto: x.nombreCuenta,
+          draftImporte: String(x.totalMovimientos),
+        }));
+
+        const persistedByOrden = new Map<number, ApiInforme["egresos"][number]>();
+        for (const p of inf.egresos) persistedByOrden.set(p.orden, p);
+
+        const computedOrdenSet = new Set<number>(computed.map((r) => r.orden));
+
+        const merged = computed.map((row) => {
+          const p = persistedByOrden.get(row.orden);
+          if (!p) return row;
+          return {
+            ...row,
+            id: p.id,
+            numero: p.numero ?? "",
+            concepto: p.concepto,
+            importe: p.importe,
+            draftNumero: p.numero ?? "",
+            draftConcepto: p.concepto,
+            draftImporte: String(p.importe),
+          };
+        });
+
+        const extras = [...inf.egresos]
+          .filter((p) => !computedOrdenSet.has(p.orden))
+          .sort((a, b) => a.orden - b.orden || a.id - b.id)
+          .map((p) => ({
+            id: p.id,
+            numero: p.numero ?? "",
+            concepto: p.concepto,
+            importe: p.importe,
+            orden: p.orden,
+            isEditing: false,
+            draftNumero: p.numero ?? "",
+            draftConcepto: p.concepto,
+            draftImporte: String(p.importe),
+          }));
+
+        setEgresos([...merged, ...extras].sort((a, b) => a.orden - b.orden || (a.id ?? 0) - (b.id ?? 0)));
       } else {
         setEgresosPersistidos(false);
         setEgresos(

@@ -16,6 +16,8 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onExportar: (agrupacion: AgrupacionMinuta) => void;
+  /** Guarda la minuta en Historial Mayores - cuentas; debe lanzar si falla para no cerrar el modal. */
+  onGuardarEnHistorial: (agrupacion: AgrupacionMinuta) => Promise<void>;
 };
 
 const OPTIONS: { value: AgrupacionMinuta; label: string }[] = [
@@ -25,8 +27,14 @@ const OPTIONS: { value: AgrupacionMinuta; label: string }[] = [
   { value: "ninguno", label: "Sin agrupación (lista plana ordenada por fecha)" },
 ];
 
-export function ModalExportarMinutaMayor({ open, onOpenChange, onExportar }: Props) {
+export function ModalExportarMinutaMayor({
+  open,
+  onOpenChange,
+  onExportar,
+  onGuardarEnHistorial,
+}: Props) {
   const [agrupacion, setAgrupacion] = useState<AgrupacionMinuta>("ninguno");
+  const [accionEnCurso, setAccionEnCurso] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -37,6 +45,18 @@ export function ModalExportarMinutaMayor({ open, onOpenChange, onExportar }: Pro
   const handleExportar = () => {
     onExportar(agrupacion);
     onOpenChange(false);
+  };
+
+  const handleGuardarHistorial = async () => {
+    setAccionEnCurso(true);
+    try {
+      await onGuardarEnHistorial(agrupacion);
+      onOpenChange(false);
+    } catch {
+      /* mensaje en el padre */
+    } finally {
+      setAccionEnCurso(false);
+    }
   };
 
   return (
@@ -65,11 +85,29 @@ export function ModalExportarMinutaMayor({ open, onOpenChange, onExportar }: Pro
             </label>
           ))}
         </div>
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={accionEnCurso}
+            onClick={() => onOpenChange(false)}
+          >
             Cancelar
           </Button>
-          <Button type="button" onClick={handleExportar}>
+          <Button
+            type="button"
+            className="bg-sky-500 text-white hover:bg-sky-600"
+            disabled={accionEnCurso}
+            onClick={() => void handleGuardarHistorial()}
+          >
+            {accionEnCurso ? "Guardando…" : "Guardar en Historial"}
+          </Button>
+          <Button
+            type="button"
+            className="bg-green-600 text-white hover:bg-green-700"
+            disabled={accionEnCurso}
+            onClick={handleExportar}
+          >
             Exportar Minuta
           </Button>
         </DialogFooter>

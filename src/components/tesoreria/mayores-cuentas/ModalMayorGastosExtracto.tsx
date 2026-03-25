@@ -9,6 +9,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatearFechaUTC } from "@/lib/utils/fecha";
 import type { MayorCuenta, MayorMovimiento, MayorRegla } from "@/types/tesoreria";
 import { preseleccionarMovsPorReglas } from "@/lib/tesoreria/mayorModalPreseleccion";
@@ -70,6 +71,12 @@ export function ModalMayorGastosExtracto({
   const [esAuto, setEsAuto] = useState<Record<number, boolean>>({});
   const [guardandoId, setGuardandoId] = useState<number | null>(null);
   const [asignandoLote, setAsignandoLote] = useState(false);
+  const [marcados, setMarcados] = useState<Set<number>>(() => new Set());
+  const [eliminandoSel, setEliminandoSel] = useState(false);
+
+  useEffect(() => {
+    if (open) setMarcados(new Set());
+  }, [open]);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -213,6 +220,61 @@ export function ModalMayorGastosExtracto({
     }
   };
 
+  const todosMarcados = movs.length > 0 && movs.every((m) => marcados.has(m.id));
+  const algunMarcado = movs.some((m) => marcados.has(m.id));
+
+  const toggleMarcarTodos = (marcar: boolean) => {
+    setMarcados(marcar ? new Set(movs.map((m) => m.id)) : new Set());
+  };
+
+  const toggleMarcadoFila = (id: number, on: boolean) => {
+    setMarcados((prev) => {
+      const n = new Set(prev);
+      if (on) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+  };
+
+  const eliminarSeleccionados = async () => {
+    const ids = [...marcados];
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `¿Eliminar ${ids.length} movimiento(s) del extracto bancario? Si estaban asignados al mayor, también se quitarán de Mayores - Cuentas.`
+      )
+    ) {
+      return;
+    }
+    setEliminandoSel(true);
+    let ok = 0;
+    let err = 0;
+    try {
+      for (const id of ids) {
+        try {
+          const res = await fetch(`/api/tesoreria/extracto-banco/${id}`, { method: "DELETE" });
+          if (res.ok) ok += 1;
+          else err += 1;
+        } catch {
+          err += 1;
+        }
+      }
+      setMarcados(new Set());
+      await cargar();
+      if (ok > 0) onAsignado();
+      showMessage(
+        err > 0 ? (ok > 0 ? "ok" : "error") : "ok",
+        err > 0
+          ? `Eliminados ${ok} movimiento(s). ${err} no se pudieron eliminar.`
+          : `Eliminados ${ok} movimiento(s) del extracto.`
+      );
+    } catch (e) {
+      showMessage("error", e instanceof Error ? e.message : "Error al eliminar.");
+    } finally {
+      setEliminandoSel(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[min(72rem,98vw)] w-full max-h-[90vh] flex flex-col">
@@ -238,6 +300,15 @@ export function ModalMayorGastosExtracto({
             >
               {asignandoLote ? "Asignando…" : "Asignar todas las pendientes"}
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={cargando || eliminandoSel || marcados.size === 0 || movs.length === 0}
+              onClick={() => void eliminarSeleccionados()}
+            >
+              {eliminandoSel ? "Eliminando…" : `Eliminar seleccionados (${marcados.size})`}
+            </Button>
           </div>
         </DialogHeader>
         <div className="flex-1 overflow-auto border rounded-md">
@@ -251,6 +322,16 @@ export function ModalMayorGastosExtracto({
             <table className="w-full text-sm table-fixed">
               <thead className="sticky top-0 bg-muted/80 z-[1]">
                 <tr className="border-b text-left">
+                  <th className="w-10 p-2 pl-3">
+                    <Checkbox
+                      aria-label="Seleccionar todas las filas"
+                      disabled={cargando || movs.length === 0 || eliminandoSel}
+                      checked={
+                        todosMarcados ? true : algunMarcado ? "indeterminate" : false
+                      }
+                      onCheckedChange={(v) => toggleMarcarTodos(v === true)}
+                    />
+                  </th>
                   <th className="p-2 w-[7.5rem]">Fecha</th>
                   <th className="p-2 w-[45%] min-w-[12rem]">Concepto</th>
                   <th className="p-2 w-[9rem] text-right">Importe</th>
@@ -262,6 +343,14 @@ export function ModalMayorGastosExtracto({
                   const ya = asignados.get(m.id);
                   return (
                     <tr key={m.id} className="border-b hover:bg-muted/30 align-top">
+                      <td className="p-2 pl-3 align-top">
+                        <Checkbox
+                          aria-label={`Seleccionar fila ${m.id}`}
+                          disabled={cargando || eliminandoSel}
+                          checked={marcados.has(m.id)}
+                          onCheckedChange={(v) => toggleMarcadoFila(m.id, v === true)}
+                        />
+                      </td>
                       <td className="p-2 whitespace-nowrap align-top">
                         {formatearFechaUTC(new Date(m.fecha))}
                       </td>

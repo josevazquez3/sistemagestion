@@ -111,6 +111,9 @@ export async function DELETE(
     return NextResponse.json({ error: "Movimiento no encontrado" }, { status: 404 });
   }
 
+  await prisma.mayorMovimiento.deleteMany({
+    where: { origen: "EXTRACTO", origenId: id },
+  });
   await prisma.movimientoExtracto.delete({ where: { id } });
 
   const user = session?.user as { id?: string; name?: string; email?: string };

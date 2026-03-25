@@ -71,6 +71,14 @@ export type InformeDatosComputados = {
   };
 };
 
+function fechaOrNull(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+  // Por si Prisma devuelve string en algún entorno / driver.
+  const d = new Date(String(v));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export async function computeInformeDatos(params: {
   informeId: number;
   fechaDesde: Date;
@@ -238,11 +246,18 @@ export async function computeInformeDatos(params: {
       )
       .sort(
         (a, b) =>
-          ((b.fecha as Date | undefined)?.getTime() ?? 0) -
-          ((a.fecha as Date | undefined)?.getTime() ?? 0)
+          ((fechaOrNull(b.fecha)?.getTime() ?? 0) -
+            (fechaOrNull(a.fecha)?.getTime() ?? 0))
       );
-    const conMat = rows.find((r) => toNumber(r.nMatriculados) > 0);
-    const ultimaFecha = ((conMat ?? rows[0])?.fecha as Date | undefined) ?? null;
+    /**
+     * Fecha a mostrar para el distrito:
+     * - Si existe alguna fila con `nMatriculados > 0` y `fecha` válida, usar esa (la más reciente por el sort de `rows`).
+     * - Si NO existe (p.ej. N. Matriculados = 0 o sin fecha válida), mantener la fecha del último ingreso del distrito (`rows[0]`).
+     *
+     * Importante: `rows` ya viene ordenado ASC/DESC por `fecha` (desc), así que `find` y `rows[0]` respetan la "más reciente".
+     */
+    const conMat = rows.find((r) => toNumber(r.nMatriculados) > 0 && !!fechaOrNull(r.fecha));
+    const ultimaFecha = (conMat ? fechaOrNull(conMat.fecha) : fechaOrNull(rows[0]?.fecha)) ?? null;
     const fechaOverride = overrideMap.has(n) ? overrideMap.get(n) ?? null : null;
     ultimosAportes.push({
       distritoNumero: n,
