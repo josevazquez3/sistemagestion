@@ -17,6 +17,7 @@ import {
   Search,
   FileSpreadsheet,
   ListOrdered,
+  RefreshCw,
 } from "lucide-react";
 import type { MayorCuenta, MayorMovimiento } from "@/types/tesoreria";
 import { formatearFechaUTC, parsearFechaSegura } from "@/lib/utils/fecha";
@@ -562,6 +563,46 @@ export function MayoresCuentasContent() {
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
+                  size="sm"
+                  className="bg-sky-500 text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={loading || movimientos.length === 0}
+                  title="Actualizar movimientos desde Extracto Banco (usa reglas)"
+                  onClick={async () => {
+                    const desde = ddmmyyyyToIsoYmd(periodoDesde);
+                    const hasta = ddmmyyyyToIsoYmd(periodoHasta);
+                    if (!desde || !hasta) {
+                      showMessage("error", "Período inválido.");
+                      return;
+                    }
+                    try {
+                      const res = await fetch(
+                        "/api/tesoreria/mayor-movimientos/sync-extracto",
+                        {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ desde, hasta }),
+                        }
+                      );
+                      const j = await res.json().catch(() => ({}));
+                      if (!res.ok) {
+                        showMessage("error", j?.error || "No se pudo actualizar desde extracto.");
+                        return;
+                      }
+                      await fetchMovimientos();
+                      showMessage(
+                        "ok",
+                        `Actualizado. Creados: ${j?.creados ?? 0}. Ya existían: ${j?.yaExistian ?? 0}. Sin regla: ${j?.sinRegla ?? 0}.`
+                      );
+                    } catch {
+                      showMessage("error", "Error de conexión.");
+                    }
+                  }}
+                >
+                  <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />
+                  Actualizar
+                </Button>
+                <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   className="border-green-600 text-green-700 hover:bg-green-50 hover:text-green-800 disabled:cursor-not-allowed"
@@ -581,9 +622,8 @@ export function MayoresCuentasContent() {
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
                   size="sm"
-                  className="disabled:cursor-not-allowed"
+                  className="bg-green-100 text-green-800 hover:bg-green-200 border border-green-200 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={loading || movimientos.length === 0}
                   title="Exportar Minuta"
                   onClick={() => setModalMinuta(true)}

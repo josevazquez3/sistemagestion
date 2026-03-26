@@ -68,15 +68,18 @@ export function TsdTabla({ expedientes, onEditar, onSeguimiento, onChanged, onEr
   }
 
   return (
-    <Table containerClassName="relative w-full overflow-x-auto rounded-lg border">
+    <Table
+      containerClassName="relative w-full overflow-x-auto rounded-lg border"
+      className="table-fixed min-w-[1100px]"
+    >
       <TableHeader>
         <TableRow className="bg-muted/50">
-          <TableHead className="whitespace-nowrap">Fecha</TableHead>
-          <TableHead className="whitespace-nowrap">Nº Expte.</TableHead>
-          <TableHead>Carátula</TableHead>
-          <TableHead className="whitespace-nowrap">Distrito</TableHead>
-          <TableHead className="whitespace-nowrap">Estado</TableHead>
-          <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
+          <TableHead className="w-[110px] whitespace-nowrap">Fecha</TableHead>
+          <TableHead className="w-[120px] whitespace-nowrap">Nº Expte.</TableHead>
+          <TableHead className="w-[520px]">Carátula</TableHead>
+          <TableHead className="w-[90px] whitespace-nowrap">Distrito</TableHead>
+          <TableHead className="w-[170px] whitespace-nowrap">Estado</TableHead>
+          <TableHead className="w-[260px] text-right whitespace-nowrap">Acciones</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -94,8 +97,10 @@ export function TsdTabla({ expedientes, onEditar, onSeguimiento, onChanged, onEr
                 <TableCell rowSpan={f.rowSpan} className="align-top font-medium whitespace-nowrap border-r">
                   {f.expediente.nroExpte}
                 </TableCell>
-                <TableCell rowSpan={f.rowSpan} className="align-top max-w-[200px] border-r">
-                  {f.expediente.caratula}
+                <TableCell rowSpan={f.rowSpan} className="align-top border-r">
+                  <div className="max-w-[520px] truncate" title={f.expediente.caratula}>
+                    {f.expediente.caratula}
+                  </div>
                 </TableCell>
                 <TableCell rowSpan={f.rowSpan} className="align-top whitespace-nowrap border-r">
                   {f.expediente.distrito}
@@ -104,7 +109,7 @@ export function TsdTabla({ expedientes, onEditar, onSeguimiento, onChanged, onEr
             ) : null}
             <TableCell>
               <span
-                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${tsdEstadoBadgeClass(f.movimiento.estado)}`}
+                className={`inline-flex max-w-[160px] truncate rounded-full px-2.5 py-0.5 text-xs font-medium ${tsdEstadoBadgeClass(f.movimiento.estado)}`}
               >
                 {tsdEstadoLabel(f.movimiento.estado)}
               </span>

@@ -141,11 +141,11 @@ export function ModalReunion({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[88vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar Reunión" : "Nueva Reunión"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 flex-1 overflow-auto pr-1">
           <p className="text-sm text-gray-500">
             Fecha de registro: {fechaRegistroTexto}
           </p>
