@@ -117,9 +117,7 @@ export function TablaTemas() {
       tema: t.tema,
       observacion: t.observacion,
       fechaODIso: latestIso(t.usos, "fechaOD"),
-      guiaMesaIso: latestIso(t.usos, "guiaMesa"),
       cantOD: countUsos(t.usos, "fechaOD"),
-      cantGuia: countUsos(t.usos, "guiaMesa"),
       asignacionTexto: asignacionTexto(t.asignaciones),
       estado: t.estado,
     }));
@@ -229,10 +227,6 @@ export function TablaTemas() {
                     <th className="p-2 w-28">Fecha</th>
                     <th className="p-2">Tema</th>
                     <th className="p-2">Observación</th>
-                    <th className="p-2 w-28">Fecha OD</th>
-                    <th className="p-2 w-28">Guia Mesa</th>
-                    <th className="p-2 w-20 text-right">Cant. OD</th>
-                    <th className="p-2 w-24 text-right">Cant. Guía</th>
                     <th className="p-2">Asignación</th>
                     <th className="p-2 w-44 text-right pr-3">Acciones</th>
                   </tr>
@@ -249,9 +243,7 @@ export function TablaTemas() {
                         : "";
                     const finalizado = esFinalizado;
                     const fechaOD = latestIso(t.usos, "fechaOD");
-                    const guiaMesa = latestIso(t.usos, "guiaMesa");
                     const cantOD = countUsos(t.usos, "fechaOD");
-                    const cantGuia = countUsos(t.usos, "guiaMesa");
                     const asig = asignacionTexto(t.asignaciones);
                     return (
                       <tr
@@ -286,10 +278,6 @@ export function TablaTemas() {
                         <td className="p-2 whitespace-nowrap">{formatearFechaUTC(new Date(t.fecha))}</td>
                         <td className="p-2">{t.tema}</td>
                         <td className="p-2">{t.observacion ?? ""}</td>
-                        <td className="p-2 whitespace-nowrap">{fechaOD ? formatearFechaUTC(new Date(fechaOD)) : "—"}</td>
-                        <td className="p-2 whitespace-nowrap">{guiaMesa ? formatearFechaUTC(new Date(guiaMesa)) : "—"}</td>
-                        <td className="p-2 text-right">{cantOD}</td>
-                        <td className="p-2 text-right">{cantGuia}</td>
                         <td className="p-2">{asig}</td>
                         <td className="p-2 pr-3 text-right">
                           <div className="flex justify-end gap-2">

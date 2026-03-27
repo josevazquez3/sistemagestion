@@ -113,7 +113,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getSessionUser();
@@ -127,7 +127,15 @@ export async function DELETE(
   if (id == null) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
   try {
-    await prisma.tema.delete({ where: { id } });
+    const force = new URL(req.url).searchParams.get("force") === "true";
+    if (force) {
+      await prisma.tema.delete({ where: { id } });
+    } else {
+      await prisma.tema.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+    }
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     return NextResponse.json(

@@ -41,6 +41,7 @@ model Tema {
   fecha        DateTime
   tema         String
   observacion  String?
+  deletedAt    DateTime?
   usuarioId    String
   usuario      User             @relation(fields: [usuarioId], references: [id])
   estado       EstadoTema       @default(PENDIENTE)

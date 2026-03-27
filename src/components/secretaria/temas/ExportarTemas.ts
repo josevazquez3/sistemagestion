@@ -19,9 +19,7 @@ export type TemaExport = {
   tema: string;
   observacion: string | null;
   fechaODIso: string | null;
-  guiaMesaIso: string | null;
   cantOD: number;
-  cantGuia: number;
   asignacionTexto: string;
   estado: "PENDIENTE" | "FINALIZADO";
 };
@@ -48,10 +46,6 @@ function headerRow() {
       cellText("Fecha", { bold: true, shading: fill }),
       cellText("Tema", { bold: true, shading: fill }),
       cellText("Observación", { bold: true, shading: fill }),
-      cellText("Fecha OD", { bold: true, shading: fill }),
-      cellText("Guia Mesa", { bold: true, shading: fill }),
-      cellText("Cant. OD", { bold: true, shading: fill }),
-      cellText("Cant. Guía", { bold: true, shading: fill }),
       cellText("Asignación", { bold: true, shading: fill }),
       cellText("Estado", { bold: true, shading: fill }),
     ],
@@ -84,10 +78,6 @@ export async function exportarTemasDocx(temas: TemaExport[]) {
             cellText(fmt(t.fechaIso), { shading: fill }),
             cellText(t.tema, { shading: fill }),
             cellText(t.observacion ?? "", { shading: fill }),
-            cellText(fmt(t.fechaODIso), { shading: fill }),
-            cellText(fmt(t.guiaMesaIso), { shading: fill }),
-            cellText(String(t.cantOD), { shading: fill }),
-            cellText(String(t.cantGuia), { shading: fill }),
             cellText(t.asignacionTexto, { shading: fill }),
             cellText(finalizado ? "FINALIZADO" : "PENDIENTE", { shading: fill }),
           ],

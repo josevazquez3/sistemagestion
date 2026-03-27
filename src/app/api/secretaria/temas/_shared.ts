@@ -53,12 +53,25 @@ export async function ensureTemasTables(): Promise<void> {
           "fecha" TIMESTAMP(3) NOT NULL,
           "tema" TEXT NOT NULL,
           "observacion" TEXT,
+          "deletedAt" TIMESTAMP(3),
           "usuarioId" TEXT NOT NULL,
           "estado" "EstadoTema" NOT NULL DEFAULT 'PENDIENTE',
           "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "Tema_pkey" PRIMARY KEY ("id")
         );
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        DO $dt$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'Tema' AND column_name = 'deletedAt'
+          ) THEN
+            ALTER TABLE "Tema" ADD COLUMN "deletedAt" TIMESTAMP(3);
+          END IF;
+        END $dt$;
       `);
 
       await prisma.$executeRawUnsafe(`

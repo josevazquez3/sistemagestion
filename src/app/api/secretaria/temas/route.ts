@@ -12,6 +12,7 @@ export async function GET() {
   await ensureTemasTables();
 
   const temas = await prisma.tema.findMany({
+    where: { deletedAt: null },
     include: {
       usuario: { select: { id: true, nombre: true, apellido: true, email: true } },
       asignaciones: true,
