@@ -28,8 +28,59 @@ model User {
   permisos      UserPermission[]
   notificaciones Notificacion[]
   auditoriaLogs AuditoriaLog[]
+  temas         Tema[]
 
   @@map("users")
+}
+
+// === SECRETARÍA — TEMAS ===
+
+model Tema {
+  id           Int              @id @default(autoincrement())
+  numero       Int
+  fecha        DateTime
+  tema         String
+  observacion  String?
+  usuarioId    String
+  usuario      User             @relation(fields: [usuarioId], references: [id])
+  estado       EstadoTema       @default(PENDIENTE)
+  asignaciones TemaAsignacion[]
+  usos         TemaUso[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([numero])
+}
+
+model TemaUso {
+  id        Int      @id @default(autoincrement())
+  temaId    Int
+  tema      Tema     @relation(fields: [temaId], references: [id], onDelete: Cascade)
+  fechaOD   DateTime?
+  guiaMesa  DateTime?
+  createdAt DateTime @default(now())
+}
+
+model TemaAsignacion {
+  id        Int            @id @default(autoincrement())
+  temaId    Int
+  tema      Tema           @relation(fields: [temaId], references: [id], onDelete: Cascade)
+  tipo      TipoAsignacion
+  otroTexto String?
+  createdAt DateTime       @default(now())
+}
+
+enum EstadoTema {
+  PENDIENTE
+  FINALIZADO
+}
+
+enum TipoAsignacion {
+  AL_ORDEN_DEL_DIA
+  AL_INFORME_GUIA
+  GIRAR_A_DISTRITOS
+  ARCHIVAR
+  OTROS
 }
 
 model Role {

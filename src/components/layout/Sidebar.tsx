@@ -62,6 +62,7 @@ const navItems = [
   { href: "/secretaria/actas", label: "Actas", icon: ScrollText, parent: "secretaria", secretariaModule: true },
   { href: "/secretaria/orden-del-dia", label: "Orden del día C.S.", icon: ClipboardList, parent: "secretaria", secretariaModule: true },
   { href: "/secretaria/agenda", label: "Agenda", icon: CalendarDays, parent: "secretaria", secretariaModule: true },
+  { href: "/secretaria/temas", label: "Temas", icon: ScrollText, parent: "secretaria", secretariaModule: true },
   { href: "/usuarios", label: "Usuarios", icon: UserCog, adminOnly: true },
   { href: "/configuraciones", label: "Configuraciones", icon: Settings, configuracionesOnly: true },
 ];
@@ -80,6 +81,7 @@ const secretariaSubItems = [
   { href: "/secretaria/actas", label: "Actas", icon: ScrollText },
   { href: "/secretaria/orden-del-dia", label: "Orden del día C.S.", icon: ClipboardList },
   { href: "/secretaria/agenda", label: "Agenda", icon: CalendarDays },
+  { href: "/secretaria/temas", label: "Temas", icon: ScrollText },
 ];
 
 const legalesSubItems = [
