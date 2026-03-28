@@ -6,17 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ModalNuevoTema, type InitialTemaModal } from "@/components/secretaria/temas/ModalNuevoTema";
+import type { ReporteTemaRow } from "@/lib/secretaria/reporteTemasData";
 
-export type ReporteTemaRow = {
-  temaId: number;
-  temaNumero: number;
-  tema: string;
-  fechaOD: string | null; // DD/MM/YYYY
-  guiaMesa: string | null; // DD/MM/YYYY
-  cantOD: number;
-  cantGuia: number;
-  eliminado?: boolean;
-};
+export type { ReporteTemaRow };
 
 type Props = {
   rows: ReporteTemaRow[];
@@ -135,12 +127,18 @@ export function ReporteTemasTable({ rows }: Props) {
                   <td className="p-2 text-right">{r.cantOD}</td>
                   <td className="p-2 text-right pr-3">{r.cantGuia}</td>
                   <td className="p-2">
-                    {r.eliminado ? (
+                    {r.estado === "ELIMINADO" ? (
                       <span className="inline-block text-xs rounded-full px-2 py-0.5 bg-gray-200 text-gray-800">
                         Eliminado
                       </span>
+                    ) : r.estado === "FINALIZADO" ? (
+                      <span className="inline-block text-xs rounded-full px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200">
+                        Finalizado
+                      </span>
                     ) : (
-                      "—"
+                      <span className="inline-block text-xs rounded-full px-2 py-0.5 bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
+                        Pendiente
+                      </span>
                     )}
                   </td>
                   <td className="p-2 pr-3 text-right">

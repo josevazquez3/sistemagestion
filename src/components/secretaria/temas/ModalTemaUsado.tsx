@@ -10,14 +10,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatearFechaUTC } from "@/lib/utils/fecha";
 import { Loader2, RefreshCw } from "lucide-react";
-type ApiTema = {
+
+type ApiTemaHistorial = {
   id: number;
   numero: number;
-  fecha: string;
   tema: string;
-  estado: "PENDIENTE" | "FINALIZADO";
+  fecha: string;
+  estado: "PENDIENTE" | "FINALIZADO" | "ELIMINADO";
 };
 
 function truncarTema(s: string, max: number) {
@@ -36,20 +36,20 @@ type Props = {
 
 export function ModalTemaUsado({ open, onOpenChange, onBatchDone, reload }: Props) {
   const [cargandoLista, setCargandoLista] = useState(false);
-  const [temas, setTemas] = useState<ApiTema[]>([]);
+  const [temas, setTemas] = useState<ApiTemaHistorial[]>([]);
   const [marcados, setMarcados] = useState<Set<number>>(new Set());
   const [activando, setActivando] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargandoLista(true);
     try {
-      const res = await fetch("/api/secretaria/temas");
+      const res = await fetch("/api/secretaria/temas/historial");
       const data = await res.json().catch(() => []);
       if (!res.ok) {
         setTemas([]);
         return;
       }
-      setTemas(Array.isArray(data) ? (data as ApiTema[]) : []);
+      setTemas(Array.isArray(data) ? (data as ApiTemaHistorial[]) : []);
     } catch {
       setTemas([]);
     } finally {
@@ -145,9 +145,15 @@ export function ModalTemaUsado({ open, onOpenChange, onBatchDone, reload }: Prop
             <p className="text-sm text-muted-foreground text-center py-8">No hay temas.</p>
           ) : (
             ordenados.map((t) => {
-              const fechaTxt = formatearFechaUTC(new Date(t.fecha));
               const preview = truncarTema(t.tema, 60);
-              const fin = t.estado === "FINALIZADO";
+              const estadoCls =
+                t.estado === "ELIMINADO"
+                  ? "text-xs rounded-full px-2 py-0.5 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                  : t.estado === "FINALIZADO"
+                    ? "text-xs rounded-full px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
+                    : "text-xs rounded-full px-2 py-0.5 bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100";
+              const estadoTxt =
+                t.estado === "ELIMINADO" ? "Eliminado" : t.estado === "FINALIZADO" ? "FINALIZADO" : "PENDIENTE";
               return (
                 <label
                   key={t.id}
@@ -160,18 +166,10 @@ export function ModalTemaUsado({ open, onOpenChange, onBatchDone, reload }: Prop
                   />
                   <span className="text-sm flex-1 leading-snug">
                     <span className="font-medium">#{t.numero}</span>
-                    <span className="text-muted-foreground"> — {fechaTxt} — </span>
+                    <span className="text-muted-foreground"> — {t.fecha} — </span>
                     <span className="break-words">&quot;{preview}&quot;</span>
                     <span className="ml-2 inline-block align-middle">
-                      <span
-                        className={
-                          fin
-                            ? "text-xs rounded-full px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
-                            : "text-xs rounded-full px-2 py-0.5 bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
-                        }
-                      >
-                        {fin ? "FINALIZADO" : "PENDIENTE"}
-                      </span>
+                      <span className={estadoCls}>{estadoTxt}</span>
                     </span>
                   </span>
                 </label>
